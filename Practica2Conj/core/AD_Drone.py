@@ -1,6 +1,7 @@
 import socket
 import json
 import random
+import time
 
 class ADDrone:
     def __init__(self, engine_address, registry_address):
@@ -35,21 +36,30 @@ class ADDrone:
         engine_socket.connect(self.engine_address)
 
         while True:
-            # Simular movimiento del dron
-            next_x = random.randint(1, 20)
-            next_y = random.randint(1, 20)
-            movement_data = {
-                'ID': self.dron_id,
-                'AccessToken': self.access_token,
-                'X': next_x,
-                'Y': next_y
-            }
-            engine_socket.send(json.dumps(movement_data).encode())
-            map_state = engine_socket.recv(1024).decode()
-            print(f"Mapa actualizado: {map_state}")
+            try:
+                next_x = random.randint(1, 20)
+                next_y = random.randint(1, 20)
+                movement_data = {
+                    'ID': self.dron_id,
+                    'AccessToken': self.access_token,
+                    'X': next_x,
+                    'Y': next_y
+                }
+                engine_socket.send(json.dumps(movement_data).encode())
+                map_state = engine_socket.recv(1024).decode()
+                print(f"Mapa actualizado: {map_state}")
 
-            # Simular intervalos de tiempo entre movimientos
-            time.sleep(1)
+                time.sleep(1)
+            except ConnectionResetError as e:
+                print(f"Error de conexión con el servidor AD_Engine: {e}")
+                # Puedes manejar el error aquí, por ejemplo, intentar reconectar o finalizar el programa.
+                break  # Salir del bucle si se produce un error de conexión
+            except BrokenPipeError as e:
+                print(f"Se cerró inesperadamente la conexión con el servidor AD_Engine: {e}")
+                # Puedes manejar el error aquí, por ejemplo, intentar reconectar o finalizar el programa.
+                break  # Salir del bucle si se produce un error de conexión
+            except Exception as e:
+                print(f"Error inesperado: {e}")
 
 if __name__ == "__main__":
     # Configuración de argumentos desde la línea de comandos (ejemplo)
