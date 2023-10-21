@@ -2,6 +2,7 @@ import socket
 import json
 import random
 import time
+from kafka import KafkaConsumer, KafkaProducer
 
 class ADEngine:
     def __init__(self, listen_port, max_drones, broker_address, weather_address, database_address=None):
@@ -11,6 +12,9 @@ class ADEngine:
         self.broker_address = broker_address
         self.weather_address = weather_address
         self.database_address = database_address  # Puede ser None si no se utiliza una base de datos
+
+        # Configurar un productor de Kafka para enviar mensajes a los drones
+        self.kafka_producer = KafkaProducer(bootstrap_servers=self.broker_address)
 
         # Inicializar el mapa 2D (matriz de bytes) para representar el espacio aéreo
         self.map_size = 20  # Tamaño del mapa (20x20)
@@ -34,10 +38,22 @@ class ADEngine:
             # Consultar el servidor de clima para obtener información climática
             # Aplicar medidas necesarias en función del clima y las posiciones de los drones
 
+            # Crear un consumidor de Kafka para recibir mensajes de un dron específico
+            consumer = KafkaConsumer(f'dron_{addr[1]}', bootstrap_servers=self.broker_address, auto_offset_reset='latest')
+
+            for message in consumer:
+            # Procesar el mensaje recibido de un dron y actualizar el mapa o realizar otras acciones
             # Enviar el estado actual del mapa a cada dron
-            self.send_map_state(client_socket)
+                self.send_map_state(client_socket)
 
             client_socket.close()
+    def send_message_to_dron(self, dron_id, message):
+        
+        # Construir el mensaje
+        message = f"Dron con ID {dron_id} ya puede despegar"
+        topic = f'dron_{dron_id}'
+        # Enviar un mensaje a un dron específico
+        self.kafka_producer.send(topic, value=message)
 
     def send_map_state(self, client_socket):
         # Enviar el estado actual del mapa a un dron
