@@ -49,7 +49,9 @@ class ADDrone:
         # Solicitar al motor (AD_Engine) el estado actual del mapa y actualizar la posición del dron
         engine_socket.send(json.dumps({'ID': self.dron_id, 'AccessToken': self.access_token}).encode())
         map_state = engine_socket.recv(1024).decode()
-        print(f"Mapa actualizado: {map_state}")
+        print("Mapa actualizado:")
+        print(map_state)
+
     
     def run(self, engine_socket):
         while True:
@@ -73,40 +75,38 @@ class ADDrone:
                 time.sleep(1)
                 
     def show_menu(self, engine_socket):
-        while True:
-            print("\nDron Menu:")
-            print("1. Registrar dron")
-            print("2. Iniciar vuelo")
-            print("3. Mostrar mapa")
-            print("4. Salir")
-            
-            choice = input("Seleccione una opción: ")
-            
-            if choice == "1":
-                if self.state == "IDLE":
-                    self.register_drone()
-                else:
-                    print("El dron ya está registrado.")
-            elif choice == "2":
-                if self.state == "IDLE":
-                    self.state = "RUN"
-                    print("El dron ha iniciado el vuelo.")
-                    self.run(engine_socket)
-                else:
-                    print("El dron ya está en vuelo.")
-            elif choice == "3":
-                self.show_map(engine_socket)
-            elif choice == "4":
-                return
+        print("\nDron Menu:")
+        print("1. Registrar dron")
+        print("2. Iniciar vuelo")
+        print("3. Mostrar mapa")
+        print("4. Salir")
+
+        choice = input("Seleccione una opción: ")
+
+        if choice == "1":
+            if self.state == "IDLE":
+                self.register_drone()
             else:
-                print("Opción no válida. Seleccione una opción válida.")
+                print("El dron ya está registrado.")
+        elif choice == "2":
+            if self.state == "IDLE":
+                self.state = "RUN"
+                print("El dron ha iniciado el vuelo.")
+                self.run(engine_socket)
+            else:
+                print("El dron ya está en vuelo.")
+        elif choice == "3":
+            self.show_map(engine_socket)
+        elif choice == "4":
+            return
+        else:
+            print("Opción no válida. Seleccione una opción válida.")
+
 
 if __name__ == "__main":
     # Configuración de argumentos desde la línea de comandos (ejemplo)
     engine_address = ("127.0.0.1", 8080)  # Dirección del motor (AD_Engine)
     registry_address = ("127.0.0.1", 8081)  # Dirección del registro (AD_Registry)
-    dron_id = random.randint(1, 99)  # ID del dron (generado aleatoriamente)
-
+    
     dron = ADDrone(engine_address, registry_address)
-    dron.dron_id = dron_id
     dron.show_menu()

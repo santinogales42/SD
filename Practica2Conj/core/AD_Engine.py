@@ -14,7 +14,9 @@ class ADEngine:
         self.database_address = database_address  # Puede ser None si no se utiliza una base de datos
 
         # Configurar un productor de Kafka para enviar mensajes a los drones
-        self.kafka_producer = KafkaProducer(bootstrap_servers=self.broker_address)
+        self.broker_address = "localhost:9092"  # Asegúrate de que esto sea la dirección y puerto correctos de tu servidor Kafka
+
+        #self.kafka_producer = KafkaProducer(bootstrap_servers=self.broker_address)
 
         # Inicializar el mapa 2D (matriz de bytes) para representar el espacio aéreo
         self.map_size = 20  # Tamaño del mapa (20x20)
