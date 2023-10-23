@@ -128,5 +128,5 @@ if __name__ == "__main":
     engine_socket=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     engine_socket.connect(engine_address)
     
-    #dron = ADDrone(engine_address, registry_address)
+    dron = ADDrone(engine_address, registry_address)
     dron.show_menu(engine_socket)
