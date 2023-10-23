@@ -1,6 +1,7 @@
 import socket
 import json
 import random
+import time
 
 class ADDrone:
     def __init__(self, engine_address, registry_address):
@@ -30,33 +31,38 @@ class ADDrone:
             print(f"Error en el registro: {response_json['message']}")
 
     def join_show(self):
-        # Conectar al motor (AD_Engine) usando el token de acceso
-        engine_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        engine_socket.connect(self.engine_address)
-
         while True:
-            # Simular movimiento del dron
-            next_x = random.randint(1, 20)
-            next_y = random.randint(1, 20)
-            movement_data = {
-                'ID': self.dron_id,
-                'AccessToken': self.access_token,
-                'X': next_x,
-                'Y': next_y
-            }
-            engine_socket.send(json.dumps(movement_data).encode())
-            map_state = engine_socket.recv(1024).decode()
-            print(f"Mapa actualizado: {map_state}")
+            try:
+                engine_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                engine_socket.connect(self.engine_address)
+                
+                while True:
+                    next_x = random.randint(1, 20)
+                    next_y = random.randint(1, 20)
+                    movement_data = {
+                        'ID': self.dron_id,
+                        'AccessToken': self.access_token,
+                        'X': next_x,
+                        'Y': next_y
+                    }
+                    engine_socket.send(json.dumps(movement_data).encode())
+                    map_state = engine_socket.recv(1024).decode()
+                    print(f"Mapa actualizado: {map_state}")
+                    
+                    time.sleep(1)
+                    
+            except (socket.error, ConnectionResetError) as e:
+                print(f"Error de conexión: {e}")
+                print("Reconectando...")
+                time.sleep(5)  # Esperar antes de intentar reconectar
+                
 
-            # Simular intervalos de tiempo entre movimientos
-            time.sleep(1)
 
-if __name__ == "__main__":
-    # Configuración de argumentos desde la línea de comandos (ejemplo)
-    engine_address = ("127.0.0.1", 8080)  # Dirección del motor (AD_Engine)
-    registry_address = ("127.0.0.1", 8081)  # Dirección del registro (AD_Registry)
-    dron_id = random.randint(1, 99)  # ID del dron (generado aleatoriamente)
-
+if __name__ == "__main":
+    engine_address = ("127.0.0.1", 8080)
+    registry_address = ("127.0.0.1", 8081)
+    dron_id = random.randint(1, 99)
+    
     dron = ADDrone(engine_address, registry_address)
     dron.dron_id = dron_id
     dron.register_drone()

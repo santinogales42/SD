@@ -2,7 +2,6 @@ import socket
 import json
 import random
 import time
-from pymongo import MongoClient
 
 class ADDrone:
     def __init__(self, engine_address, registry_address):
@@ -34,19 +33,6 @@ class ADDrone:
             self.access_token = response_json['token']
             print(f"Registro exitoso. Token de acceso: {self.access_token}")
             self.state = "IDLE"  # Cambiar el estado a "IDLE" después del registro
-            
-            #Conexion con MongoDB
-            client = MongoClient('localhost', 27017)
-            db = client['dronedb']
-            
-            drone_data = {
-                'ID': self.dron_id,
-                'Alias': f'Dron_{self.dron_id}',
-                'AccessToken' : self.access_token
-            }
-            db.drones.insert_one(drone_data)
-            print(f"Dron {self.dron_id} registrado en la base de datos")
-            
         else:
             print(f"Error en el registro: {response_json['message']}")
 
@@ -83,7 +69,8 @@ class ADDrone:
                 if movement_data:
                     engine_socket.send(json.dumps(movement_data).encode())
                     map_state = engine_socket.recv(1024).decode()
-                    print(f"Mapa actualizado: {map_state}")
+                    print(f"Mapa actualizado: ") 
+                    print({map_state})
                     self.x, self.y = next_x, next_y
                 else:
                     print("El dron no se está moviendo.")
@@ -93,7 +80,7 @@ class ADDrone:
     def show_menu(self, engine_socket):
         print("\nDron Menu:")
         print("1. Registrar dron")
-        print("2. Iniciar vuelo")
+        print("2. Unirse al espectaculo")
         print("3. Mostrar mapa")
         print("4. Salir")
         
@@ -129,4 +116,4 @@ if __name__ == "__main":
     engine_socket.connect(engine_address)
     
     dron = ADDrone(engine_address, registry_address)
-    dron.show_menu(engine_socket)
+    dron.register_drone(engine_socket)

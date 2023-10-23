@@ -67,7 +67,7 @@ if __name__ == "__main__":
     # Punto de entrada principal para ejecutar AD_Engine como un script independiente
     # Configuración de argumentos desde la línea de comandos (ejemplo)
     listen_port = 8080
-    max_drones = 10
+    max_drones = float('inf')
     broker_address = ("127.0.0.1", 9092)
     weather_address = ("127.0.0.1", 8081)
     database_address = None  # Puede proporcionarse si se utiliza una base de datos

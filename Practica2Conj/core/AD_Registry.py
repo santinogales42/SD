@@ -10,6 +10,12 @@ class ADRegistry:
         self.db_name = db_name
         self.client = MongoClient(self.db_host, self.db_port)
         self.db = self.client[self.db_name]
+        
+        self.db_address = db_address
+        
+        client = MongoClient(db_address)
+        self.db = client['dronedb']  # 'dronedb' es el nombre de la base de datos
+
 
     def start(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
