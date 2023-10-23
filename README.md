@@ -20,7 +20,7 @@ Para ejecutar la práctica que mencionaste, que involucra componentes como AD_Re
 
         shell
 
-    python AD_Registry.py 8081 localhost 27017 dronedb
+    python AD_Registry.py 8081 localhost:27017
 
 Iniciar AD_Engine:
 
@@ -30,7 +30,7 @@ Iniciar AD_Engine:
 
     shell
 
-    python AD_Engine.py 8080 localhost 9092
+    python AD_Engine.py 8080 10 localhost:9092 localhost:8081 localhost:27017
 
 Iniciar AD_Drone:
 
@@ -40,7 +40,7 @@ Iniciar AD_Drone:
 
     shell
 
-    python AD_Drone.py localhost 8080 localhost 8081
+    python AD_Drone.py localhost:8080 localhost:9092 localhost:8081
 
 Interactuar con los drones: Ejecuta tantas instancias de AD_Drone como desees en diferentes terminales. Cada instancia debería permitirte unirte al espectáculo y mover el dron.
 
