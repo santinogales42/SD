@@ -2,6 +2,7 @@ import socket
 import json
 import random
 import time
+from pymongo import MongoClient
 
 class ADDrone:
     def __init__(self, engine_address, registry_address):
@@ -12,14 +13,17 @@ class ADDrone:
         self.state = "IDLE"  # El estado se inicia como "IDLE" (en espera)
         self.x, self.y = 1, 1  # Iniciar en la coordenada (1, 1)
         
-    def register_drone(self, dron_id, alias):
+    def register_drone(self):
+        if self.dron_id is None:
+            self.dron_id=input("Introduzca el ID (0-99): ")
+            
         # Conectar al módulo de registro (AD_Registry) para registrar el dron
         registry_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         registry_socket.connect(self.registry_address)
 
         dron_data = {
-            'ID': dron_id,
-            'Alias': alias
+            'ID': self.dron_id,
+            'Alias': f'Dron_{self.dron_id}'
         }
         registry_socket.send(json.dumps(dron_data).encode())
         response = registry_socket.recv(1024).decode()
@@ -27,10 +31,22 @@ class ADDrone:
 
         response_json = json.loads(response)
         if response_json['status'] == 'success':
-            self.dron_id = dron_id
             self.access_token = response_json['token']
             print(f"Registro exitoso. Token de acceso: {self.access_token}")
             self.state = "IDLE"  # Cambiar el estado a "IDLE" después del registro
+            
+            #Conexion con MongoDB
+            client = MongoClient('localhost', 27017)
+            db = client['dronedb']
+            
+            drone_data = {
+                'ID': self.dron_id,
+                'Alias': f'Dron_{self.dron_id}',
+                'AccessToken' : self.access_token
+            }
+            db.drones.insert_one(drone_data)
+            print(f"Dron {self.dron_id} registrado en la base de datos")
+            
         else:
             print(f"Error en el registro: {response_json['message']}")
 
@@ -80,9 +96,9 @@ class ADDrone:
         print("2. Iniciar vuelo")
         print("3. Mostrar mapa")
         print("4. Salir")
-
+        
         choice = input("Seleccione una opción: ")
-
+        
         if choice == "1":
             if self.state == "IDLE":
                 self.register_drone()
@@ -108,5 +124,9 @@ if __name__ == "__main":
     engine_address = ("127.0.0.1", 8080)  # Dirección del motor (AD_Engine)
     registry_address = ("127.0.0.1", 8081)  # Dirección del registro (AD_Registry)
     
-    dron = ADDrone(engine_address, registry_address)
-    dron.show_menu()
+    #Crea un socket que se utilizara para comunicarse con el AD_Engine
+    engine_socket=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    engine_socket.connect(engine_address)
+    
+    #dron = ADDrone(engine_address, registry_address)
+    dron.show_menu(engine_socket)

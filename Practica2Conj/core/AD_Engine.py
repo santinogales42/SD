@@ -15,7 +15,7 @@ class ADEngine:
 
         # Configurar un productor de Kafka para enviar mensajes a los drones
         self.broker_address = "localhost:9092"  # Asegúrate de que esto sea la dirección y puerto correctos de tu servidor Kafka
-
+        #Esto es para conectarlo con Mongo y el de arriba con Kafka
         #self.kafka_producer = KafkaProducer(bootstrap_servers=self.broker_address)
 
         # Inicializar el mapa 2D (matriz de bytes) para representar el espacio aéreo
@@ -49,6 +49,7 @@ class ADEngine:
                 self.send_map_state(client_socket)
 
             client_socket.close()
+            
     def send_message_to_dron(self, dron_id, message):
         
         # Construir el mensaje
