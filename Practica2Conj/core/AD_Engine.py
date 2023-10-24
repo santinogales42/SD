@@ -11,7 +11,8 @@ class ADEngine:
         self.max_drones = max_drones
         self.broker_address = broker_address
         self.weather_address = weather_address
-        self.database_address = database_address  # Puede ser None si no se utiliza una base de datos
+        self.database_address = database_address  
+        # Puede ser None si no se utiliza una base de datos
 
         # Configurar un productor de Kafka para enviar mensajes a los drones
         self.broker_address = "localhost:9092"  # Asegúrate de que esto sea la dirección y puerto correctos de tu servidor Kafka
@@ -62,6 +63,10 @@ class ADEngine:
         # Enviar el estado actual del mapa a un dron
         map_state = json.dumps(self.map)  # Convertir el mapa a formato JSON
         client_socket.send(map_state.encode())
+        
+        #En el caso de que lo queramos en una cadena de texto simple
+        #map_state_str = "\n".join([" ".join(row) for row in self.map_state])
+        #client_socket.send(map_state_str.encode())
 
 if __name__ == "__main__":
     # Punto de entrada principal para ejecutar AD_Engine como un script independiente
