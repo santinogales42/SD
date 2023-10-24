@@ -3,6 +3,7 @@ import json
 import random
 import time
 
+
 class ADDrone:
     def __init__(self, engine_address, registry_address):
         self.engine_address = engine_address
