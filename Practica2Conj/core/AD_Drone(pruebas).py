@@ -1,6 +1,7 @@
 import socket
 import json
 import time
+from kafka import KafkaConsumer, KafkaProducer
 
 
 class ADDrone:

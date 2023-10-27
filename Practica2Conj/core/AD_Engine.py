@@ -15,7 +15,7 @@ class ADEngine:
         # Puede ser None si no se utiliza una base de datos
 
         # Configurar un productor de Kafka para enviar mensajes a los drones
-        self.broker_address = "127.0.0.1:9092"
+        self.broker_address = "127.0.0.1:29092"
 
         #self.broker_address = "localhost:9092"  # Asegúrate de que esto sea la dirección y puerto correctos de tu servidor Kafka
         #Esto es para conectarlo con Mongo y el de arriba con Kafka
@@ -46,12 +46,12 @@ class ADEngine:
             # Crear un consumidor de Kafka para recibir mensajes de un dron específico
             consumer = KafkaConsumer(f'dron_{addr[1]}', bootstrap_servers=self.broker_address, auto_offset_reset='latest')
 
-            for message in consumer:
+            #for message in consumer:
             # Procesar el mensaje recibido de un dron y actualizar el mapa o realizar otras acciones
             # Enviar el estado actual del mapa a cada dron
-                self.send_map_state(client_socket)
+                #self.send_map_state(client_socket)
 
-            client_socket.close()
+            #client_socket.close()
             
     def send_message_to_dron(self, dron_id, message):
         
@@ -75,7 +75,7 @@ if __name__ == "__main__":
     # Configuración de argumentos desde la línea de comandos (ejemplo)
     listen_port = 8080
     max_drones = float('inf')
-    broker_address = ("127.0.0.1", 9092)
+    broker_address = ("127.0.0.1", 29092)
     weather_address = ("127.0.0.1", 8081)
     database_address = None  # Puede proporcionarse si se utiliza una base de datos
 
