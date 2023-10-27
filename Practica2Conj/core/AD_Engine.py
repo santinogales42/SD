@@ -15,7 +15,9 @@ class ADEngine:
         # Puede ser None si no se utiliza una base de datos
 
         # Configurar un productor de Kafka para enviar mensajes a los drones
-        self.broker_address = "localhost:9092"  # Asegúrate de que esto sea la dirección y puerto correctos de tu servidor Kafka
+        self.broker_address = "127.0.0.1:9092"
+
+        #self.broker_address = "localhost:9092"  # Asegúrate de que esto sea la dirección y puerto correctos de tu servidor Kafka
         #Esto es para conectarlo con Mongo y el de arriba con Kafka
         #self.kafka_producer = KafkaProducer(bootstrap_servers=self.broker_address)
 
