@@ -2,6 +2,7 @@ import socket
 import json
 import time
 from kafka import KafkaConsumer, KafkaProducer
+import pymongo
 
 
 class ADDrone:
@@ -41,42 +42,78 @@ class ADDrone:
             print(f"Error en el registro: {response_json['message']}")
 
     def join_show(self):
+        engine_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        engine_socket.connect(self.engine_address)
+
         while True:
-            try:
-                engine_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                engine_socket.connect(self.engine_address)
+            # Recibir instrucciones del motor (AD_Engine)
+            instruction = engine_socket.recv(1024).decode()
+            if instruction == "EXIT":
+                print("Saliendo del programa.")
+                break
+            elif instruction == "SHOW_MAP":
+                self.show_map(engine_socket)
+            else:
+                print(f"Instrucción desconocida: {instruction}")
 
-                while True:
-                    next_x = int(input("Introduce la coordenada X de destino (1-20): "))
-                    next_y = int(input("Introduce la coordenada Y de destino (1-20): "))
+    def show_map(self, engine_socket):
+        engine_socket.send(json.dumps({'ID': self.dron_id, 'AccessToken': self.access_token}).encode())
+        map_state = engine_socket.recv(1024).decode()
+        print("Mapa actualizado:")
+        print(map_state)
 
-                    if 1 <= next_x <= 20 and 1 <= next_y <= 20:
-                        movement_data = {
-                            'ID': self.dron_id,
-                            'AccessToken': self.access_token,
-                            'X': next_x,
-                            'Y': next_y
-                        }
-                        engine_socket.send(json.dumps(movement_data).encode())
-                        map_state = engine_socket.recv(1024).decode()
-                        print(f"Mapa actualizado: {map_state}")
 
-                        time.sleep(1)
-                    else:
-                        print("Coordenadas inválidas. Deben estar entre 1 y 20.")
+    def list_drones(self):
+        # Conectar a la base de datos de MongoDB
+        mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
+        db = mongo_client["dronedb"]
+        drones_collection = db["drones"]
 
-            except (socket.error, ConnectionResetError) as e:
-                print(f"Error de conexión: {e}")
-                print("Reconectando...")
-                time.sleep(5)  # Esperar antes de intentar reconectar
+        # Recuperar todos los drones desde la base de datos
+        drones = drones_collection.find()
 
+        # Imprimir la información de los drones
+        for drone in drones:
+            print(f"ID: {drone['ID']}")
+            print(f'Alias: {drone["Alias"]}')
+            print()  # Línea en blanco para separar los drones
+        # Cerrar la conexión con la base de datos
+        mongo_client.close()
+            
+            
+            
+    def show_menu(self):
+        while True:
+            print("\nDron Menu:")
+            print("1. Registrar dron")
+            print("2. Unirse al espectáculo")
+            print("3. Listar todos los drones")
+            print("4. Salir")
+            
+            choice = input("Seleccione una opción: ")
+
+            if choice == "1":
+                if not self.dron_id:
+                    self.input_drone_data()
+                if not self.access_token:
+                    self.register_drone()
+            elif choice == "2":
+                if self.access_token:
+                    self.join_show()
+                else:
+                    print("Debe registrar el dron primero.")
+            elif choice == "3":
+                self.list_drones()
+            elif choice == "4":
+                break
+            else:
+                print("Opción no válida. Seleccione una opción válida.")
+                
+                
 
 if __name__ == "__main__":
     engine_address = ("127.0.0.1", 8080)
     registry_address = ("127.0.0.1", 8081)
 
     dron = ADDrone(engine_address, registry_address)
-    while not dron.input_drone_data():
-        pass  # Repetir hasta que se ingrese un ID de dron válido
-    dron.register_drone()
-    dron.join_show()
+    dron.show_menu()
