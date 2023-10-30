@@ -11,15 +11,36 @@ class ADDrone:
         self.registry_address = registry_address
         self.dron_id = None
         self.access_token = None
+        self.status = "IDLE"
+        self.registered_drones = {}
 
     def input_drone_data(self):
-        # Método para ingresar los datos del dron desde el usuario
-        self.dron_id = int(input("Introduce el ID del dron (número entre 1 y 99): "))
-        if 1 <= self.dron_id <= 99:
-            return True
-        else:
-            print("ID de dron inválido. Debe estar entre 1 y 99.")
-            return False
+        while True:
+            dron_id = int(input("Introduce el ID del dron (número entre 1 y 99): "))
+            alias = input("Introduce el alias del dron: ")
+
+            if 1 <= dron_id <= 99:
+                # Conectar a la base de datos de MongoDB y verificar si el ID ya existe
+                mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
+                db = mongo_client["dronedb"]
+                drones_collection = db["drones"]
+
+                existing_dron = drones_collection.find_one({"ID": dron_id})
+
+                if existing_dron:
+                    print("ID de dron ya existe. Introduce un ID diferente.")
+                else:
+                    # ID válido y no duplicado, se puede continuar
+                    self.dron_id = dron_id
+                    self.alias = alias
+                    break
+            else:
+                print("ID de dron inválido. Debe estar entre 1 y 99.")
+
+        # Cerrar la conexión con la base de datos
+        mongo_client.close()
+
+        return True
 
     def register_drone(self):
         # Conectar al módulo de registro (AD_Registry) para registrar el dron
@@ -28,7 +49,7 @@ class ADDrone:
 
         dron_data = {
             'ID': self.dron_id,
-            'Alias': f'Dron_{self.dron_id}'
+            'Alias': self.alias
         }
         registry_socket.send(json.dumps(dron_data).encode())
         response = registry_socket.recv(1024).decode()
@@ -40,8 +61,24 @@ class ADDrone:
             print(f"Registro exitoso. Token de acceso: {self.access_token}")
         else:
             print(f"Error en el registro: {response_json['message']}")
+            
+
+    def authenticate(self):
+        if self.dron_id in self.registered_drones:
+            # Si el ID del dron está registrado, verificar el token
+            stored_token = self.registered_drones[self.dron_id]
+            if stored_token == self.access_token:
+                return True
+        return False
+    
 
     def join_show(self):
+        if not self.authenticate():
+            print("Autenticación fallida. El dron no puede unirse al espectáculo.")
+            return
+
+        print(f"Autenticación correcta. El dron con ID: {self.dron_id} se va a unir al espectáculo.")
+
         engine_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         engine_socket.connect(self.engine_address)
 
@@ -84,28 +121,27 @@ class ADDrone:
     
     
     def delete_drones(self):
+        if not self.dron_id:
+            print("Dron no registrado.")
+            return
         # Conectar a la base de datos de MongoDB
         mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
         db = mongo_client["dronedb"]
         drones_collection = db["drones"]
-        
-        self.dron_id=int(input("Introduce el ID del dron: "))
-        
-        # Recuperar todos los drones desde la base de datos
-        drones = drones_collection.find_one({"ID": self.dron_id})
-        
-        if not self.dron_id:
-            print("Dron no registrado.")
-            return
-        else:
-            result= drones_collection.delete_one({"ID": self.dron_id})
-            
-            if result.deleted_count==1:
-                print(f"Dron con ID {self.dron_id} eliminado. ")
+
+        # Recuperar el dron desde la base de datos
+        drone = drones_collection.find_one({"ID": self.dron_id})
+
+        if drone:
+            result = drones_collection.delete_one({"ID": self.dron_id})
+            if result.deleted_count == 1:
+                print(f"Dron con ID {self.dron_id} eliminado.")
                 self.dron_id = None
                 self.access_token = None
             else:
-                print(f"No se encontro el dron.")
+                print(f"No se encontró el dron.")
+        else:
+            print(f"No se encontró el dron con ID {self.dron_id} en la base de datos.")
 
 
     def list_drones(self):
