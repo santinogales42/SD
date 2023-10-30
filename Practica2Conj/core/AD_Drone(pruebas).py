@@ -61,6 +61,51 @@ class ADDrone:
         map_state = engine_socket.recv(1024).decode()
         print("Mapa actualizado:")
         print(map_state)
+        
+        
+    def modify_drones(self):
+        # Conectar a la base de datos de MongoDB
+        mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
+        db = mongo_client["dronedb"]
+        drones_collection = db["drones"]
+        
+        self.dron_id=int(input("Introduce el ID del dron: "))
+        
+        # Recuperar todos los drones desde la base de datos
+        drones = drones_collection.find_one({"ID": self.dron_id})
+        if drones:
+            new_alias =input("Introduce el nuevo alias: ")
+            drones_collection.update_one({"ID": self.dron_id}, {"$set": {"Alias": new_alias}})
+            print(f"Dron con ID {self.dron_id} actualizado con el nuevo alias: {new_alias}")
+        else:
+            print(f"No se encontro el dron con id {self.dron_id}")
+        
+        mongo_client.close()
+    
+    
+    def delete_drones(self):
+        # Conectar a la base de datos de MongoDB
+        mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
+        db = mongo_client["dronedb"]
+        drones_collection = db["drones"]
+        
+        self.dron_id=int(input("Introduce el ID del dron: "))
+        
+        # Recuperar todos los drones desde la base de datos
+        drones = drones_collection.find_one({"ID": self.dron_id})
+        
+        if not self.dron_id:
+            print("Dron no registrado.")
+            return
+        else:
+            result= drones_collection.delete_one({"ID": self.dron_id})
+            
+            if result.deleted_count==1:
+                print(f"Dron con ID {self.dron_id} eliminado. ")
+                self.dron_id = None
+                self.access_token = None
+            else:
+                print(f"No se encontro el dron.")
 
 
     def list_drones(self):
@@ -88,7 +133,9 @@ class ADDrone:
             print("1. Registrar dron")
             print("2. Unirse al espectáculo")
             print("3. Listar todos los drones")
-            print("4. Salir")
+            print("4. Modificar drones")
+            print("5. Eliminar drones")
+            print("6. Salir")
             
             choice = input("Seleccione una opción: ")
 
@@ -104,7 +151,11 @@ class ADDrone:
                     print("Debe registrar el dron primero.")
             elif choice == "3":
                 self.list_drones()
-            elif choice == "4":
+            elif choice =="4":
+                self.modify_drones()
+            elif choice =="5":
+                self.delete_drones()
+            elif choice == "6":
                 break
             else:
                 print("Opción no válida. Seleccione una opción válida.")

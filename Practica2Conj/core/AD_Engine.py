@@ -24,6 +24,7 @@ class ADEngine:
         # Inicializar el mapa 2D (matriz de bytes) para representar el espacio aéreo
         self.map_size = 20  # Tamaño del mapa (20x20)
         self.map = [[0 for _ in range(self.map_size)] for _ in range(self.map_size)]
+        
 
     def start(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -52,13 +53,14 @@ class ADEngine:
                 self.send_map_state(client_socket)
 
             client_socket.close()
+            
 
     def send_map_state(self, client_socket):
         map_state = json.dumps(self.map)  # Convertir el mapa a formato JSON
         client_socket.send(map_state.encode())
+        
             
     def send_message_to_dron(self, dron_id, message):
-        
         # Construir el mensaje
         message = f"Dron con ID {dron_id} ya puede despegar"
         topic = f'dron_{dron_id}'
