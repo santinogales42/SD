@@ -13,6 +13,7 @@ class ADDrone:
         self.access_token = None
         self.status = "IDLE"
         self.registered_drones = {}
+        self.current_position = (1,1)
 
     def input_drone_data(self):
         while True:
@@ -58,6 +59,8 @@ class ADDrone:
         response_json = json.loads(response)
         if response_json['status'] == 'success':
             self.access_token = response_json['token']
+            #Molines fijate AQUI
+            self.registered_drones[self.dron_id] = self.access_token
             print(f"Registro exitoso. Token de acceso: {self.access_token}")
         else:
             print(f"Error en el registro: {response_json['message']}")
@@ -71,6 +74,27 @@ class ADDrone:
                 return True
         return False
     
+    
+    def consume_kafka_messages(self):
+        consumer = KafkaConsumer(
+            'dron_' + str(self.dron_id),  # El nombre del tópico debe coincidir con el que AD_Engine utiliza para enviar instrucciones al dron.
+            bootstrap_servers='127.0.0.1:29092',  # La dirección y el puerto de tu servidor Kafka.
+            auto_offset_reset='latest',  # Puedes configurarlo según tus necesidades.
+            enable_auto_commit=True,  # Puedes configurarlo según tus necesidades.
+            group_id=None  # Puedes configurarlo según tus necesidades.
+        )
+
+        for message in consumer:
+            # Aquí procesa el mensaje recibido desde el motor (AD_Engine) y ejecuta las instrucciones necesarias.
+            instruction = message.value.decode()
+            if instruction.startswith("MOVE"):
+                move_data = json.loads(instruction[4:])
+                target_x, target_y = move_data["X"], move_data["Y"]
+                self.move_to_position(target_x, target_y)
+            elif instruction == "STOP":
+                # Realiza la acción correspondiente cuando se recibe la instrucción "STOP".
+                pass  # Puedes agregar tu lógica aquí.
+    
 
     def join_show(self):
         if not self.authenticate():
@@ -81,6 +105,9 @@ class ADDrone:
 
         engine_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         engine_socket.connect(self.engine_address)
+        
+        # Llamar a la función consume_kafka_messages para recibir instrucciones de movimiento
+        self.consume_kafka_messages()
 
         while True:
             # Recibir instrucciones del motor (AD_Engine)
@@ -90,14 +117,48 @@ class ADDrone:
                 break
             elif instruction == "SHOW_MAP":
                 self.show_map(engine_socket)
+            elif instruction.startswith("MOVE"):
+                move_data = json.loads(instruction[4:])
+                target_x, target_y = move_data["X"], move_data["Y"]
+                self.move_to_position(target_x, target_y)
             else:
                 print(f"Instrucción desconocida: {instruction}")
+
 
     def show_map(self, engine_socket):
         engine_socket.send(json.dumps({'ID': self.dron_id, 'AccessToken': self.access_token}).encode())
         map_state = engine_socket.recv(1024).decode()
         print("Mapa actualizado:")
         print(map_state)
+        
+        
+    def move_to_position(self, x, y):
+        if self.current_position == (x, y):
+            print("El dron ya está en la posición deseada.")
+            return
+
+        while self.current_position != (x, y):
+            next_x, next_y = self.calculate_next_position(x, y)
+            self.current_position = (next_x, next_y)
+            print(f"Dron {self.dron_id} se ha movido a la posición ({next_x}, {next_y}).")
+            time.sleep(1)  # Simular el movimiento de una celda a otra
+            
+
+    def calculate_next_position(self, target_x, target_y):
+        current_x, current_y = self.current_position
+
+        # Calcular la siguiente posición adyacente
+        if current_x < target_x:
+            current_x += 1
+        elif current_x > target_x:
+            current_x -= 1
+
+        if current_y < target_y:
+            current_y += 1
+        elif current_y > target_y:
+            current_y -= 1
+
+        return current_x, current_y
         
         
     def modify_drones(self):
