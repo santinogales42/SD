@@ -1,0 +1,8 @@
+
+AD_Registry.py: Registro de dron: ID=7, Alias=vfrg
+AD_Engine.py: Dron con ID 7 ya puede despegar
+AD_Engine.py: Dron con ID 7 se ha unido. Posición inicial: [1, 1], Posición final: 13,15
+AD_Engine.py: MOVE, X: 1, Y: 3
+AD_Registry.py: Registro de dron: ID=8, Alias=cdvfrt
+AD_Registry.py: Registro de dron: ID=9, Alias=cvf
+AD_Engine.py: Dron con ID 9 se ha unido. Posición inicial: [1, 1], Posición final: None

@@ -3,6 +3,7 @@ import json
 import time
 from kafka import KafkaConsumer, KafkaProducer
 import pymongo
+import os
 
 
 class ADDrone:
@@ -59,7 +60,6 @@ class ADDrone:
         response_json = json.loads(response)
         if response_json['status'] == 'success':
             self.access_token = response_json['token']
-            #Molines fijate AQUI
             self.registered_drones[self.dron_id] = self.access_token
             print(f"Registro exitoso. Token de acceso: {self.access_token}")
         else:
@@ -75,25 +75,31 @@ class ADDrone:
         return False
     
     
+    def process_instruction(self, instruction):
+        if instruction.startswith("MOVE"):
+            move_data = json.loads(instruction[4:])
+            target_x, target_y = move_data["X"], move_data["Y"]
+            self.move_to_position(target_x, target_y)
+        elif instruction == "STOP":
+            # Realiza la acción correspondiente cuando se recibe la instrucción "STOP".
+            pass  # Puedes agregar tu lógica aquí.
+        elif instruction == "EXIT":
+            # Realiza la acción correspondiente cuando se recibe la instrucción "EXIT".
+            pass  # Puedes agregar tu lógica aquí.
+    
+    
     def consume_kafka_messages(self):
         consumer = KafkaConsumer(
-            'dron_' + str(self.dron_id),  # El nombre del tópico debe coincidir con el que AD_Engine utiliza para enviar instrucciones al dron.
-            bootstrap_servers='127.0.0.1:29092',  # La dirección y el puerto de tu servidor Kafka.
-            auto_offset_reset='latest',  # Puedes configurarlo según tus necesidades.
-            enable_auto_commit=True,  # Puedes configurarlo según tus necesidades.
-            group_id=None  # Puedes configurarlo según tus necesidades.
+            'register_dron',  # Cambia según la configuración de tu servidor Kafka
+            bootstrap_servers='127.0.0.1:29092',  # Cambia según la configuración de tu servidor Kafka
+            auto_offset_reset='latest',  # Puedes configurarlo según tus necesidades
+            enable_auto_commit=True,  # Puedes configurarlo según tus necesidades
+            group_id=None  # Puedes configurarlo según tus necesidades
         )
 
         for message in consumer:
-            # Aquí procesa el mensaje recibido desde el motor (AD_Engine) y ejecuta las instrucciones necesarias.
             instruction = message.value.decode()
-            if instruction.startswith("MOVE"):
-                move_data = json.loads(instruction[4:])
-                target_x, target_y = move_data["X"], move_data["Y"]
-                self.move_to_position(target_x, target_y)
-            elif instruction == "STOP":
-                # Realiza la acción correspondiente cuando se recibe la instrucción "STOP".
-                pass  # Puedes agregar tu lógica aquí.
+            self.process_instruction(instruction)
     
 
     def join_show(self):
@@ -256,6 +262,18 @@ class ADDrone:
                 break
             else:
                 print("Opción no válida. Seleccione una opción válida.")
+                
+                
+    def log_to_file(self, message, log_file='drone_log.txt'):
+        # Obtener el nombre del archivo actual
+        current_file = os.path.basename(__file__)
+
+        # Formatear el mensaje con el nombre del archivo
+        log_message = f"AD_{current_file}: {message}\n"
+
+        # Registrar el mensaje en el archivo de registro
+        with open(log_file, 'a') as f:
+            f.write(log_message)
                 
                 
 
