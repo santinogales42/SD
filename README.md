@@ -1,7 +1,6 @@
 # SD
 Sistemas distribuidos
 
-Santi para que ejecutes en tu casa el programa:
 Para ejecutar la práctica que mencionaste, que involucra componentes como AD_Registry, AD_Engine, y AD_Drone, generalmente sigues estos pasos:
 
     Configurar el entorno: Asegúrate de que tengas todas las dependencias necesarias instaladas. Esto podría incluir Python, MongoDB, Kafka (u otra cola de mensajes, según la implementación), y otras bibliotecas específicas de Python utilizadas en el proyecto.
