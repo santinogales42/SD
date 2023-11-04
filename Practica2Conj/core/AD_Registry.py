@@ -1,16 +1,14 @@
 import socket
 import json
-import os
 from pymongo import MongoClient
 from kafka import KafkaProducer
 
 class ADRegistry:
-    def __init__(self, listen_port, db_host, db_port, db_name, log_file):
+    def __init__(self, listen_port, db_host, db_port, db_name):
         self.listen_port = listen_port
         self.db_host = db_host
         self.db_port = db_port
         self.db_name = db_name
-        self.log_file = log_file
 
         self.client = MongoClient(self.db_host, self.db_port)
         self.db= self.client[self.db_name]
@@ -72,21 +70,8 @@ class ADRegistry:
         # Enviar un mensaje a Kafka utilizando self.kafka_producer
         kafka_message = f"Registro de dron: ID={drone_id}, Alias={alias}"
         self.kafka_producer.send("register_dron", value=kafka_message.encode())
-        self.log_to_file(kafka_message)
 
         return access_token
-
-
-    def log_to_file(self, message, log_file='drone_log.txt'):
-        # Obtener el nombre del archivo actual
-        current_file = os.path.basename(__file__)
-
-        # Formatear el mensaje con el nombre del archivo
-        log_message = f"{current_file}: {message}\n"
-
-        # Registrar el mensaje en el archivo de registro
-        with open(log_file, 'a') as f:
-            f.write(log_message)
             
 
 if __name__ == "__main__":
@@ -95,7 +80,6 @@ if __name__ == "__main__":
     db_host = 'localhost'
     db_port = 27017
     db_name = 'dronedb'
-    log_file = 'drone_log.txt'  # Nombre del archivo de registro
 
-    registry = ADRegistry(listen_port, db_host, db_port, db_name, log_file)
+    registry = ADRegistry(listen_port, db_host, db_port, db_name)
     registry.start()
