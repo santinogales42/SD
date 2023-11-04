@@ -3,8 +3,6 @@ import json
 import time
 from kafka import KafkaConsumer, KafkaProducer
 import pymongo
-import os
-
 
 class ADDrone:
     def __init__(self, engine_address, registry_address):
@@ -15,6 +13,7 @@ class ADDrone:
         self.status = "IDLE"
         self.registered_drones = {}
         self.current_position = (1,1)
+        self.kafka_producer = KafkaProducer(bootstrap_servers='localhost:29092')
 
     def input_drone_data(self):
         while True:
@@ -76,18 +75,20 @@ class ADDrone:
     
     
     def process_instruction(self, instruction):
-        if instruction.startswith("MOVE"):
-            move_data = json.loads(instruction[4:])
-            target_x, target_y = move_data["X"], move_data["Y"]
-            self.move_to_position(target_x, target_y)
-        elif instruction == "STOP":
-            # Realiza la acción correspondiente cuando se recibe la instrucción "STOP".
-            pass  # Puedes agregar tu lógica aquí.
-        elif instruction == "EXIT":
-            # Realiza la acción correspondiente cuando se recibe la instrucción "EXIT".
-            pass  # Puedes agregar tu lógica aquí.
-    
-    
+        if "MOVE" in instruction:
+            parts = instruction.split(',')
+            x = int(parts[0].split('[')[1])
+            y = int(parts[1].split(']')[0])
+            dron_id = int(parts[2].split(' ')[-1])
+            
+            # Ahora puedes utilizar x, y y dron_id para lo que necesites
+            print(f"Received MOVE instruction - X: {x}, Y: {y}, ID: {dron_id}")
+        else:
+            print(f"Instrucción desconocida: {instruction}")
+
+
+
+
     def consume_kafka_messages(self):
         consumer = KafkaConsumer(
             'register_dron',  # Cambia según la configuración de tu servidor Kafka
@@ -99,7 +100,7 @@ class ADDrone:
 
         for message in consumer:
             instruction = message.value.decode()
-            self.process_instruction(instruction)
+            return instruction
     
 
     def join_show(self):
@@ -111,24 +112,35 @@ class ADDrone:
 
         engine_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         engine_socket.connect(self.engine_address)
-        
-        # Llamar a la función consume_kafka_messages para recibir instrucciones de movimiento
-        self.consume_kafka_messages()
 
         while True:
-            # Recibir instrucciones del motor (AD_Engine)
-            instruction = engine_socket.recv(1024).decode()
+            instruction = self.consume_kafka_messages()
+            print(f"Instrucción recibida: {instruction}")
+
             if instruction == "EXIT":
                 print("Saliendo del programa.")
                 break
             elif instruction == "SHOW_MAP":
                 self.show_map(engine_socket)
-            elif instruction.startswith("MOVE"):
-                move_data = json.loads(instruction[4:])
-                target_x, target_y = move_data["X"], move_data["Y"]
-                self.move_to_position(target_x, target_y)
+            elif "MOVE" in instruction:
+                try:
+                    # Split y analiza la cadena de instrucción
+                    parts = instruction.split(',')
+                    x = int(parts[0].split('[')[1])
+                    y = int(parts[1].split(']')[0])
+                    dron_id = int(parts[2].split('ID: ')[1])
+                    print(f"Received MOVE instruction: X: {x}, Y: {y}, ID: {dron_id}")
+
+                    # Luego puedes usar x, y y dron_id como necesites
+                    target_x = x
+                    target_y = y
+                    self.move_to_position(target_x, target_y)
+                    self.show_map(engine_socket)
+                except Exception as e:
+                    print(f"Error al procesar la instrucción: {str(e)}, {instruction}")
             else:
                 print(f"Instrucción desconocida: {instruction}")
+
 
 
     def show_map(self, engine_socket):
@@ -136,37 +148,47 @@ class ADDrone:
         map_state = engine_socket.recv(1024).decode()
         print("Mapa actualizado:")
         print(map_state)
-        
-        
-    def move_to_position(self, x, y):
-        if self.current_position == (x, y):
-            print("El dron ya está en la posición deseada.")
-            return
 
-        while self.current_position != (x, y):
-            next_x, next_y = self.calculate_next_position(x, y)
-            self.current_position = (next_x, next_y)
-            print(f"Dron {self.dron_id} se ha movido a la posición ({next_x}, {next_y}).")
-            time.sleep(1)  # Simular el movimiento de una celda a otra
+
+    def move_to_position(self, target_x, target_y):
+        if self.current_position == (target_x, target_y):
+            print(f"El dron {self.dron_id} ya está en la posición deseada.")
+        else:
+            print(f"Moviendo el dron {self.dron_id} a la posición ({target_x}, {target_y})")
+
+            while self.current_position != (target_x, target_y):
+                if self.current_position[0] < target_x:
+                    self.current_position = (self.current_position[0] + 1, self.current_position[1])
+                elif self.current_position[0] > target_x:
+                    self.current_position = (self.current_position[0] - 1, self.current_position[1])
+
+                if self.current_position[1] < target_y:
+                    self.current_position = (self.current_position[0], self.current_position[1] + 1)
+                elif self.current_position[1] > target_y:
+                    self.current_position = (self.current_position[0], self.current_position[1] - 1)
+
+                time.sleep(1)  # Simular el movimiento de una celda a otra
+
+            print(f"Dron {self.dron_id} ha llegado a la posición ({target_x}, {target_y}).")
+            self.update_position()
+       
+    def update_position(self):
+        # Conectar a la base de datos de MongoDB
+        mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
+        db = mongo_client["dronedb"]
+        drones_collection = db["drones"]
+
+        # Actualizar la posición del dron en la base de datos
+        drones_collection.update_one({"ID": self.dron_id}, {"$set": {"InitialPosition": self.current_position}})
+
+        # Enviar la nueva posición al motor AD_Engine
+        message = f"UPDATE_POSITION[{self.current_position[0]},{self.current_position[1]}] ID: {self.dron_id}"
+        self.kafka_producer.send("update_position", value=message.encode())
+
+        
+        # Cerrar la conexión con la base de datos
+        mongo_client.close() 
             
-
-    def calculate_next_position(self, target_x, target_y):
-        current_x, current_y = self.current_position
-
-        # Calcular la siguiente posición adyacente
-        if current_x < target_x:
-            current_x += 1
-        elif current_x > target_x:
-            current_x -= 1
-
-        if current_y < target_y:
-            current_y += 1
-        elif current_y > target_y:
-            current_y -= 1
-
-        return current_x, current_y
-        
-        
     def modify_drones(self):
         # Conectar a la base de datos de MongoDB
         mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
@@ -262,19 +284,6 @@ class ADDrone:
                 break
             else:
                 print("Opción no válida. Seleccione una opción válida.")
-                
-                
-    def log_to_file(self, message, log_file='drone_log.txt'):
-        # Obtener el nombre del archivo actual
-        current_file = os.path.basename(__file__)
-
-        # Formatear el mensaje con el nombre del archivo
-        log_message = f"AD_{current_file}: {message}\n"
-
-        # Registrar el mensaje en el archivo de registro
-        with open(log_file, 'a') as f:
-            f.write(log_message)
-                
                 
 
 if __name__ == "__main__":

@@ -6,3 +6,130 @@ AD_Engine.py: MOVE, X: 1, Y: 3
 AD_Registry.py: Registro de dron: ID=8, Alias=cdvfrt
 AD_Registry.py: Registro de dron: ID=9, Alias=cvf
 AD_Engine.py: Dron con ID 9 se ha unido. Posición inicial: [1, 1], Posición final: None
+AD_Registry.py: Registro de dron: ID=1, Alias=cdfg
+AD_Registry.py: Registro de dron: ID=2, Alias=ct
+AD_Engine.py: Dron con ID 2 se ha unido. Posición inicial: [1, 1], Posición final: 8,16
+AD_Engine.py: MOVE, X: 8, Y: ,
+AD_Registry.py: Registro de dron: ID=3, Alias=cfg
+AD_Engine.py: Dron con ID 3 se ha unido. Posición inicial: [1, 1], Posición final: 9,17
+AD_Engine.py: MOVE, X: 8, Y: ,
+AD_Engine.py: MOVE, X: 9, Y: ,
+AD_Registry.py: Registro de dron: ID=4, Alias=fcghn
+AD_Engine.py: MOVE, X: 1, Y: 0, ID: 4, Posicion current: None, Posicion final: 10,17
+AD_Registry.py: Registro de dron: ID=5, Alias=vfrtny
+AD_Engine.py: MOVE, X: 1, Y: 1, ID: 5, Posicion current: [1, 1], Posicion final: 11,17
+AD_Registry.py: Registro de dron: ID=7, Alias=frvgt
+AD_Engine.py: MOVE, X: 1, Y: 3, ID: 7, Posicion current: [1, 1], Posicion final: 13,15
+AD_Registry.py: Registro de dron: ID=6, Alias=cdvfrtdf
+AD_Engine.py: MOVE, X: 1, Y: 3, ID: 7, Posicion current: [1, 1], Posicion final: 13,15
+AD_Engine.py: MOVE, X: 1, Y: 2, ID: 6, Posicion current: [1, 1], Posicion final: 12,16
+AD_Registry.py: Registro de dron: ID=8, Alias=sderft
+AD_Engine.py: MOVE, X: 1, Y: 3, ID: 7, Posicion current: [1, 1], Posicion final: 13,15
+AD_Engine.py: MOVE, X: 1, Y: 2, ID: 6, Posicion current: [1, 1], Posicion final: 12,16
+AD_Engine.py: MOVE, X: 0, Y: ,, ID: 8, Posicion current: [1, 1], Posicion final: 0,0
+AD_Registry.py: Registro de dron: ID=1, Alias=cdvf
+AD_Engine.py: {"type": "MOVE", "X": "7", "Y": ",", "ID": 1, "Posicion current": [1, 1], "Posicion final": "7,15"}
+AD_Registry.py: Registro de dron: ID=2, Alias=dcfr
+AD_Engine.py: {"type": "MOVE", "X": "7", "Y": ",", "ID": 1, "Posicion current": [1, 1], "Posicion final": "7,15"}
+AD_Engine.py: {"type": "MOVE", "X": "8", "Y": ",", "ID": 2, "Posicion current": [1, 1], "Posicion final": "8,16"}
+AD_Registry.py: Registro de dron: ID=3, Alias=cdfv
+AD_Engine.py: {"type": "MOVE", "X": "7", "Y": ",", "ID": 1, "Posicion current": [1, 1], "Posicion final": "7,15"}
+AD_Engine.py: {"type": "MOVE", "X": "8", "Y": ",", "ID": 2, "Posicion current": [1, 1], "Posicion final": "8,16"}
+AD_Engine.py: {"type": "MOVE", "X": "9", "Y": ",", "ID": 3, "Posicion current": [1, 1], "Posicion final": "9,17"}
+AD_Registry.py: Registro de dron: ID=4, Alias=cdvfg
+AD_Registry.py: Registro de dron: ID=5, Alias=vfgnh
+AD_Registry.py: Registro de dron: ID=6, Alias=vfnh
+AD_Registry.py: Registro de dron: ID=1, Alias=dcfv
+AD_Engine.py: {"type": "MOVE", "X": "7", "Y": ",", "ID": 1, "Posicion current": [1, 1], "Posicion final": "7,15"}
+AD_Registry.py: Registro de dron: ID=2, Alias=df
+AD_Engine.py: {"type": "MOVE", "X": "7", "Y": ",", "ID": 1, "Posicion current": [1, 1], "Posicion final": "7,15"}
+AD_Engine.py: {"type": "MOVE", "X": "8", "Y": ",", "ID": 2, "Posicion current": [1, 1], "Posicion final": "8,16"}
+AD_Registry.py: Registro de dron: ID=3, Alias=cdvfg
+AD_Engine.py: {"type": "MOVE", "X": "7", "Y": ",", "ID": 1, "Posicion current": [1, 1], "Posicion final": "7,15"}
+AD_Engine.py: {"type": "MOVE", "X": "8", "Y": ",", "ID": 2, "Posicion current": [1, 1], "Posicion final": "8,16"}
+AD_Engine.py: {"type": "MOVE", "X": "9", "Y": ",", "ID": 3, "Posicion current": [1, 1], "Posicion final": "9,17"}
+AD_Registry.py: Registro de dron: ID=4, Alias=fg
+AD_Engine.py: {"type": "MOVE", "X": 1, "Y": 0, "ID": 4, "Posicion current": [1, 1], "Posicion final": "10,17"}
+AD_Registry.py: Registro de dron: ID=5, Alias=cdfrg
+AD_Registry.py: Registro de dron: ID=7, Alias=vfghn
+AD_Registry.py: Registro de dron: ID=6, Alias=cdyn
+AD_Registry.py: Registro de dron: ID=1, Alias=cdg
+AD_Registry.py: Registro de dron: ID=2, Alias=dfrt
+AD_Engine.py: {"type": "MOVE", "X": "8", "Y": ",", "ID": 2, "Posicion current": [1, 1], "Posicion final": "8,16"}
+AD_Registry.py: Registro de dron: ID=3, Alias=vftynumj
+AD_Engine.py: {"type": "MOVE", "X": "9", "Y": ",", "ID": 3, "Posicion current": [1, 1], "Posicion final": "9,17"}
+AD_Registry.py: Registro de dron: ID=4, Alias=cd
+AD_Engine.py: {"type": "MOVE", "X": "1", "Y": "0", "ID": 4, "Posicion current": [1, 1], "Posicion final": "10,17"}
+AD_Registry.py: Registro de dron: ID=5, Alias=vfgh
+AD_Engine.py: {"type": "MOVE", "X": "1", "Y": "1", "ID": 5, "Posicion current": [1, 1], "Posicion final": "11,17"}
+AD_Registry.py: Registro de dron: ID=7, Alias=frvgt
+AD_Engine.py: {"type": "MOVE", "X": "1", "Y": "3", "ID": 7, "Posicion current": [1, 1], "Posicion final": "13,15"}
+AD_Registry.py: Registro de dron: ID=1, Alias=cdfv
+AD_Engine.py: {"type": "MOVE", "X": "7", "Y": ",", "ID": 1, "Posicion current": [1, 1], "Posicion final": "7,15"}
+AD_Registry.py: Registro de dron: ID=7, Alias=hnj
+AD_Registry.py: Registro de dron: ID=2, Alias=dvfg
+AD_Registry.py: Registro de dron: ID=3, Alias=cdfg
+AD_Registry.py: Registro de dron: ID=4, Alias=cdvfg
+AD_Registry.py: Registro de dron: ID=5, Alias=dcfgh
+AD_Registry.py: Registro de dron: ID=6, Alias=hyjuy
+AD_Registry.py: Registro de dron: ID=8, Alias=sdfgt
+AD_Registry.py: Registro de dron: ID=1, Alias=xsrt
+AD_Registry.py: Registro de dron: ID=2, Alias=cdfrty
+AD_Registry.py: Registro de dron: ID=3, Alias=cdvfrty
+AD_Registry.py: Registro de dron: ID=1, Alias=cden
+AD_Registry.py: Registro de dron: ID=2, Alias=cdf
+AD_Registry.py: Registro de dron: ID=3, Alias=cdfrvt
+AD_Registry.py: Registro de dron: ID=4, Alias=xsdf
+AD_Registry.py: Registro de dron: ID=1, Alias=sdfr
+AD_Registry.py: Registro de dron: ID=2, Alias=cdfr
+AD_Registry.py: Registro de dron: ID=3, Alias=df
+AD_Registry.py: Registro de dron: ID=4, Alias=dfrtyh
+AD_Registry.py: Registro de dron: ID=5, Alias=cdt
+AD_Registry.py: Registro de dron: ID=6, Alias=dsf
+AD_Registry.py: Registro de dron: ID=7, Alias=sdfgt
+AD_Registry.py: Registro de dron: ID=1, Alias=sdert
+AD_Registry.py: Registro de dron: ID=2, Alias=csdf
+AD_Registry.py: Registro de dron: ID=3, Alias=d
+AD_Registry.py: Registro de dron: ID=8, Alias=sdfg
+AD_Engine.py: {"type": "MOVE", "X": 0, "Y": 0, "ID": 8, "Posicion current": [1, 1], "Posicion final": [0, 0]}
+AD_Registry.py: Registro de dron: ID=2, Alias=234d
+AD_Engine.py: {"type": "MOVE", "X": 2, "Y": 2, "ID": 2, "Posicion current": [1, 1], "Posicion final": [8, 16]}
+AD_Registry.py: Registro de dron: ID=3, Alias=cdf
+AD_Engine.py: {"type": "MOVE", "X": 2, "Y": 2, "ID": 3, "Posicion current": [1, 1], "Posicion final": [9, 17]}
+AD_Registry.py: Registro de dron: ID=4, Alias=sdfg
+AD_Engine.py: {"type": "MOVE", "X": 2, "Y": 2, "ID": 4, "Posicion current": [1, 1], "Posicion final": [10, 17]}
+AD_Registry.py: Registro de dron: ID=1, Alias=xsdf
+AD_Engine.py: {"type": "MOVE", "X": 2, "Y": 2, "ID": 1, "Posicion current": [1, 1], "Posicion final": [7, 15]}
+AD_Registry.py: Registro de dron: ID=2, Alias=scdf
+AD_Engine.py: {"type": "MOVE", "X": 2, "Y": 2, "ID": 2, "Posicion current": [1, 1], "Posicion final": [8, 16]}
+AD_Registry.py: Registro de dron: ID=4, Alias=dcf
+AD_Engine.py: {"type": "MOVE", "X": 2, "Y": 2, "ID": 4, "Posicion current": [1, 1], "Posicion final": [10, 17]}
+AD_Registry.py: Registro de dron: ID=3, Alias=cdfrt
+AD_Engine.py: {"type": "MOVE", "X": 2, "Y": 2, "ID": 3, "Posicion current": [1, 1], "Posicion final": [9, 17]}
+AD_Registry.py: Registro de dron: ID=5, Alias=vfghnj
+AD_Engine.py: {"type": "MOVE", "X": 2, "Y": 2, "ID": 5, "Posicion current": [1, 1], "Posicion final": [11, 17]}
+AD_Registry.py: Registro de dron: ID=6, Alias=cdf
+AD_Registry.py: Registro de dron: ID=7, Alias=cfrty
+AD_Registry.py: Registro de dron: ID=1, Alias=scdvf
+AD_Registry.py: Registro de dron: ID=2, Alias=csdfrt
+AD_Registry.py: Registro de dron: ID=3, Alias=cdf
+AD_Registry.py: Registro de dron: ID=4, Alias=vf
+AD_Registry.py: Registro de dron: ID=5, Alias=cvfrt
+AD_Registry.py: Registro de dron: ID=6, Alias=cdft
+AD_Registry.py: Registro de dron: ID=7, Alias=sdfr
+AD_Registry.py: Registro de dron: ID=1, Alias=xscdf
+AD_Registry.py: Registro de dron: ID=2, Alias=cdvft
+AD_Registry.py: Registro de dron: ID=3, Alias=cdvf
+AD_Registry.py: Registro de dron: ID=4, Alias=vf
+AD_Registry.py: Registro de dron: ID=5, Alias=dfrt
+AD_Registry.py: Registro de dron: ID=6, Alias=dft
+AD_Registry.py: Registro de dron: ID=7, Alias=sda
+AD_Registry.py: Registro de dron: ID=1, Alias=xcdf
+AD_Registry.py: Registro de dron: ID=2, Alias=cdfr
+AD_Registry.py: Registro de dron: ID=3, Alias=cdvf
+AD_Registry.py: Registro de dron: ID=4, Alias=vf
+AD_Registry.py: Registro de dron: ID=5, Alias=vfgt
+AD_Registry.py: Registro de dron: ID=6, Alias=xsdfrt
+AD_Registry.py: Registro de dron: ID=7, Alias=f
+AD_Registry.py: Registro de dron: ID=1, Alias=cdvf
+AD_Registry.py: Registro de dron: ID=2, Alias=dfrt
