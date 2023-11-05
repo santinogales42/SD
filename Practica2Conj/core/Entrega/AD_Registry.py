@@ -13,7 +13,7 @@ class ADRegistry:
 
         self.client = MongoClient(self.db_host, self.db_port)
         self.db= self.client[self.db_name]
-        self.kafka_producer = KafkaProducer(bootstrap_servers='localhost:29092')  # Asegúrate de que esto sea la dirección y puerto correctos de tu servidor Kafka
+        self.kafka_producer = KafkaProducer(bootstrap_servers='localhost:29092')
         self.broker_address = broker_address
 
     def start(self):
@@ -26,7 +26,6 @@ class ADRegistry:
             client_socket, addr = server_socket.accept()
             print(f"Nueva solicitud de registro desde {addr}")
 
-            # Manejar solicitud de registro
             request_data = client_socket.recv(1024).decode()
             try:
                 request_json = json.loads(request_data)
@@ -34,7 +33,6 @@ class ADRegistry:
                     drone_id = request_json['ID']
                     alias = request_json['Alias']
                     addr = addr[1]
-                    # Registrar dron en el archivo de registro y en Kafka
                     access_token = self.register_drone(drone_id, alias, addr)
                     response = {'status': 'success', 'message': 'Registro exitoso', 'token': access_token}
                 else:
@@ -42,22 +40,17 @@ class ADRegistry:
             except json.JSONDecodeError:
                 response = {'status': 'error', 'message': 'Formato JSON inválido'}
             
-            # Enviar respuesta al dron
             response_json = json.dumps(response)
             client_socket.send(response_json.encode())
             client_socket.close()
 
     def register_drone(self, drone_id, alias, addr):
-        # Generar un token de acceso único para el dron
         access_token = f"Token_{addr}"
         
-        #Posicion inicial del dron
         initial_position = (1,1)
 
-        #Define dron_id
         dron_id = drone_id
         
-        # Crear un diccionario con los datos del dron
         drone_data = {
             'ID': drone_id,
             'Alias': alias,
@@ -65,10 +58,8 @@ class ADRegistry:
             'InitialPosition': initial_position
         }
 
-        # Registrar el dron en la base de datos MongoDB
         self.db.drones.insert_one(drone_data)
 
-        #Conectarse con ConsumerProducer para enviar el mensaje de registro del dron a Kafka
         producer_thread = cp.ProducerDron(self.broker_address, dron_id)
         producer_thread.start()
     
@@ -77,7 +68,6 @@ class ADRegistry:
             
 
 if __name__ == "__main__":
-    # Configuración de argumentos desde la línea de comandos (ejemplo)
     listen_port = 8081
     db_host = 'localhost'
     db_port = 27017
