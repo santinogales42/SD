@@ -197,95 +197,103 @@ class ADEngine:
         print(f"Procesando actualizaciones del dron {dron_id}: {update_data}")
         # Puedes agregar aquí la lógica real para procesar las actualizaciones del dron
 
-
+    
 
     def start(self):
-        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.bind(("127.0.0.1", self.listen_port))
-        server_socket.listen(1)
-        print(f"AD_Engine en funcionamiento. Escuchando en el puerto {self.listen_port}...")
+        try:
+            server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server_socket.bind(("127.0.0.1", self.listen_port))
+            server_socket.listen(1)
+            print(f"AD_Engine en funcionamiento. Escuchando en el puerto {self.listen_port}...")
 
-        initial_positions = {}
-        
-        temperature_consumer_thread = cp.CityTemperatureConsumer(self.broker_address)
-        temperature_consumer_thread.start()
-            
-        while True:
-            client_socket, addr = server_socket.accept()
-            print(f"Nueva conexión desde {addr}")
-            
-            dron_id = self.receive_dron_id(client_socket)
-            
-            initial_position = self.get_initial_position_from_database(dron_id)
-            current_position = initial_position 
+            initial_positions = {}
 
-            if initial_position:
-                initial_positions[dron_id] = initial_position
-                self.current_positions[dron_id] = initial_position
-            print(f"Posición inicial del dron con ID {dron_id}: {initial_position}")
-            
-            producer_threads = {}
-            drones_terminados = []
-            
-            try:
-            
-                while True:
-                    move_instructions = self.calculate_move_instructions(dron_id, self.final_positions[dron_id])
-                    print(f"Instrucciones de movimiento: {move_instructions}")
+            temperature_consumer_thread = cp.CityTemperatureConsumer(self.broker_address)
+            temperature_consumer_thread.start()
 
-                    # Comprobar si ya se ha creado un hilo de productor para este dron
-                    if dron_id not in producer_threads:
-                        producer_thread = cp.ProducerMovements(self.broker_address, dron_id)
-                        producer_threads[dron_id] = producer_thread
-                        producer_thread.start()
+            while True:
+                client_socket, addr = server_socket.accept()
+                print(f"Nueva conexión desde {addr}")
 
-                    # Enviar las instrucciones de movimiento a través del hilo del productor
-                    producer_threads[dron_id].send_movement_instructions(move_instructions)
-                    
-                    # Obtener la próxima posición del dron
-                    final_position = self.get_final_position_from_database(dron_id)
-                    new_position = self.calculate_next_position(current_position, final_position)
-                    # Actualizar el mapa con la nueva posición del dron
-                    #self.update_map_with_dron_position(dron_id, new_position)
+                dron_id = self.receive_dron_id(client_socket)
 
-                    current_position = new_position  # Actualiza la posición actual del dron
-                    
-                    # Volver a coger la posición actual del dron
-                    initial_position = self.get_initial_position_from_database(dron_id)
-                    print(f"Posición actual: {initial_position}")
-                    
-                    time.sleep(2)
-                
-                    self.send_map_state(client_socket)
-
-                    if move_instructions and move_instructions[0].get("type") == "STOP":
-                        drones_terminados.append(dron_id)  # Agregar el dron a la lista de drones terminados
-                        break  # Salir del bucle cuando la instrucción sea "STOP"
-            
-            except ConnectionResetError:
-                # Manejar la excepción de desconexión
-                print(f"El dron con ID {dron_id} se ha desconectado.")
                 initial_position = self.get_initial_position_from_database(dron_id)
+                current_position = initial_position
+
                 if initial_position:
-                    self.current_positions[dron_id] = (1,1)
-                    #guardar en la base de datos la nueva posicion
-                    self.db.drones.update_one({"ID": dron_id}, {"$set": {"InitialPosition": self.current_positions[dron_id]}})
-                print(f"El dron con ID {dron_id}, vuelve a {self.current_positions[dron_id]}")
-                # Puedes agregar aquí la lógica necesaria para manejar esta desconexión (por ejemplo, notificar al sistema)
-                continue  # Continuar con el próximo dron después de una desconexión
+                    initial_positions[dron_id] = initial_position
+                    self.current_positions[dron_id] = initial_position
+                print(f"Posición inicial del dron con ID {dron_id}: {initial_position}")
 
+                producer_threads = {}
+                drones_terminados = []
 
-            # Después de salir del bucle, imprimir la información de los drones terminados
-            if drones_terminados:
-                print("Drones que han llegado a la posición final:")
-                for dron_id in drones_terminados:
-                    print(f"Dron ID: {dron_id}")
+                try:
 
-            drones_posicionados_finalmente = self.drones_posicionados_finalmente()
-            if drones_posicionados_finalmente:
-                print("Todos los drones han llegado a su posición final.")
-                break  # Salir del bucle principal cuando todos los drones hayan llegado a su posición final       
+                    while True:
+                        move_instructions = self.calculate_move_instructions(dron_id, self.final_positions[dron_id])
+                        print(f"Instrucciones de movimiento: {move_instructions}")
 
+                        # Comprobar si ya se ha creado un hilo de productor para este dron
+                        if dron_id not in producer_threads:
+                            producer_thread = cp.ProducerMovements(self.broker_address, dron_id)
+                            producer_threads[dron_id] = producer_thread
+                            producer_thread.start()
+
+                        # Enviar las instrucciones de movimiento a través del hilo del productor
+                        producer_threads[dron_id].send_movement_instructions(move_instructions)
+
+                        # Obtener la próxima posición del dron
+                        final_position = self.get_final_position_from_database(dron_id)
+                        new_position = self.calculate_next_position(current_position, final_position)
+                        # Actualizar el mapa con la nueva posición del dron
+                        # self.update_map_with_dron_position(dron_id, new_position)
+
+                        current_position = new_position  # Actualiza la posición actual del dron
+
+                        # Volver a coger la posición actual del dron
+                        initial_position = self.get_initial_position_from_database(dron_id)
+                        print(f"Posición actual: {initial_position}")
+
+                        time.sleep(2)
+
+                        self.send_map_state(client_socket)
+
+                        if move_instructions and move_instructions[0].get("type") == "STOP":
+                            drones_terminados.append(dron_id)  # Agregar el dron a la lista de drones terminados
+                            break  # Salir del bucle cuando la instrucción sea "STOP"
+
+                except ConnectionResetError:
+                    # Manejar la excepción de desconexión
+                    print(f"El dron con ID {dron_id} se ha desconectado.")
+                    initial_position = self.get_initial_position_from_database(dron_id)
+                    if initial_position:
+                        self.current_positions[dron_id] = (1, 1)
+                        # guardar en la base de datos la nueva posicion
+                        self.db.drones.update_one({"ID": dron_id}, {"$set": {"InitialPosition": self.current_positions[dron_id]}})
+                    print(f"El dron con ID {dron_id}, vuelve a {self.current_positions[dron_id]}")
+                    # Puedes agregar aquí la lógica necesaria para manejar esta desconexión (por ejemplo, notificar al sistema)
+                    continue  # Continuar con el próximo dron después de una desconexión
+                
+                # Después de salir del bucle, imprimir la información de los drones terminados
+                if drones_terminados:
+                    print("Drones que han llegado a la posición final:")
+                    for dron_id in drones_terminados:
+                        print(f"Dron ID: {dron_id}")
+
+                drones_posicionados_finalmente = self.drones_posicionados_finalmente()
+                if drones_posicionados_finalmente:
+                    print("Todos los drones han llegado a su posición final.")
+                    break 
+
+        except KeyboardInterrupt:
+            print("El motor se apagó bruscamente. Realizando acciones de cierre...")
+            # Agrega aquí las acciones de cierre necesarias, como cerrar conexiones y liberar recursos.
+            # Por ejemplo, puedes cerrar el socket del servidor y detener otros hilos antes de salir del programa.
+            server_socket.close()
+            # Detener otros hilos y liberar recursos si es necesario
+            print("Motor apagado bruscamente. ¡Hasta luego!") # Salir del bucle principal cuando todos los drones hayan llegado a su posición final       
+            
 
     def update_map_with_dron_position(self, dron_id, new_position):
         if dron_id in self.current_positions:

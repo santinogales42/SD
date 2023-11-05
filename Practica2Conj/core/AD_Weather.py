@@ -38,9 +38,6 @@ class ADWeather:
     # Devuelve la ciudad y la temperatura.
         return True
 
-
-    
-
     def start(self):
         self.load_city_data()
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
