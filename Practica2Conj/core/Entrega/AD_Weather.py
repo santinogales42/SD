@@ -53,7 +53,7 @@ class ADWeather:
                 city = request['city']
                 temperature = self.get_temperature(city)
                 print(f"Temperatura actual en {city}: {temperature}")
-                self.clima[city] = temperature  # Almacenar la temperatura actual
+                self.clima[city] = temperature
                 
                 producer_thread = cp.WeatherProducer(self.broker_address, self.city_data)
                 producer_thread.start()
