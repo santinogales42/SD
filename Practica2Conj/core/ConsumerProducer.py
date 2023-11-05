@@ -1,6 +1,7 @@
 import threading
 from kafka import KafkaConsumer, KafkaProducer
 import kafka
+import time
 
 # Cambio de nombres de los módulos para adecuarlos a tu práctica
 import AD_Engine as engine
@@ -196,3 +197,57 @@ class ProducerMovements(threading.Thread):
                 break
 
         self.producer.close()
+        
+        
+
+class WeatherProducer(threading.Thread):
+    def __init__(self, KAFKA_SERVER, city_data):
+        threading.Thread.__init__(self)
+        self.stop_event = threading.Event()
+        self.server = KAFKA_SERVER
+        self.city_data = city_data  # Datos de las ciudades y temperaturas
+        self.producer = kafka.KafkaProducer(bootstrap_servers=self.server)
+
+    def stop(self):
+        self.stop_event.set()
+
+    def run(self):
+        while not self.stop_event.is_set():
+            for city, temperature in self.city_data.items():
+                # Construir el mensaje de temperatura de la ciudad
+                temperature_message = f"Temperatura actual en {city}: {temperature}"
+                
+                # Enviar el mensaje de temperatura de la ciudad al motor
+                self.producer.send('city_temperature', temperature_message.encode(FORMAT))
+
+                if self.stop_event.is_set():
+                    break
+
+            # Esperar un intervalo de tiempo (por ejemplo, 5 minutos) antes de enviar las actualizaciones nuevamente
+            time.sleep(300)
+
+        self.producer.close()
+        
+        
+# En la clase ADEngine o en un módulo separado
+class CityTemperatureConsumer(threading.Thread):
+    def __init__(self, KAFKA_SERVER):
+        threading.Thread.__init__(self)
+        self.stop_event = threading.Event()
+        self.server = KAFKA_SERVER
+
+    def stop(self):
+        self.stop_event.set()
+
+    def run(self):
+        consumer = kafka.KafkaConsumer(
+            'city_temperature', bootstrap_servers=self.server, auto_offset_reset='latest')
+
+
+        while not self.stop_event.is_set():
+            for message in consumer:
+                # Procesa las instrucciones de movimiento de drones (cambia este nombre y la lógica a la real en tu código)
+                if self.stop_event.is_set():
+                    break
+
+        consumer.close()

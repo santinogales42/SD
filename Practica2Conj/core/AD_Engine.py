@@ -8,10 +8,11 @@ import threading
 import time
 
 class ADEngine:
-    def __init__(self, listen_port, broker_address, database_address):
+    def __init__(self, listen_port, broker_address, database_address, weather_address):
         self.listen_port = listen_port
         self.broker_address = broker_address
         self.database_address = database_address
+        self.weather_address = weather_address
         
         
         if self.database_address:
@@ -26,6 +27,32 @@ class ADEngine:
         
         self.current_positions = {}  # Almacenar las posiciones actuales de los drones
         self.final_positions = {}  # Almacenar las posiciones finales de los drones
+    
+    
+    
+    def check_weather_and_take_actions(self):
+        # Lógica para consultar el clima y tomar acciones en función de la temperatura
+        city_name = "CiudadEjemplo"  # Puedes reemplazarlo con la ciudad donde se realiza el espectáculo
+        temperature = self.get_temperature_from_weather_service(city_name)
+
+        if temperature < 0:
+            self.finalizar_espectaculo()
+
+    def get_temperature_from_weather_service(self, city_name):
+        # Simula la consulta al servicio de clima (reemplazar con una solicitud real)
+        # Aquí puedes usar la instancia de ADWeather para obtener la temperatura de la ciudad
+        temperature = self.weather_app.get_temperature(city_name)
+        return temperature
+
+    def finalizar_espectaculo(self):
+        # Lógica para finalizar el espectáculo y notificar a los drones
+        print("CONDICIONES CLIMATICAS ADVERSAS. ESPECTACULO FINALIZADO")
+        # Puedes agregar aquí la lógica para notificar a los drones que regresen a su base o realizar otras acciones necesarias
+
+    
+    
+    
+    
     
     # drones_posicionados_finalmente() devuelve True si todos los drones han alcanzado su posición final
     def drones_posicionados_finalmente(self):
@@ -252,7 +279,18 @@ if __name__ == "__main__":
     listen_port = 8080
     broker_address = "127.0.0.1:29092"
     database_address = "mongodb://localhost:27017/"
+    weather_address = "127.0.0.1:8082"
     
-    engine_address = ADEngine(listen_port, broker_address, database_address)
+    engine_address = ADEngine(listen_port, broker_address, database_address, weather_address)
     engine_address.procesar_datos_json("PRUEBAS/AwD_figuras.json")
     engine_address.start()
+    
+    #POR COMANDOS
+    #parser = argparse.ArgumentParser(description='AD Engine Application')
+    #parser.add_argument('--listen_port', type=int, default=8080, help='Port for listening')
+    #parser.add_argument('--broker_address', type=str, default='127.0.0.1:29092', help='Broker address')
+    #parser.add_argument('--database_address', type=str, default='mongodb://localhost:27017/', help='Database address')
+    #parser.add_argument('--weather_address', type=str, default='127.0.0.1:8082', help='Weather service address')
+
+    # Parsear los argumentos
+    #args = parser.parse_args()
