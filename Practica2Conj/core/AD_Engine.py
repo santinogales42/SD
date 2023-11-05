@@ -24,12 +24,13 @@ class ADEngine:
         self.map_size = 20
         self.map = [[0 for _ in range(self.map_size)] for _ in range(self.map_size)]
         
-        
-        
-        
         self.current_positions = {}  # Almacenar las posiciones actuales de los drones
         self.final_positions = {}  # Almacenar las posiciones finales de los drones
     
+    # drones_posicionados_finalmente() devuelve True si todos los drones han alcanzado su posición final
+    def drones_posicionados_finalmente(self):
+        return len(self.final_positions) == len(self.current_positions)
+
 
     def save_figura_info(self, figura, dron_id):
         figura_info = {
@@ -230,6 +231,11 @@ class ADEngine:
                 print("Drones que han llegado a la posición final:")
                 for dron_id in drones_terminados:
                     print(f"Dron ID: {dron_id}")
+
+            drones_posicionados_finalmente = self.drones_posicionados_finalmente()
+            if drones_posicionados_finalmente:
+                print("Todos los drones han llegado a su posición final.")
+                break  # Salir del bucle principal cuando todos los drones hayan llegado a su posición final
             
 
 

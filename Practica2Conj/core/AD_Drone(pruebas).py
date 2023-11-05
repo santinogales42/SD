@@ -145,7 +145,7 @@ class ADDrone:
                     self.move_to_position(target_x, target_y)
                     self.show_map(engine_socket)
                 except Exception as e:
-                    print("")
+                    print("ERROR: ", e)
             elif "STOP" in instruction:
                 print("STOP instruction received.")
                 self.status = "IDLE"
