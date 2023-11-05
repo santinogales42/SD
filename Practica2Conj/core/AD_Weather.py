@@ -10,6 +10,8 @@ class ADWeather:
         self.listen_port = listen_port
         self.city_data = self.load_city_data()
         self.clima = {}
+        
+        self.broker_adress = "localhost:29092"
 
     def load_city_data(self):
         try:
@@ -20,16 +22,22 @@ class ADWeather:
             print("El archivo 'ciudades.json' no se encontró. Asegúrate de que el archivo exista en el directorio actual.")
             return {}
         
-    def get_temperature(self):
+    def get_temperature(self, city):
         if not self.city_data:
             print("No se han cargado datos de ciudades.")
             return None
 
-        city_names = list(self.city_data.keys())
-        selected_city = random.choice(city_names)
-        temperature = self.city_data.get(selected_city, 0)
+        temperature = self.city_data.get(city, 0)
         
         return temperature
+    
+    
+    def get_city_and_temperature(self, dron_id):
+    # Aquí implementa la lógica para comunicarse con el ADWeather
+    # y obtener la ciudad y la temperatura en función del dron_id.
+    # Devuelve la ciudad y la temperatura.
+        return True
+
 
     
 
@@ -53,8 +61,10 @@ class ADWeather:
                 print(f"Temperatura actual en {city}: {temperature}")
                 self.clima[city] = temperature  # Almacenar la temperatura actual
                 
-                producer_thread = cp.WeatherProducer(self.broker_address)
+                producer_thread = cp.WeatherProducer(self.broker_address, self.city_data)
                 producer_thread.start()
+
+
 
                 # Realizar comprobaciones climáticas y notificar a AD_Engine si es necesario
                 if temperature < 0:

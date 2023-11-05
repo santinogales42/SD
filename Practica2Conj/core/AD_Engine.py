@@ -15,6 +15,7 @@ class ADEngine:
         self.weather_address = weather_address
         
         
+        
         if self.database_address:
             self.client = pymongo.MongoClient(self.database_address)
             self.db = self.client["dronedb"]
@@ -23,7 +24,7 @@ class ADEngine:
         self.consumer_producer = cp.ConsumerDronUpdates(broker_address, self.dron_id)  # Proporciona broker_address
         self.kafka_producer = KafkaProducer(bootstrap_servers=self.broker_address)
         self.map_size = 20
-        self.map = [[0 for _ in range(self.map_size)] for _ in range(self.map_size)]
+        self.map = [[{"dron_id": None} for _ in range(self.map_size)] for _ in range(self.map_size)]
         
         self.current_positions = {}  # Almacenar las posiciones actuales de los drones
         self.final_positions = {}  # Almacenar las posiciones finales de los drones
@@ -48,11 +49,7 @@ class ADEngine:
         # Lógica para finalizar el espectáculo y notificar a los drones
         print("CONDICIONES CLIMATICAS ADVERSAS. ESPECTACULO FINALIZADO")
         # Puedes agregar aquí la lógica para notificar a los drones que regresen a su base o realizar otras acciones necesarias
-
-    
-    
-    
-    
+        
     
     # drones_posicionados_finalmente() devuelve True si todos los drones han alcanzado su posición final
     def drones_posicionados_finalmente(self):
@@ -184,12 +181,11 @@ class ADEngine:
                 for message in kafka_consumer:
                     message_value = message.value.decode('utf-8')
                     print(f"Mensaje recibido: {message_value}")
-                    
+                    keep_waiting = False  # Salir del bucle
                     # Utilizar una expresión regular para buscar el patrón con el ID del dron
                     match = re.search(r'El dron con ID: (\d+) se va a unir al espectáculo', message_value)
                     if match:
                         dron_id = int(match.group(1))
-                        keep_waiting = False  # Salir del bucle
                         return dron_id
         except Exception as e:
             print(f"Error al recibir el ID del dron: {str(e)}")
@@ -210,6 +206,9 @@ class ADEngine:
         print(f"AD_Engine en funcionamiento. Escuchando en el puerto {self.listen_port}...")
 
         initial_positions = {}
+        
+        temperature_consumer_thread = cp.CityTemperatureConsumer(self.broker_address)
+        temperature_consumer_thread.start()
             
         while True:
             client_socket, addr = server_socket.accept()
@@ -228,30 +227,53 @@ class ADEngine:
             producer_threads = {}
             drones_terminados = []
             
-            while True:
-                move_instructions = self.calculate_move_instructions(dron_id, self.final_positions[dron_id])
-                print(f"Instrucciones de movimiento: {move_instructions}")
-
-                # Comprobar si ya se ha creado un hilo de productor para este dron
-                if dron_id not in producer_threads:
-                    producer_thread = cp.ProducerMovements(self.broker_address, dron_id)
-                    producer_threads[dron_id] = producer_thread
-                    producer_thread.start()
-
-                # Enviar las instrucciones de movimiento a través del hilo del productor
-                producer_threads[dron_id].send_movement_instructions(move_instructions)
-
-                # Volver a coger la posición actual del dron
-                initial_position = self.get_initial_position_from_database(dron_id)
-                print(f"Posición actual: {initial_position}")
-                
-                time.sleep(2)
+            try:
             
-                self.send_map_state(client_socket)
+                while True:
+                    move_instructions = self.calculate_move_instructions(dron_id, self.final_positions[dron_id])
+                    print(f"Instrucciones de movimiento: {move_instructions}")
 
-                if move_instructions and move_instructions[0].get("type") == "STOP":
-                    drones_terminados.append(dron_id)  # Agregar el dron a la lista de drones terminados
-                    break  # Salir del bucle cuando la instrucción sea "STOP"
+                    # Comprobar si ya se ha creado un hilo de productor para este dron
+                    if dron_id not in producer_threads:
+                        producer_thread = cp.ProducerMovements(self.broker_address, dron_id)
+                        producer_threads[dron_id] = producer_thread
+                        producer_thread.start()
+
+                    # Enviar las instrucciones de movimiento a través del hilo del productor
+                    producer_threads[dron_id].send_movement_instructions(move_instructions)
+                    
+                    # Obtener la próxima posición del dron
+                    final_position = self.get_final_position_from_database(dron_id)
+                    new_position = self.calculate_next_position(current_position, final_position)
+                    # Actualizar el mapa con la nueva posición del dron
+                    #self.update_map_with_dron_position(dron_id, new_position)
+
+                    current_position = new_position  # Actualiza la posición actual del dron
+                    
+                    # Volver a coger la posición actual del dron
+                    initial_position = self.get_initial_position_from_database(dron_id)
+                    print(f"Posición actual: {initial_position}")
+                    
+                    time.sleep(2)
+                
+                    self.send_map_state(client_socket)
+
+                    if move_instructions and move_instructions[0].get("type") == "STOP":
+                        drones_terminados.append(dron_id)  # Agregar el dron a la lista de drones terminados
+                        break  # Salir del bucle cuando la instrucción sea "STOP"
+            
+            except ConnectionResetError:
+                # Manejar la excepción de desconexión
+                print(f"El dron con ID {dron_id} se ha desconectado.")
+                initial_position = self.get_initial_position_from_database(dron_id)
+                if initial_position:
+                    self.current_positions[dron_id] = (1,1)
+                    #guardar en la base de datos la nueva posicion
+                    self.db.drones.update_one({"ID": dron_id}, {"$set": {"InitialPosition": self.current_positions[dron_id]}})
+                print(f"El dron con ID {dron_id}, vuelve a {self.current_positions[dron_id]}")
+                # Puedes agregar aquí la lógica necesaria para manejar esta desconexión (por ejemplo, notificar al sistema)
+                continue  # Continuar con el próximo dron después de una desconexión
+
 
             # Después de salir del bucle, imprimir la información de los drones terminados
             if drones_terminados:
@@ -262,17 +284,21 @@ class ADEngine:
             drones_posicionados_finalmente = self.drones_posicionados_finalmente()
             if drones_posicionados_finalmente:
                 print("Todos los drones han llegado a su posición final.")
-                break  # Salir del bucle principal cuando todos los drones hayan llegado a su posición final
-            
+                break  # Salir del bucle principal cuando todos los drones hayan llegado a su posición final       
 
 
-
+    def update_map_with_dron_position(self, dron_id, new_position):
+        if dron_id in self.current_positions:
+            current_x, current_y = self.current_positions[dron_id]
+            self.map[current_x][current_y] = {"dron_id": None}  # Borra la posición anterior
+        x, y = new_position
+        self.map[x][y] = {"dron_id": dron_id}  # Actualiza la posición del dron en el mapa
+        self.current_positions[dron_id] = new_position
+    
 
     def send_map_state(self, client_socket):
         map_state = json.dumps(self.map)
         client_socket.send(map_state.encode())
-        
-        
         
 
 if __name__ == "__main__":
@@ -283,6 +309,7 @@ if __name__ == "__main__":
     
     engine_address = ADEngine(listen_port, broker_address, database_address, weather_address)
     engine_address.procesar_datos_json("PRUEBAS/AwD_figuras.json")
+    # Crear un hilo para manejar cada dron en paralelo
     engine_address.start()
     
     #POR COMANDOS

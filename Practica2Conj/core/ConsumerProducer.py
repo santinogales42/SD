@@ -146,7 +146,7 @@ class ProducerDron(threading.Thread):
         threading.Thread.__init__(self)
         self.stop_event = threading.Event()
         self.server = KAFKA_SERVER
-
+        self.registration_sent = False  # Indica si el mensaje de registro se ha enviado al motor
         self.dron_id = dron_id  # Almacenar el ID del dron
 
     def stop(self):
@@ -155,7 +155,7 @@ class ProducerDron(threading.Thread):
     def run(self):
         producer = kafka.KafkaProducer(bootstrap_servers=self.server)
 
-        while not self.stop_event.is_set():
+        while not self.stop_event.is_set() and not self.registration_sent:
             # Utilizar el ID del dron registrado en AD_Registry
             dron_id = self.dron_id
             
@@ -164,6 +164,7 @@ class ProducerDron(threading.Thread):
             
             # Enviar el mensaje de registro del dron al motor
             producer.send('register_dron', registration_message.encode(FORMAT))
+            self.registration_sent = True
             
             if self.stop_event.is_set():
                 break
@@ -217,14 +218,14 @@ class WeatherProducer(threading.Thread):
                 # Construir el mensaje de temperatura de la ciudad
                 temperature_message = f"Temperatura actual en {city}: {temperature}"
                 
-                # Enviar el mensaje de temperatura de la ciudad al motor
+                # Enviar el mensaje de temperatura de la ciudad al motor a través de Kafka
                 self.producer.send('city_temperature', temperature_message.encode(FORMAT))
 
                 if self.stop_event.is_set():
                     break
 
             # Esperar un intervalo de tiempo (por ejemplo, 5 minutos) antes de enviar las actualizaciones nuevamente
-            time.sleep(300)
+            time.sleep(10)
 
         self.producer.close()
         
@@ -243,10 +244,10 @@ class CityTemperatureConsumer(threading.Thread):
         consumer = kafka.KafkaConsumer(
             'city_temperature', bootstrap_servers=self.server, auto_offset_reset='latest')
 
-
         while not self.stop_event.is_set():
             for message in consumer:
-                # Procesa las instrucciones de movimiento de drones (cambia este nombre y la lógica a la real en tu código)
+                # Procesa las actualizaciones de temperatura de la ciudad (cambia este nombre y la lógica a la real en tu código)
+                print(f"Actualización de temperatura de la ciudad: {message.value.decode('utf-8')}")
                 if self.stop_event.is_set():
                     break
 

@@ -20,6 +20,7 @@ class ADDrone:
         self.broker_address = broker_address
         self.consumer_producer = cp.ConsumerProducer(self.broker_address)
         self.kafka_producer = KafkaProducer(bootstrap_servers='localhost:29092')
+        
 
     # Resto del código de la clase ADDrone
 
@@ -110,6 +111,7 @@ class ADDrone:
 
         producer_thread = cp.ProducerShow(self.broker_address, self.dron_id)
         producer_thread.start()
+        
         print(f"El dron con ID {self.dron_id} se ha unido al espectáculo.")
         
 
@@ -121,38 +123,58 @@ class ADDrone:
         consumer_producer = cp.ConsumerProducer(broker_address, dron_id)
         consumer_producer.start_consumer()
         print("Conectado a Kafka para recibir actualizaciones de posición del dron.")
+        
+        try:
 
-        while True:
-            instruction = self.consume_kafka_messages()
+            while True:
+                instruction = self.consume_kafka_messages()
 
-            if instruction == "EXIT":
-                print("Saliendo del programa.")
-                break
-            elif instruction == "SHOW_MAP":
-                self.show_map(engine_socket)
-            elif "MOVE" in instruction:
-                try:
-                    # Split y analiza la cadena de instrucción
-                    parts = instruction.split(',')
-                    x = int(parts[0].split('[')[1])
-                    y = int(parts[1].split(']')[0])
-                    dron_id = int(parts[2].split('ID: ')[1])
-                    print(f"Received MOVE instruction: X: {x}, Y: {y}, ID: {dron_id}")
-
-                    # Luego puedes usar x, y y dron_id como necesites
-                    target_x = x
-                    target_y = y
-                    self.move_to_position(target_x, target_y)
+                if instruction == "EXIT":
+                    print("Saliendo del programa.")
+                    break
+                elif instruction == "SHOW_MAP":
                     self.show_map(engine_socket)
-                except Exception as e:
-                    print("ERROR: ", e)
-            elif "STOP" in instruction:
-                print("STOP instruction received.")
-                self.status = "IDLE"
-            else:
-                print(f"Instrucción desconocida: {instruction}")
+                elif "MOVE" in instruction:
+                    try:
+                        # Split y analiza la cadena de instrucción
+                        parts = instruction.split(',')
+                        x = int(parts[0].split('[')[1])
+                        y = int(parts[1].split(']')[0])
+                        dron_id = int(parts[2].split('ID: ')[1])
+                        print(f"Received MOVE instruction: X: {x}, Y: {y}, ID: {dron_id}")
+
+                        # Luego puedes usar x, y y dron_id como necesites
+                        target_x = x
+                        target_y = y
+                        self.move_to_position(target_x, target_y)
+                        self.show_map(engine_socket)
+                    except Exception as e:
+                        print("ERROR: ", e)
+                elif "STOP" in instruction:
+                    print("STOP instruction received.")
+                    self.status = "IDLE"
+                else:
+                    print(f"Instrucción desconocida: {instruction}")
+        except ConnectionResetError:
+            # Manejar la excepción de desconexión del motor
+            print("Error: AD_Engine se ha desconectado.")
+            # Restablecer la posición de todos los drones a (1, 1)
+            self.reset_all_drones_position()
+            # Puedes agregar aquí la lógica necesaria para manejar esta desconexión (por ejemplo, notificar al sistema)
 
 
+    def reset_all_drones_position(self):
+        # Conectar a la base de datos de MongoDB
+        mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
+        db = mongo_client["dronedb"]
+        drones_collection = db["drones"]
+
+        # Actualizar la posición de todos los drones en la base de datos
+        drones_collection.update_many({}, {"$set": {"InitialPosition": (1, 1)}})
+
+        # Cerrar la conexión con la base de datos
+        mongo_client.close()
+    
 
     def show_map(self, engine_socket):
         engine_socket.send(json.dumps({'ID': self.dron_id, 'AccessToken': self.access_token}).encode())
@@ -192,9 +214,7 @@ class ADDrone:
         # Actualizar la posición del dron en la base de datos
         drones_collection.update_one({"ID": self.dron_id}, {"$set": {"InitialPosition": self.current_position}})
 
-        # Enviar la nueva posición al motor AD_Engine
-        message = f"UPDATE_POSITION[{self.current_position[0]},{self.current_position[1]}] ID: {self.dron_id}"
-        self.kafka_producer.send("update_position", value=message.encode())
+       
         # Cerrar la conexión con la base de datos
         mongo_client.close() 
         
