@@ -33,9 +33,6 @@ class ADWeather:
     
     
     def get_city_and_temperature(self, dron_id):
-    # Aquí implementa la lógica para comunicarse con el ADWeather
-    # y obtener la ciudad y la temperatura en función del dron_id.
-    # Devuelve la ciudad y la temperatura.
         return True
 
     def start(self):
@@ -62,21 +59,13 @@ class ADWeather:
                 producer_thread.start()
 
 
-
-                # Realizar comprobaciones climáticas y notificar a AD_Engine si es necesario
                 if temperature < 0:
-                    # Informar a AD_Engine y finalizar el espectáculo
-                    # Aquí podrías establecer la lógica para notificar al AD_Engine de las condiciones climáticas adversas.
-                    # Por ejemplo, puedes usar sockets o un mecanismo de comunicación adecuado para enviar el mensaje al AD_Engine.
-
-                    # Notificar a los drones y finalizar el espectáculo
-                    # ...
                     return False
             else:
                 print("Solicitud de información incorrecta")
 
 if __name__ == "__main__":
     listen_port = 8082
-    city_data_file = "ciudades.json"  # Puedes cargar los datos de ciudades y temperaturas desde un archivo JSON
+    city_data_file = "ciudades.json"
     weather_app = ADWeather(listen_port)
     weather_app.start()
