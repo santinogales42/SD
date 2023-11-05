@@ -2,9 +2,10 @@ import socket
 import json
 from pymongo import MongoClient
 from kafka import KafkaProducer
+import ConsumerProducer as cp
 
 class ADRegistry:
-    def __init__(self, listen_port, db_host, db_port, db_name):
+    def __init__(self, listen_port, db_host, db_port, db_name, broker_address):
         self.listen_port = listen_port
         self.db_host = db_host
         self.db_port = db_port
@@ -13,7 +14,7 @@ class ADRegistry:
         self.client = MongoClient(self.db_host, self.db_port)
         self.db= self.client[self.db_name]
         self.kafka_producer = KafkaProducer(bootstrap_servers='localhost:29092')  # Asegúrate de que esto sea la dirección y puerto correctos de tu servidor Kafka
-
+        self.broker_address = broker_address
 
     def start(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -45,16 +46,16 @@ class ADRegistry:
             response_json = json.dumps(response)
             client_socket.send(response_json.encode())
             client_socket.close()
-    
-    #ADDR
+
     def register_drone(self, drone_id, alias, addr):
         # Generar un token de acceso único para el dron
         access_token = f"Token_{addr}"
         
         #Posicion inicial del dron
         initial_position = (1,1)
-    
-        #Guardar el addr del dron y juntarlo con el id
+
+        #Define dron_id
+        dron_id = drone_id
         
         # Crear un diccionario con los datos del dron
         drone_data = {
@@ -67,10 +68,11 @@ class ADRegistry:
         # Registrar el dron en la base de datos MongoDB
         self.db.drones.insert_one(drone_data)
 
-        # Enviar un mensaje a Kafka utilizando self.kafka_producer
-        kafka_message = f"Registro de dron: ID={drone_id}, Alias={alias}"
-        self.kafka_producer.send("register_dron", value=kafka_message.encode())
-
+        #Conectarse con ConsumerProducer para enviar el mensaje de registro del dron a Kafka
+        producer_thread = cp.ProducerDron(self.broker_address, dron_id)
+        producer_thread.start()
+    
+        
         return access_token
             
 
@@ -80,6 +82,7 @@ if __name__ == "__main__":
     db_host = 'localhost'
     db_port = 27017
     db_name = 'dronedb'
+    broker_address = 'localhost:29092'
 
-    registry = ADRegistry(listen_port, db_host, db_port, db_name)
+    registry = ADRegistry(listen_port, db_host, db_port, db_name, broker_address)
     registry.start()
