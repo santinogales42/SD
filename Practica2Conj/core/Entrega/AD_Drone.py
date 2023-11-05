@@ -22,10 +22,8 @@ class ADDrone:
         self.kafka_producer = KafkaProducer(bootstrap_servers='localhost:29092')
         
 
-    # Resto del código de la clase ADDrone
 
 
-        
     def input_drone_data(self):
         while True:
             user_input = input("Introduce el ID del dron (número entre 1 y 99): ")
@@ -34,7 +32,6 @@ class ADDrone:
             try:
                 dron_id = int(user_input)
                 if 1 <= dron_id <= 99:
-                     # Conectar a la base de datos de MongoDB y verificar si el ID ya existe
                     mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
                     db = mongo_client["dronedb"]
                     drones_collection = db["drones"]
@@ -44,23 +41,20 @@ class ADDrone:
                     if existing_dron:
                         print("ID de dron ya existe. Introduce un ID diferente.")
                     else:
-                        # ID válido y no duplicado, se puede continuar
                         self.dron_id = dron_id
                         self.alias = alias
-                        break  # La entrada es un número válido y está en el rango, sal del bucle
+                        break 
                 else:
                     print("El ID del dron debe estar entre 1 y 99. Inténtalo de nuevo.")
             except ValueError:
                 print("Entrada inválida. Debes ingresar un número válido.")
 
-        # Cerrar la conexión con la base de datos
         mongo_client.close()
 
         return True
 
     def register_drone(self):
         try:
-            # Conectar al módulo de registro (AD_Registry) para registrar el dron
             registry_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             registry_socket.connect(self.registry_address)
 
@@ -88,7 +82,6 @@ class ADDrone:
 
     def authenticate(self):
         if self.dron_id in self.registered_drones:
-            # Si el ID del dron está registrado, verificar el token
             stored_token = self.registered_drones[self.dron_id]
             if stored_token == self.access_token:
                 return True
@@ -98,11 +91,11 @@ class ADDrone:
 
     def consume_kafka_messages(self):
         consumer = KafkaConsumer(
-            'register_movement',  # Cambia según la configuración de tu servidor Kafka
-            bootstrap_servers='127.0.0.1:29092',  # Cambia según la configuración de tu servidor Kafka
-            auto_offset_reset='latest',  # Puedes configurarlo según tus necesidades
-            enable_auto_commit=True,  # Puedes configurarlo según tus necesidades
-            group_id=None  # Puedes configurarlo según tus necesidades
+            'register_movement', 
+            bootstrap_servers='127.0.0.1:29092', 
+            auto_offset_reset='latest',  
+            enable_auto_commit=True,
+            group_id=None
         )
 
         for message in consumer:
@@ -125,7 +118,6 @@ class ADDrone:
             engine_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             engine_socket.connect(self.engine_address)
             
-            # Conectar a Kafka para recibir actualizaciones de posición del dron
             dron_id = self.dron_id  
             consumer_producer = cp.ConsumerProducer(broker_address, dron_id)
             consumer_producer.start_consumer()
@@ -143,14 +135,12 @@ class ADDrone:
                         self.show_map(engine_socket)
                     elif "MOVE" in instruction:
                         try:
-                            # Split y analiza la cadena de instrucción
                             parts = instruction.split(',')
                             x = int(parts[0].split('[')[1])
                             y = int(parts[1].split(']')[0])
                             dron_id = int(parts[2].split('ID: ')[1])
                             print(f"Received MOVE instruction: X: {x}, Y: {y}, ID: {dron_id}")
 
-                            # Luego puedes usar x, y y dron_id como necesites
                             target_x = x
                             target_y = y
                             self.move_to_position(target_x, target_y)
@@ -163,25 +153,18 @@ class ADDrone:
                     else:
                         print(f"Instrucción desconocida: {instruction}")
             except ConnectionResetError:
-                # Manejar la excepción de desconexión del motor
                 print("Error: AD_Engine se ha desconectado.")
-                # Restablecer la posición de todos los drones a (1, 1)
                 self.reset_all_drones_position()
-                # Puedes agregar aquí la lógica necesaria para manejar esta desconexión (por ejemplo, notificar al sistema)
         except KeyboardInterrupt:
             print("Saliendo del programa.")
 
 
     def reset_all_drones_position(self):
-        # Conectar a la base de datos de MongoDB
         mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
         db = mongo_client["dronedb"]
         drones_collection = db["drones"]
 
-        # Actualizar la posición de todos los drones en la base de datos
         drones_collection.update_many({}, {"$set": {"InitialPosition": (1, 1)}})
-
-        # Cerrar la conexión con la base de datos
         mongo_client.close()
     
 
@@ -209,34 +192,29 @@ class ADDrone:
                 elif self.current_position[1] > target_y:
                     self.current_position = (self.current_position[0], self.current_position[1] - 1)
 
-                time.sleep(1)  # Simular el movimiento de una celda a otra
+                time.sleep(1)
 
             print(f"Dron {self.dron_id} ha llegado a la posición ({target_x}, {target_y}).")
             self.update_position()
        
     def update_position(self):
-        # Conectar a la base de datos de MongoDB
         mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
         db = mongo_client["dronedb"]
         drones_collection = db["drones"]
 
-        # Actualizar la posición del dron en la base de datos
         drones_collection.update_one({"ID": self.dron_id}, {"$set": {"InitialPosition": self.current_position}})
 
        
-        # Cerrar la conexión con la base de datos
         mongo_client.close() 
         
             
     def modify_drones(self):
-        # Conectar a la base de datos de MongoDB
         mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
         db = mongo_client["dronedb"]
         drones_collection = db["drones"]
         
         self.dron_id=int(input("Introduce el ID del dron: "))
         
-        # Recuperar todos los drones desde la base de datos
         drones = drones_collection.find_one({"ID": self.dron_id})
         if drones:
             new_alias =input("Introduce el nuevo alias: ")
@@ -249,15 +227,12 @@ class ADDrone:
     
     
     def delete_drones(self):
-        #Input para buscar el ID del dron
         self.dron_id=int(input("Introduce el ID del dron: "))
         
-        # Conectar a la base de datos de MongoDB
         mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
         db = mongo_client["dronedb"]
         drones_collection = db["drones"]
 
-        # Recuperar el dron desde la base de datos
         drone = drones_collection.find_one({"ID": self.dron_id})
 
         if drone:
@@ -273,20 +248,16 @@ class ADDrone:
 
 
     def list_drones(self):
-        # Conectar a la base de datos de MongoDB
         mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
         db = mongo_client["dronedb"]
         drones_collection = db["drones"]
 
-        # Recuperar todos los drones desde la base de datos
         drones = drones_collection.find()
 
-        # Imprimir la información de los drones
         for drone in drones:
             print(f"ID: {drone['ID']}")
             print(f'Alias: {drone["Alias"]}')
-            print()  # Línea en blanco para separar los drones
-        # Cerrar la conexión con la base de datos
+            print()
         mongo_client.close()
             
             
