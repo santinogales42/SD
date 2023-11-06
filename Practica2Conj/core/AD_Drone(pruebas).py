@@ -5,6 +5,7 @@ from kafka import KafkaConsumer, KafkaProducer
 import ConsumerProducer as cp
 import pymongo
 import threading
+import sys
 
 class ADDrone:
     def __init__(self, engine_address, registry_address, broker_address):
@@ -16,47 +17,43 @@ class ADDrone:
         
         self.status = "IDLE"
         self.registered_drones = {}
+        self.joined_drones = []
         self.current_position = (1,1)
         self.broker_address = broker_address
         self.consumer_producer = cp.ConsumerProducer(self.broker_address)
         self.kafka_producer = KafkaProducer(bootstrap_servers='localhost:29092')
         
 
-    # Resto del código de la clase ADDrone
-
-
-        
     def input_drone_data(self):
         while True:
             user_input = input("Introduce el ID del dron (número entre 1 y 99): ")
             alias = input("Introduce el alias del dron: ")
 
-            try:
-                dron_id = int(user_input)
-                if 1 <= dron_id <= 99:
-                     # Conectar a la base de datos de MongoDB y verificar si el ID ya existe
-                    mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
-                    db = mongo_client["dronedb"]
-                    drones_collection = db["drones"]
+            if user_input.strip() and alias.strip():  # Verifica que ambas entradas no estén vacías
+                try:
+                    dron_id = int(user_input)
+                    if 1 <= dron_id <= 99:
+                        # Conectar a la base de datos de MongoDB y verificar si el ID ya existe
+                        mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
+                        db = mongo_client["dronedb"]
+                        drones_collection = db["drones"]
 
-                    existing_dron = drones_collection.find_one({"ID": dron_id})
+                        existing_dron = drones_collection.find_one({"ID": dron_id})
 
-                    if existing_dron:
-                        print("ID de dron ya existe. Introduce un ID diferente.")
+                        if existing_dron:
+                            print("ID de dron ya existe. Introduce un ID diferente.")
+                        else:
+                            # ID válido y no duplicado, se puede continuar
+                            self.dron_id = dron_id
+                            self.alias = alias
+                            break  # La entrada es un número válido y está en el rango, sal del bucle
                     else:
-                        # ID válido y no duplicado, se puede continuar
-                        self.dron_id = dron_id
-                        self.alias = alias
-                        break  # La entrada es un número válido y está en el rango, sal del bucle
-                else:
-                    print("El ID del dron debe estar entre 1 y 99. Inténtalo de nuevo.")
-            except ValueError:
-                print("Entrada inválida. Debes ingresar un número válido.")
+                        print("El ID del dron debe estar entre 1 y 99. Inténtalo de nuevo.")
+                except ValueError:
+                    print("Entrada inválida. Debes ingresar un número válido.")
+            else:
+                print("Ambos campos son obligatorios. Introduce el ID y el alias del dron.")
 
-        # Cerrar la conexión con la base de datos
-        mongo_client.close()
-
-        return True
 
     def register_drone(self):
         try:
@@ -110,27 +107,23 @@ class ADDrone:
             return instruction
     
 
-    def join_show(self):
+    def join_show(self, dron_id):
+        if not self.authenticate():
+            print("Autenticación fallida. El dron no puede unirse al espectáculo.")
+            return
+
+        producer_thread = cp.ProducerShow(self.broker_address, self.dron_id)
+        producer_thread.start()
+            
         try:
-            if not self.authenticate():
-                print("Autenticación fallida. El dron no puede unirse al espectáculo.")
-                return
-
-            producer_thread = cp.ProducerShow(self.broker_address, self.dron_id)
-            producer_thread.start()
-            
-            print(f"El dron con ID {self.dron_id} se ha unido al espectáculo.")
-            
-
             engine_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             engine_socket.connect(self.engine_address)
             
             # Conectar a Kafka para recibir actualizaciones de posición del dron
-            dron_id = self.dron_id  
             consumer_producer = cp.ConsumerProducer(broker_address, dron_id)
             consumer_producer.start_consumer()
-            print("Conectado a Kafka para recibir actualizaciones de posición del dron.")
-            
+            print(f"El dron con ID {self.dron_id} se ha unido al espectáculo.")
+                
             try:
 
                 while True:
@@ -167,9 +160,10 @@ class ADDrone:
                 print("Error: AD_Engine se ha desconectado.")
                 # Restablecer la posición de todos los drones a (1, 1)
                 self.reset_all_drones_position()
+                engine_socket.close()
                 # Puedes agregar aquí la lógica necesaria para manejar esta desconexión (por ejemplo, notificar al sistema)
-        except KeyboardInterrupt:
-            print("Saliendo del programa.")
+        except ConnectionRefusedError:
+            print(f"Error: No se pudo conectar al motor (Connection Refused).")
 
 
     def reset_all_drones_position(self):
@@ -190,6 +184,8 @@ class ADDrone:
         map_state = engine_socket.recv(1024).decode()
         print("Mapa actualizado:")
         print(map_state)
+        return map_state  # Devuelve el mapa actualizado
+
 
 
     def move_to_position(self, target_x, target_y):
@@ -292,37 +288,47 @@ class ADDrone:
             
             
     def show_menu(self):
-        while True:
-            print("\nDron Menu:")
-            print("1. Registrar dron")
-            print("2. Unirse al espectáculo")
-            print("3. Listar todos los drones")
-            print("4. Modificar drones")
-            print("5. Eliminar drones")
-            print("6. Salir")
-            
-            choice = input("Seleccione una opción: ")
+        try:
+            while True:
+                print("\nDron Menu:")
+                print("1. Registrar dron")
+                print("2. Unirse al espectáculo")
+                print("3. Listar todos los drones")
+                print("4. Modificar drones")
+                print("5. Eliminar drones")
+                print("6. Salir")
 
-            if choice == "1":
-                if not self.dron_id:
-                    self.input_drone_data()
-                if not self.access_token:
-                    self.register_drone()
-            elif choice == "2":
-                if self.access_token:
-                    self.join_show()
+                choice = input("Seleccione una opción: ")
+
+                if choice == "1":
+                    if not self.dron_id:
+                        self.input_drone_data()
+                    if not self.access_token:
+                        self.register_drone()
+                elif choice == "2":
+                    if self.access_token:
+                        dron_id = self.dron_id
+                        t = threading.Thread(target=self.join_show, args=(dron_id,))
+                        t.start()
+                        self.joined_drones.append(dron_id)
+                    else:
+                        print("Debe registrar el dron primero.")
+                elif choice == "3":
+                    self.list_drones()
+                elif choice == "4":
+                    self.modify_drones()
+                elif choice == "5":
+                    self.delete_drones()
+                elif choice == "6":
+                    break
                 else:
-                    print("Debe registrar el dron primero.")
-            elif choice == "3":
-                self.list_drones()
-            elif choice =="4":
-                self.modify_drones()
-            elif choice =="5":
-                self.delete_drones()
-            elif choice == "6":
-                break
-            else:
-                print("Opción no válida. Seleccione una opción válida.")
+                    print("Opción no válida. Seleccione una opción válida.")
+        except KeyboardInterrupt:
+            print("Se ha presionado Ctrl+C. Saliendo del programa...")
+        except ConnectionResetError:
+            print("Error de conexión. Saliendo del programa...")
+        finally:
+            sys.exit()
                 
 
 if __name__ == "__main__":

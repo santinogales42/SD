@@ -17,35 +17,41 @@ class ADRegistry:
         self.broker_address = broker_address
 
     def start(self):
-        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.bind(("127.0.0.1", self.listen_port))
-        server_socket.listen(1)
-        print(f"AD_Registry en funcionamiento. Escuchando en el puerto {self.listen_port}...")
-
-        while True:
-            client_socket, addr = server_socket.accept()
-            print(f"Nueva solicitud de registro desde {addr}")
-
-            # Manejar solicitud de registro
-            request_data = client_socket.recv(1024).decode()
-            try:
-                request_json = json.loads(request_data)
-                if 'ID' in request_json and 'Alias' in request_json:
-                    drone_id = request_json['ID']
-                    alias = request_json['Alias']
-                    addr = addr[1]
-                    # Registrar dron en el archivo de registro y en Kafka
-                    access_token = self.register_drone(drone_id, alias, addr)
-                    response = {'status': 'success', 'message': 'Registro exitoso', 'token': access_token}
-                else:
-                    response = {'status': 'error', 'message': 'Solicitud de registro incorrecta'}
-            except json.JSONDecodeError:
-                response = {'status': 'error', 'message': 'Formato JSON inválido'}
+        try:
             
-            # Enviar respuesta al dron
-            response_json = json.dumps(response)
-            client_socket.send(response_json.encode())
-            client_socket.close()
+            server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server_socket.bind(("127.0.0.1", self.listen_port))
+            server_socket.listen(1)
+            print(f"AD_Registry en funcionamiento. Escuchando en el puerto {self.listen_port}...")
+
+            while True:
+                client_socket, addr = server_socket.accept()
+                print(f"Nueva solicitud de registro desde {addr}")
+
+                # Manejar solicitud de registro
+                request_data = client_socket.recv(1024).decode()
+                try:
+                    request_json = json.loads(request_data)
+                    if 'ID' in request_json and 'Alias' in request_json:
+                        drone_id = request_json['ID']
+                        alias = request_json['Alias']
+                        addr = addr[1]
+                        # Registrar dron en el archivo de registro y en Kafka
+                        access_token = self.register_drone(drone_id, alias, addr)
+                        response = {'status': 'success', 'message': 'Registro exitoso', 'token': access_token}
+                    else:
+                        response = {'status': 'error', 'message': 'Solicitud de registro incorrecta'}
+                except json.JSONDecodeError:
+                    response = {'status': 'error', 'message': 'Formato JSON inválido'}
+                
+                # Enviar respuesta al dron
+                response_json = json.dumps(response)
+                client_socket.send(response_json.encode())
+                client_socket.close()
+        except KeyboardInterrupt:
+            print("AD_Registry detenido por el usuario")
+        finally:
+            server_socket.close()
 
     def register_drone(self, drone_id, alias, addr):
         # Generar un token de acceso único para el dron

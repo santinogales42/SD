@@ -2,6 +2,7 @@ import threading
 from kafka import KafkaConsumer, KafkaProducer
 import kafka
 import time
+import json
 
 # Cambio de nombres de los módulos para adecuarlos a tu práctica
 import AD_Engine as engine
@@ -16,34 +17,61 @@ class ConsumerProducer:
         self.broker_address = broker_address
         self.dron_id = dron_id
         self.kafka_producer = KafkaProducer(bootstrap_servers=self.broker_address)
-        self.consumer_thread = None  # Agrega esta línea para inicializar consumer_thread
+        self.consumer_thread =  None
+        self.consumer_threads = {}
 
     def start_consumer(self):
+
         self.consumer_thread = ConsumerDronUpdates(self.broker_address, self.dron_id)
         self.consumer_thread.start()
         
+        
+    
+    def extract_dron_id_from_message(self, message):
+        # Analiza el mensaje para extraer el ID del dron
+        # La lógica para extraer el ID del dron depende de la estructura de tus mensajes
+        # Reemplaza esto con la lógica real necesaria
+        try:
+            # Ejemplo: Si el mensaje es JSON y contiene un campo "dron_id"
+            data = json.loads(message)
+            return data.get("dron_id")
+        except json.JSONDecodeError:
+            # Manejo de errores
+            return None
+        
 
     def start(self):
-        # Crear e iniciar un hilo para consumir mensajes de registro de drones
-        consumer_thread = ConsumerEngine(self.KAFKA_SERVER)
+        consumer_thread = ConsumerEngine(self.broker_address, self.consumer_threads)
         consumer_thread.start()
 
-        # Crear e iniciar un hilo para producir mensajes de registro de drones
-        producer_thread = ProducerDron(self.KAFKA_SERVER, self.dron_id)
+        producer_thread = ProducerDron(self.broker_address, self.dron_id)
         producer_thread.start()
+
+        consumer_thread_movement = ConsumerMovement(self.broker_address)
+        consumer_thread_movement.start()
+
+        producer_thread_show = ProducerShow(self.broker_address, self.dron_id)
+        producer_thread_show.start()
+
+        consumer_thread_city_temperature = CityTemperatureConsumer(self.broker_address)
+        consumer_thread_city_temperature.start()
 
         # Esperar a que los hilos terminen
         consumer_thread.join()
         producer_thread.join()
+        consumer_thread_movement.join()
+        producer_thread_show.join()
+        consumer_thread_city_temperature.join()
 
 
 
 # Actualización del nombre del tópico para recibir mensajes de registro de drones
 class ConsumerEngine(threading.Thread):
-    def __init__(self, KAFKA_SERVER):
+    def __init__(self, KAFKA_SERVER, consumer_threads):
         threading.Thread.__init__(self)
         self.stop_event = threading.Event()
         self.server = KAFKA_SERVER
+        self.consumer_threads = consumer_threads
 
     def stop(self):
         self.stop_event.set()
@@ -54,14 +82,26 @@ class ConsumerEngine(threading.Thread):
 
         while not self.stop_event.is_set():
             for message in consumer:
-                # Llama a la función de registro del dron (cambia este nombre a la función real en tu código)
-                engine.register_dron(message.value)
+                # Obtener el ID del dron a partir del mensaje (cambia esto según tu implementación real)
+                dron_id = self.extract_dron_id_from_message(message.value)
+
+                # Comprobar si ya existe un hilo de consumidor para este dron
+                if dron_id not in self.consumer_threads:
+                    consumer_thread = ConsumerDronUpdates(self.server, dron_id)
+                    self.consumer_threads[dron_id] = consumer_thread
+                    consumer_thread.start()
+
+                # Procesa el mensaje de registro del dron (cambia esto según tu implementación real)
+                print(f"Mensaje de registro del dron: {message.value.decode('utf-8')}")
+
                 if self.stop_event.is_set():
                     break
 
         consumer.close()
-        
-# Consumer para recibir actualizaciones de posición del dron y otras actualizaciones
+
+# Resto del código ...
+
+# Clase para el hilo de consumidor de actualizaciones de posición del dron
 class ConsumerDronUpdates(threading.Thread):
     def __init__(self, KAFKA_SERVER, dron_id):
         threading.Thread.__init__(self)
@@ -78,11 +118,13 @@ class ConsumerDronUpdates(threading.Thread):
 
         while not self.stop_event.is_set():
             for message in consumer:
-                # Procesa las actualizaciones de posición del dron y otras actualizaciones (cambia este nombre y la lógica a la real en tu código)
+                # Procesa las actualizaciones de posición del dron (cambia esto según tu implementación real)
+                print(f"Actualización de posición del dron {self.dron_id}: {message.value.decode('utf-8')}")
                 if self.stop_event.is_set():
                     break
 
         consumer.close()
+        
         
 
 # Consumer para recibir instrucciones de movimiento de drones
@@ -202,32 +244,37 @@ class ProducerMovements(threading.Thread):
         
 
 class WeatherProducer(threading.Thread):
-    def __init__(self, KAFKA_SERVER, city_data):
+    def __init__(self, KAFKA_SERVER, city_data, chosen_city):
         threading.Thread.__init__(self)
         self.stop_event = threading.Event()
         self.server = KAFKA_SERVER
         self.city_data = city_data  # Datos de las ciudades y temperaturas
+        self.chosen_city = chosen_city  # Ciudad elegida para el show
         self.producer = kafka.KafkaProducer(bootstrap_servers=self.server)
 
     def stop(self):
         self.stop_event.set()
 
+    def send_temperature_to_engine(self, city, temperature):
+        temperature_message = f"Temperatura actual en {city}: {temperature}"
+        self.producer.send('city_temperature', temperature_message.encode(FORMAT))
+        self.producer.flush()
+
     def run(self):
         while not self.stop_event.is_set():
             for city, temperature in self.city_data.items():
-                # Construir el mensaje de temperatura de la ciudad
-                temperature_message = f"Temperatura actual en {city}: {temperature}"
-                
-                # Enviar el mensaje de temperatura de la ciudad al motor a través de Kafka
-                self.producer.send('city_temperature', temperature_message.encode(FORMAT))
+                if city == self.chosen_city:
+                    # Solo envía la temperatura de la ciudad elegida al motor
+                    self.send_temperature_to_engine(city, temperature)
 
                 if self.stop_event.is_set():
                     break
 
-            # Esperar un intervalo de tiempo (por ejemplo, 5 minutos) antes de enviar las actualizaciones nuevamente
+            # Esperar un intervalo de tiempo (por ejemplo, 10 segundos) antes de enviar las actualizaciones nuevamente
             time.sleep(10)
 
         self.producer.close()
+
         
         
 # En la clase ADEngine o en un módulo separado

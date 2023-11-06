@@ -8,75 +8,66 @@ import ConsumerProducer as cp
 class ADWeather:
     def __init__(self, listen_port):
         self.listen_port = listen_port
-        self.city_data = self.load_city_data()
-        self.clima = {}
-        
-        self.broker_adress = "localhost:29092"
+        self.city_temperatures = self.load_city_temperatures()
+        self.broker_address = "localhost:29092"
+        self.chosen_city = None  # Almacena la ciudad elegida para el show
 
-    def load_city_data(self):
+    def load_city_temperatures(self):
         try:
             with open('ciudades.json', 'r') as file:
-                city_data = json.load(file)
-            return city_data
+                city_temperatures = json.load(file)
+                # Asigna temperaturas iniciales aleatorias en lugar de null
+                for city in city_temperatures:
+                    city_temperatures[city] = random.randint(1, 40)
+                return city_temperatures
         except FileNotFoundError:
             print("El archivo 'ciudades.json' no se encontró. Asegúrate de que el archivo exista en el directorio actual.")
             return {}
-        
-    def get_temperature(self, city):
-        if not self.city_data:
-            print("No se han cargado datos de ciudades.")
-            return None
 
-        temperature = self.city_data.get(city, 0)
-        
-        return temperature
-    
-    
-    def get_city_and_temperature(self, dron_id):
-    # Aquí implementa la lógica para comunicarse con el ADWeather
-    # y obtener la ciudad y la temperatura en función del dron_id.
-    # Devuelve la ciudad y la temperatura.
-        return True
+    def choose_random_city(self):
+        if self.city_temperatures:
+            self.chosen_city = random.choice(list(self.city_temperatures.keys()))
+        return self.chosen_city
 
     def start(self):
-        self.load_city_data()
-        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.bind(("127.0.0.1", self.listen_port))
-        server_socket.listen(1)
-        print(f"AD_Weather en funcionamiento. Escuchando en el puerto {self.listen_port}...")
+        try:
+            server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            server_socket.bind(("127.0.0.1", self.listen_port))
+            server_socket.listen(1)
+            print(f"AD_Weather en funcionamiento. Escuchando en el puerto {self.listen_port}")
+            city = self.choose_random_city()
+            initial_temperature = random.randint(0, 40)  # Asegura que la temperatura inicial sea mayor o igual a 0
+            self.city_temperatures[self.chosen_city] = initial_temperature
 
-        while True:
-            client_socket, addr = server_socket.accept()
-            print(f"Solicitud de información del clima desde {addr}")
+            # Realizar la elección aleatoria de la ciudad una vez al comienzo
+            weather_producer = cp.WeatherProducer(self.broker_address, self.city_temperatures, self.chosen_city)
+            weather_producer.start()
 
-            data = client_socket.recv(1024).decode()
-            request = json.loads(data)
+            while True:
+                client_socket, addr = server_socket.accept()
+                print(f"Solicitud de información del clima desde {addr}")
+                print(f"Ciudad elegida para el show: {self.chosen_city}")
 
-            if 'city' in request:
-                city = request['city']
-                temperature = self.get_temperature(city)
-                print(f"Temperatura actual en {city}: {temperature}")
-                self.clima[city] = temperature  # Almacenar la temperatura actual
-                
-                producer_thread = cp.WeatherProducer(self.broker_address, self.city_data)
-                producer_thread.start()
+                while True:
+                    temperature = random.randint(-20, 40)
+                    self.city_temperatures[self.chosen_city] = temperature
+                    print(f"Temperatura actual en {city}: {temperature}")
+
+                    if city == self.chosen_city:
+                        weather_producer.send_temperature_to_engine(city, temperature)
+
+                    # Simular cambios de temperatura cada 10 segundos
+                    time.sleep(10)
+
+        except OSError as e:
+            print(f"OSError al intentar enlazar el socket al puerto: {str(e)}")
+        except KeyboardInterrupt:
+            print("Interrupción de teclado. Deteniendo el servidor ADWeather.")
+            server_socket.close()
 
 
-
-                # Realizar comprobaciones climáticas y notificar a AD_Engine si es necesario
-                if temperature < 0:
-                    # Informar a AD_Engine y finalizar el espectáculo
-                    # Aquí podrías establecer la lógica para notificar al AD_Engine de las condiciones climáticas adversas.
-                    # Por ejemplo, puedes usar sockets o un mecanismo de comunicación adecuado para enviar el mensaje al AD_Engine.
-
-                    # Notificar a los drones y finalizar el espectáculo
-                    # ...
-                    return False
-            else:
-                print("Solicitud de información incorrecta")
 
 if __name__ == "__main__":
     listen_port = 8082
-    city_data_file = "ciudades.json"  # Puedes cargar los datos de ciudades y temperaturas desde un archivo JSON
     weather_app = ADWeather(listen_port)
     weather_app.start()
