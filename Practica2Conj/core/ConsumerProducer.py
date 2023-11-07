@@ -34,7 +34,7 @@ class ConsumerProducer:
         try:
             # Ejemplo: Si el mensaje es JSON y contiene un campo "dron_id"
             data = json.loads(message)
-            return data.get("dron_id")
+            return data.get("self.dron_id")
         except json.JSONDecodeError:
             # Manejo de errores
             return None
@@ -43,9 +43,6 @@ class ConsumerProducer:
     def start(self):
         consumer_thread = ConsumerEngine(self.broker_address, self.consumer_threads)
         consumer_thread.start()
-
-        producer_thread = ProducerDron(self.broker_address, self.dron_id)
-        producer_thread.start()
 
         consumer_thread_movement = ConsumerMovement(self.broker_address)
         consumer_thread_movement.start()
@@ -58,7 +55,6 @@ class ConsumerProducer:
 
         # Esperar a que los hilos terminen
         consumer_thread.join()
-        producer_thread.join()
         consumer_thread_movement.join()
         producer_thread_show.join()
         consumer_thread_city_temperature.join()
@@ -181,37 +177,6 @@ class ProducerShow(threading.Thread):
 
         producer.close()
 
-
-# Producer para enviar registros de drones
-class ProducerDron(threading.Thread):
-    def __init__(self, KAFKA_SERVER, dron_id):
-        threading.Thread.__init__(self)
-        self.stop_event = threading.Event()
-        self.server = KAFKA_SERVER
-        self.registration_sent = False  # Indica si el mensaje de registro se ha enviado al motor
-        self.dron_id = dron_id  # Almacenar el ID del dron
-
-    def stop(self):
-        self.stop_event.set()
-
-    def run(self):
-        producer = kafka.KafkaProducer(bootstrap_servers=self.server)
-
-        while not self.stop_event.is_set() and not self.registration_sent:
-            # Utilizar el ID del dron registrado en AD_Registry
-            dron_id = self.dron_id
-            
-            # Construir el mensaje de registro del dron
-            registration_message = f"Registro de dron: ID={dron_id}"
-            
-            # Enviar el mensaje de registro del dron al motor
-            producer.send('register_dron', registration_message.encode(FORMAT))
-            self.registration_sent = True
-            
-            if self.stop_event.is_set():
-                break
-
-        producer.close()
         
         
 class ProducerMovements(threading.Thread):
@@ -274,7 +239,6 @@ class WeatherProducer(threading.Thread):
             time.sleep(10)
 
         self.producer.close()
-
         
         
 # En la clase ADEngine o en un módulo separado

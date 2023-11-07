@@ -21,7 +21,7 @@ class ADDrone:
         self.current_position = (1,1)
         self.broker_address = broker_address
         self.consumer_producer = cp.ConsumerProducer(self.broker_address)
-        self.kafka_producer = KafkaProducer(bootstrap_servers='localhost:29092')
+        self.kafka_producer = KafkaProducer(bootstrap_servers=self.broker_address)
         
 
     def input_drone_data(self):
@@ -74,6 +74,14 @@ class ADDrone:
                 self.access_token = response_json['token']
                 self.registered_drones[self.dron_id] = self.access_token
                 print(f"Registro exitoso. Token de acceso: {self.access_token}")
+                
+                self.send_kafka_message('drone_registered', {
+                    'type': 'register',
+                    'ID': self.dron_id,
+                    'Alias': self.alias,
+                    'AccessToken': self.access_token,
+                    'InitialPosition': self.current_position
+                })
             else:
                 print(f"Error en el registro: {response_json['message']}")
         except ConnectionRefusedError:
@@ -81,7 +89,17 @@ class ADDrone:
         except Exception as e:
             print(f"Error inesperado: {e}")
 
-            
+    def send_kafka_message(self, topic, message):
+        try:
+            # El valor ya debe ser serializado a bytes antes de esta llamada
+            # Asegúrate de que el mensaje esté en formato JSON y codificado a bytes
+            self.kafka_producer.send(topic, value=json.dumps(message).encode('utf-8'))
+            self.kafka_producer.flush()
+        except Exception as e:
+            print(f"Error al enviar mensaje Kafka: {e}")
+
+        
+    
 
     def authenticate(self):
         if self.dron_id in self.registered_drones:
@@ -94,17 +112,62 @@ class ADDrone:
 
 
     def consume_kafka_messages(self):
+        # Configurar el consumidor de Kafka
         consumer = KafkaConsumer(
-            'register_movement',  # Cambia según la configuración de tu servidor Kafka
-            bootstrap_servers='127.0.0.1:29092',  # Cambia según la configuración de tu servidor Kafka
-            auto_offset_reset='latest',  # Puedes configurarlo según tus necesidades
-            enable_auto_commit=True,  # Puedes configurarlo según tus necesidades
-            group_id=None  # Puedes configurarlo según tus necesidades
+            'drone_messages_topic',  # Cambiado a un tópico genérico para todos los mensajes de drones
+            bootstrap_servers=self.broker_address,
+            auto_offset_reset='latest',
+            enable_auto_commit=True,  # Asegúrate de que esto esté habilitado
+            group_id='drone-group-{}'.format(self.dron_id)
         )
 
-        for message in consumer:
-            instruction = message.value.decode()
-            return instruction
+        try:
+            for message in consumer:
+                # Decodificar el mensaje de bytes a dict
+                message_data = json.loads(message.value.decode('utf-8'))
+                if message_data.get('ID') == self.dron_id:
+                    # Verificar si el mensaje es un registro o una instrucción
+                    if 'type' in message_data and message_data['type'] == 'register':
+                        # Manejar registro de drones
+                        drone_id = message_data['ID']
+                        self.registered_drones[drone_id] = {
+                            'alias': message_data['Alias'],
+                            'access_token': message_data['AccessToken'],
+                            'initial_position': message_data['InitialPosition']
+                        }
+                        print(f"Drone {drone_id} registered with alias {message_data['Alias']}.")
+                    elif 'type' in message_data and message_data['type'] == 'instruction':
+                        # Procesar la instrucción específica
+                        instruction = message_data['instruction']
+                        if instruction == "MOVE":
+                            # Extraer detalles de la instrucción MOVE y actuar en consecuencia
+                            pass  # Reemplazar con la lógica de movimiento
+                        elif instruction == "SHOW_MAP":
+                            # Mostrar el mapa o realizar la acción correspondiente
+                            pass  # Reemplazar con la lógica para mostrar el mapa
+                        # Añadir más instrucciones según sea necesario
+                    else:
+                        print(f"Unknown message type received: {message_data}")
+
+        except Exception as e:
+            print(f"Error while consuming messages: {e}")
+        finally:
+            consumer.close()
+
+    
+    
+    def register_to_engine(self):
+        # Conectar con AD_Registry para obtener el token
+        # Conectar con AD_Engine para unirse al espectáculo
+        pass
+
+    def send_movement_update(self, position):
+        # Enviar actualización de movimiento a AD_Engine
+        pass
+
+    def start_moving(self):
+        # Comenzar a moverse hacia la posición de destino asignada
+        pass
     
 
     def join_show(self, dron_id):
@@ -119,15 +182,21 @@ class ADDrone:
             engine_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             engine_socket.connect(self.engine_address)
             
+            # Envía mensaje al Engine informando que el dron con ID se ha unido
+            join_message = {'action': 'join', 'ID': self.dron_id}
+            engine_socket.send(json.dumps(join_message).encode('utf-8'))
+            
             # Conectar a Kafka para recibir actualizaciones de posición del dron
             consumer_producer = cp.ConsumerProducer(broker_address, dron_id)
             consumer_producer.start_consumer()
             print(f"El dron con ID {self.dron_id} se ha unido al espectáculo.")
                 
             try:
-
                 while True:
                     instruction = self.consume_kafka_messages()
+                    if instruction is None:
+                        print("No se recibió ninguna instrucción válida.")
+                        break
 
                     if instruction == "EXIT":
                         print("Saliendo del programa.")
@@ -221,26 +290,6 @@ class ADDrone:
 
        
         # Cerrar la conexión con la base de datos
-        mongo_client.close() 
-        
-            
-    def modify_drones(self):
-        # Conectar a la base de datos de MongoDB
-        mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
-        db = mongo_client["dronedb"]
-        drones_collection = db["drones"]
-        
-        self.dron_id=int(input("Introduce el ID del dron: "))
-        
-        # Recuperar todos los drones desde la base de datos
-        drones = drones_collection.find_one({"ID": self.dron_id})
-        if drones:
-            new_alias =input("Introduce el nuevo alias: ")
-            drones_collection.update_one({"ID": self.dron_id}, {"$set": {"Alias": new_alias}})
-            print(f"Dron con ID {self.dron_id} actualizado con el nuevo alias: {new_alias}")
-        else:
-            print(f"No se encontro el dron con id {self.dron_id}")
-        
         mongo_client.close()
     
     
@@ -294,9 +343,8 @@ class ADDrone:
                 print("1. Registrar dron")
                 print("2. Unirse al espectáculo")
                 print("3. Listar todos los drones")
-                print("4. Modificar drones")
-                print("5. Eliminar drones")
-                print("6. Salir")
+                print("4. Eliminar drones")
+                print("5. Salir")
 
                 choice = input("Seleccione una opción: ")
 
@@ -316,10 +364,8 @@ class ADDrone:
                 elif choice == "3":
                     self.list_drones()
                 elif choice == "4":
-                    self.modify_drones()
-                elif choice == "5":
                     self.delete_drones()
-                elif choice == "6":
+                elif choice == "5":
                     break
                 else:
                     print("Opción no válida. Seleccione una opción válida.")

@@ -1,73 +1,104 @@
 import socket
 import json
-import time
+import threading
 import random
 from kafka import KafkaProducer
-import ConsumerProducer as cp
+import time
+
 
 class ADWeather:
-    def __init__(self, listen_port):
+    def __init__(self, listen_port, broker_address):
         self.listen_port = listen_port
+        self.broker_address = broker_address
         self.city_temperatures = self.load_city_temperatures()
-        self.broker_address = "localhost:29092"
         self.chosen_city = None  # Almacena la ciudad elegida para el show
 
     def load_city_temperatures(self):
+        # Intenta cargar la temperatura de las ciudades desde un archivo JSON
         try:
             with open('ciudades.json', 'r') as file:
                 city_temperatures = json.load(file)
-                # Asigna temperaturas iniciales aleatorias en lugar de null
-                for city in city_temperatures:
-                    city_temperatures[city] = random.randint(1, 40)
-                return city_temperatures
+            return city_temperatures
         except FileNotFoundError:
-            print("El archivo 'ciudades.json' no se encontró. Asegúrate de que el archivo exista en el directorio actual.")
+            print("El archivo 'ciudades.json' no se encontró.")
             return {}
 
     def choose_random_city(self):
-        if self.city_temperatures:
-            self.chosen_city = random.choice(list(self.city_temperatures.keys()))
+        # Elige una ciudad aleatoria de las disponibles y asigna una temperatura inicial mayor a 0
+        self.chosen_city = random.choice(list(self.city_temperatures.keys()))
+        self.city_temperatures[self.chosen_city] = random.randint(1, 40)  # Asegura que la primera temperatura sea mayor a 0
         return self.chosen_city
 
-    def start(self):
+    def start_weather_producer(self):
+        #Inicia el productor de Kafka para enviar actualizaciones de temperatura
+
+        while True:
+            # Actualiza la temperatura de la ciudad elegida aleatoriamente entre -20 y 40
+            self.city_temperatures[self.chosen_city] = random.randint(-20, 40)
+            # Enviar la actualización de la temperatura aquí...
+            time.sleep(15)
+            
+            
+
+    def handle_client_request(self, client_socket):
+        # Maneja las solicitudes entrantes de los clientes
         try:
-            server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            server_socket.bind(("127.0.0.1", self.listen_port))
-            server_socket.listen(1)
-            print(f"AD_Weather en funcionamiento. Escuchando en el puerto {self.listen_port}")
-            city = self.choose_random_city()
-            initial_temperature = random.randint(0, 40)  # Asegura que la temperatura inicial sea mayor o igual a 0
-            self.city_temperatures[self.chosen_city] = initial_temperature
+            request_data = client_socket.recv(1024).decode('utf-8')
+            if not request_data:  # Verifica que se haya recibido algún dato
+                raise ValueError("No se recibieron datos o la cadena está vacía.")
 
-            # Realizar la elección aleatoria de la ciudad una vez al comienzo
-            weather_producer = cp.WeatherProducer(self.broker_address, self.city_temperatures, self.chosen_city)
-            weather_producer.start()
+            request_json = json.loads(request_data)  # Intenta decodificar el JSON
+            # ... procesa la solicitud ...
+            if request_json['action'] == 'get_temperature':
+                self.send_weather_info(client_socket)
+               
 
+            # Puedes añadir más acciones según sea necesario
+        except Exception as e:
+            print(f"Error al manejar la solicitud del cliente: {e}")
+        finally:
+            client_socket.close()
+
+    def send_weather_info(self, client_socket):
+        # Envía la información del clima al cliente
+        weather_info = {
+            'city': self.chosen_city,
+            'temperature': self.city_temperatures[self.chosen_city]
+        }
+        client_socket.send(json.dumps(weather_info).encode('utf-8'))
+
+    def start(self):
+        # Configura el socket del servidor y comienza a escuchar las solicitudes
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server_socket.bind(("127.0.0.1", self.listen_port))
+        server_socket.listen(1)
+        print(f"AD_Weather en funcionamiento. Escuchando en el puerto {self.listen_port}")
+
+        # Elige una ciudad y su temperatura al azar al principio
+        self.choose_random_city()
+
+        # Inicia el productor de clima en un hilo separado
+        weather_producer_thread = threading.Thread(target=self.start_weather_producer)
+        weather_producer_thread.start()
+        #Falta el random a la temperatura
+        try:
             while True:
                 client_socket, addr = server_socket.accept()
                 print(f"Solicitud de información del clima desde {addr}")
-                print(f"Ciudad elegida para el show: {self.chosen_city}")
-
-                while True:
-                    temperature = random.randint(-20, 40)
-                    self.city_temperatures[self.chosen_city] = temperature
-                    print(f"Temperatura actual en {city}: {temperature}")
-
-                    if city == self.chosen_city:
-                        weather_producer.send_temperature_to_engine(city, temperature)
-
-                    # Simular cambios de temperatura cada 10 segundos
-                    time.sleep(10)
-
-        except OSError as e:
-            print(f"OSError al intentar enlazar el socket al puerto: {str(e)}")
+                # Maneja cada solicitud del cliente en su propio hilo
+                client_thread = threading.Thread(target=self.handle_client_request, args=(client_socket,))
+                client_thread.start()
         except KeyboardInterrupt:
-            print("Interrupción de teclado. Deteniendo el servidor ADWeather.")
+            print("Servidor AD_Weather detenido por el usuario.")
+        except Exception as e:
+            print(f"Error del servidor: {e}")
+        finally:
             server_socket.close()
-
-
+            weather_producer_thread.join()  # Asegúrate de que el hilo del productor termina correctamente
 
 if __name__ == "__main__":
+    # Estos valores podrían venir de un archivo de configuración o variables de entorno
     listen_port = 8082
-    weather_app = ADWeather(listen_port)
+    broker_address = "localhost:29092"
+    weather_app = ADWeather(listen_port, broker_address)
     weather_app.start()
