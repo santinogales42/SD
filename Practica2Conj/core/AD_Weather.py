@@ -12,6 +12,11 @@ class ADWeather:
         self.broker_address = broker_address
         self.city_temperatures = self.load_city_temperatures()
         self.chosen_city = None  # Almacena la ciudad elegida para el show
+        
+        self.kafka_producer = KafkaProducer(
+            bootstrap_servers=[broker_address],
+            value_serializer=lambda v: json.dumps(v).encode('utf-8')
+        )
 
     def load_city_temperatures(self):
         # Intenta cargar la temperatura de las ciudades desde un archivo JSON
@@ -30,12 +35,17 @@ class ADWeather:
         return self.chosen_city
 
     def start_weather_producer(self):
-        #Inicia el productor de Kafka para enviar actualizaciones de temperatura
-
         while True:
-            # Actualiza la temperatura de la ciudad elegida aleatoriamente entre -20 y 40
-            self.city_temperatures[self.chosen_city] = random.randint(-20, 40)
-            # Enviar la actualización de la temperatura aquí...
+            # Actualiza la temperatura de la ciudad elegida aleatoriamente entre -10 y 40
+            self.city_temperatures[self.chosen_city] = random.randint(-10, 40)
+            # Construye el mensaje
+            weather_update = {
+                'city': self.chosen_city,
+                'temperature': self.city_temperatures[self.chosen_city]
+            }
+            # Enviar la actualización de la temperatura a través de Kafka
+            self.kafka_producer.send('get_temperature', value=weather_update)
+            self.kafka_producer.flush()
             time.sleep(15)
             
             
