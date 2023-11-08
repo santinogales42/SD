@@ -37,7 +37,7 @@ class ADWeather:
     def start_weather_producer(self):
         while True:
             # Actualiza la temperatura de la ciudad elegida aleatoriamente entre -10 y 40
-            self.city_temperatures[self.chosen_city] = random.randint(-10, 40)
+            self.city_temperatures[self.chosen_city] = random.randint(1, 40)
             # Construye el mensaje
             weather_update = {
                 'city': self.chosen_city,

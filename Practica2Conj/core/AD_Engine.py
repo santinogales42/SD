@@ -6,7 +6,11 @@ import pymongo
 import re
 import threading
 import time
+import traceback
 
+INSTRUCTION_START = 'START'
+INSTRUCTION_STOP = 'STOP'
+INSTRUCTION_MOVE = 'MOVE'
 
 class DroneThread(threading.Thread):
     def __init__(self, dron_id, engine_instance):
@@ -17,29 +21,26 @@ class DroneThread(threading.Thread):
 
     def run(self):
         try:
-            while not self._stop_event.is_set():  # Continúa hasta que se active el evento de detención
-                # Espera para evitar sobrecarga si el dron ya está en su posición final
-                if self.engine_instance.current_positions.get(self.dron_id) == \
-                        self.engine_instance.final_positions.get(self.dron_id):
-                    time.sleep(1)
-                    continue
+            while not self._stop_event.is_set():
+                current_position = self.engine_instance.get_current_position(self.dron_id)
+                final_position = self.engine_instance.get_final_position(self.dron_id)
 
-                # Solicita la siguiente posición al ADEngine
-                next_position = self.engine_instance.calculate_next_position(
-                    self.engine_instance.current_positions.get(self.dron_id),
-                    self.engine_instance.final_positions.get(self.dron_id)
-                )
-                
-                # Enviar instrucciones de movimiento al dron
-                self.engine_instance.send_movement_instructions_to_drone(self.dron_id, next_position)
+                if current_position == final_position:
+                    print(f"Dron {self.dron_id} ya está en posición final.")
+                    self.stop()
+                    break
 
-                # Esperar antes de la próxima actualización para no sobrecargar el CPU
-                time.sleep(1)
+                next_position = self.engine_instance.calculate_next_position(current_position, final_position)
+                if next_position != current_position:
+                    self.engine_instance.send_movement_instructions_to_drone(self.dron_id, next_position)
+                else:
+                    print(f"Dron {self.dron_id} ya está en la posición deseada ({next_position}).")
+                time.sleep(5)
         except Exception as e:
             print(f"Error en DroneThread {self.dron_id}: {e}")
 
     def stop(self):
-        self._stop_event.set()  # Activa el evento para detener el hilo
+        self._stop_event.set()
 
 class ADEngine:
     def __init__(self, listen_port, broker_address, database_address, weather_address):
@@ -84,6 +85,8 @@ class ADEngine:
         print(f"AD_Engine en funcionamiento. Escuchando en el puerto {self.listen_port}...")
         self.weather_thread = threading.Thread(target=self.update_weather_conditions)
         self.weather_thread.start()
+        self.kafka_consumer_thread = threading.Thread(target=self.start_kafka_consumer)
+        self.kafka_consumer_thread.start()
         try:
             while True:
                 client_socket, addr = self.server_socket.accept()
@@ -95,25 +98,36 @@ class ADEngine:
         finally:
             self.close()
 
+
+    def accept_connections(self):
+        while not self.stop_event.is_set():
+            client_socket, addr = self.server_socket.accept()
+            print(f"Conexión aceptada de {addr}")
+            drone_connection_thread = threading.Thread(target=self.handle_drone_connection, args=(client_socket,))
+            drone_connection_thread.start()
+
     def handle_drone_connection(self, client_socket):
         try:
-            data = client_socket.recv(1024)
+            data = client_socket.recv(1024).decode('utf-8')
             if not data:
                 raise ValueError("No se recibieron datos.")
 
-            message = json.loads(data.decode('utf-8'))
+            message = json.loads(data)
             if message.get('action') == 'join':
                 dron_id = message['ID']
                 if dron_id not in self.connected_drones:
                     self.connected_drones.add(dron_id)
-                    print(f"Drone con ID={dron_id} se ha unido.")  # Esto debería imprimirse para el primer dron
+                    self.current_positions[dron_id] = self.get_initial_position(dron_id)
+                    print(f"Drone con ID={dron_id} se ha unido.")
                     self.check_all_drones_connected()
                 else:
                     print(f"Drone con ID={dron_id} ya está unido.")
         except Exception as e:
             print(f"Error al manejar la conexión del dron: {e}")
+            traceback.print_exc()
         finally:
             client_socket.close()
+
 
     def check_all_drones_connected(self):
         if self.required_drones is not None:
@@ -125,8 +139,30 @@ class ADEngine:
 
     def start_show(self):
         print("El espectáculo ha comenzado.")
-        # Inicia la secuencia de movimientos para todos los drones.
+        self.send_start_instructions()
         self.initiate_movement_sequence()
+
+    def send_start_instructions(self):
+        for dron_id in self.connected_drones:
+            self.send_instruction(dron_id, INSTRUCTION_START)
+    
+    def send_stop_instructions(self):
+        for dron_id in self.connected_drones:
+            self.send_instruction(dron_id, INSTRUCTION_STOP)
+
+    def send_instruction(self, dron_id, instruction_type):
+        message = {
+            'type': 'instruction',
+            'dron_id': dron_id,
+            'instruction': instruction_type
+        }
+        self.kafka_producer.send('drone_messages_topic', value=message)
+        self.kafka_producer.flush()
+        print(f"Instrucción {instruction_type} enviada al dron {dron_id}")
+
+    def send_movement_instructions_to_drone(self, dron_id, target_position):
+        # Asumiendo que esta función ya está definida y envía instrucciones de movimiento
+        self.send_instruction(dron_id, INSTRUCTION_MOVE + ':' + str(target_position))
 
     def calculate_next_position(self, current_position, final_position):
         # Desempaca las posiciones actuales y finales
@@ -155,15 +191,22 @@ class ADEngine:
 
         # Devuelve la siguiente posición
         return (next_x, next_y)
+        
+    def start_kafka_consumer(self):
+        # Configurar el consumidor de Kafka
+        consumer = KafkaConsumer(
+            'drone_position_updates',  # Asegúrate de que el tópico sea el correcto
+            bootstrap_servers=self.broker_address,
+            auto_offset_reset='latest',
+            enable_auto_commit=True,
+            group_id='engine-group'  # Un group_id para el engine
+        )
 
-
-    def receive_drone_updates(self, message):
-        # Actualiza las posiciones actuales de los drones cuando recibes una actualización.
-        # Esta función debería ser llamada cuando se consumen mensajes del tópico de Kafka.
-        dron_id = message['dron_id']
-        current_position = message['current_position']
-        self.current_positions[dron_id] = current_position
-        self.check_figure_completion()
+        for message in consumer:
+            message_data = json.loads(message.value.decode('utf-8'))
+            if message_data['type'] == 'position_update':
+                # Actualiza la posición actual del dron en AD_Engine
+                self.update_drone_position(message_data['ID'], message_data['new_position'])
         
     def end_show(self):
         print("El espectáculo ha finalizado debido a condiciones climáticas adversas.")
@@ -180,18 +223,14 @@ class ADEngine:
         
 
     def close(self):
-        self.stop_event.set()  # Indica al hilo que debe detenerse
+        self.stop_event.set()
         if self.weather_thread:
-            self.weather_thread.join()  # Espera a que el hilo termine
+            self.weather_thread.join()
+        if self.kafka_consumer_thread:
+            self.kafka_consumer_thread.join()
         self.server_socket.close()
+        self.kafka_producer.close()
         print("AD_Engine ha cerrado todos los recursos.")
-
-    def accept_connections(self):
-        while not self.stop_event.is_set():
-            client_socket, addr = self.server_socket.accept()
-            print(f"Conexión aceptada de {addr}")
-            drone_connection_thread = threading.Thread(target=self.handle_drone_connection, args=(client_socket,))
-            drone_connection_thread.start()
 
     def procesar_datos_json(self, ruta_archivo_json):
         with open(ruta_archivo_json, 'r') as archivo:
@@ -212,7 +251,6 @@ class ADEngine:
             final_position = tuple(map(int, dron['POS'].split(',')))  # Convertir la posición a una tupla de enteros
             self.final_positions[dron_id] = final_position  # Nuevas posiciones finales
             print(f"Dron ID: {dron_id}, Posición final: {final_position}")  # Imprime el ID del dron y su posición final
-
         # Asegúrate de que todos los drones requeridos están conectados antes de comenzar
         self.check_all_drones_connected()
 
@@ -240,6 +278,8 @@ class ADEngine:
     def monitor_progress(self):
         while self.show_in_progress:
             for dron_id in self.connected_drones:
+                if self.drone_threads[dron_id].status == "COMPLETED":
+                    continue
                 current_position = self.get_current_position(dron_id)
                 final_position = self.final_positions[dron_id]
                 if current_position != final_position:
@@ -248,34 +288,26 @@ class ADEngine:
                     # El dron ha llegado a su posición final, potencialmente marca como completo
                     pass
             time.sleep(1)
-            
-    def send_movement_instructions_to_drone(self, dron_id, target_position):
-        try:
-            # Suponemos que el método send() del productor de Kafka está configurado para enviar mensajes.
-            # La key asegura que todos los mensajes para un dron particular vayan a la misma partición y,
-            # por lo tanto, se procesen en el orden correcto.
-            message = {
-                'type': 'instruction',
-                'dron_id': dron_id,
-                'target_position': target_position
-            }
-            self.kafka_producer.send(
-                'drone_messages_topic', 
-                key=str(dron_id).encode(), 
-                value=json.dumps(message).encode('utf-8')
-            )
-            self.kafka_producer.flush()
-            print(f"Instrucciones de movimiento enviadas al dron {dron_id} para moverse a {target_position}")
-        except Exception as e:
-            print("ERROR {e}")
+
     
     def get_initial_position(self, dron_id):
-        # Supongamos que las posiciones iniciales están guardadas en una base de datos o en una variable
-        return self.db.drones.find_one({"ID": dron_id})['InitialPosition']
+        dron_data = self.db.drones.find_one({"ID": dron_id})
+        # Si el dron se encuentra en la base de datos, devuelve su posición inicial
+        if dron_data:
+            return dron_data.get('InitialPosition')  # Devuelve una posición predeterminada si no se encuentra 'InitialPosition'
 
     def get_current_position(self, dron_id):
         # Supongamos que las posiciones actuales se almacenan en el estado de la clase
         return self.current_positions.get(dron_id)
+    
+    def get_final_position(self, dron_id):
+        # Supongamos que las posiciones finales se almacenan en un diccionario
+        return self.final_positions.get(dron_id)
+    
+    
+    def update_current_position(self, dron_id, position):
+        # Actualiza la posición actual del dron en el sistema
+        self.current_positions[dron_id] = position
 
     def show_in_progress(self):
         for dron_id, position in self.current_positions.items():
@@ -301,8 +333,22 @@ class ADEngine:
                 self.end_show()
             time.sleep(15)
 
-# Luego, en el método start(), debes iniciar el hilo que llamará a update_weather_conditions periódicamente
-
+    def update_drone_position(self, dron_id, position):
+        # Actualiza la posición actual del dron en el sistema
+        self.current_positions[dron_id] = position
+        # Verifica si el dron ha llegado a la posición final
+        if position == self.final_positions.get(dron_id):
+            print(f"Dron {dron_id} ha confirmado llegada a la posición final.")
+            # Aquí podrías marcar al dron como que ha alcanzado su posición final
+            # para evitar enviarle más instrucciones
+            # Por ejemplo, podrías tener un conjunto de drones 'en posición'
+        else:
+            print(f"Dron {dron_id} ha confirmado llegada a la posición intermedia {position}.")
+            # Actualiza la posición actual del dron y calcula el siguiente movimiento
+            next_position = self.calculate_next_position(position, self.final_positions.get(dron_id))
+            # Si la siguiente posición es diferente a la actual, envía la nueva instrucción
+            if next_position != position:
+                self.send_movement_instructions_to_drone(dron_id, next_position)
 
 
 if __name__ == "__main__":
