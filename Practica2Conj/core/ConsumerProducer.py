@@ -50,15 +50,10 @@ class ConsumerProducer:
         producer_thread_show = ProducerShow(self.broker_address, self.dron_id)
         producer_thread_show.start()
 
-        consumer_thread_city_temperature = CityTemperatureConsumer(self.broker_address)
-        consumer_thread_city_temperature.start()
-
         # Esperar a que los hilos terminen
         consumer_thread.join()
         consumer_thread_movement.join()
         producer_thread_show.join()
-        consumer_thread_city_temperature.join()
-
 
 
 # Actualización del nombre del tópico para recibir mensajes de registro de drones
@@ -205,61 +200,3 @@ class ProducerMovements(threading.Thread):
                 break
 
         self.producer.close()
-        
-        
-
-class WeatherProducer(threading.Thread):
-    def __init__(self, KAFKA_SERVER, city_data, chosen_city):
-        threading.Thread.__init__(self)
-        self.stop_event = threading.Event()
-        self.server = KAFKA_SERVER
-        self.city_data = city_data  # Datos de las ciudades y temperaturas
-        self.chosen_city = chosen_city  # Ciudad elegida para el show
-        self.producer = kafka.KafkaProducer(bootstrap_servers=self.server)
-
-    def stop(self):
-        self.stop_event.set()
-
-    def send_temperature_to_engine(self, city, temperature):
-        temperature_message = f"Temperatura actual en {city}: {temperature}"
-        self.producer.send('city_temperature', temperature_message.encode(FORMAT))
-        self.producer.flush()
-
-    def run(self):
-        while not self.stop_event.is_set():
-            for city, temperature in self.city_data.items():
-                if city == self.chosen_city:
-                    # Solo envía la temperatura de la ciudad elegida al motor
-                    self.send_temperature_to_engine(city, temperature)
-
-                if self.stop_event.is_set():
-                    break
-
-            # Esperar un intervalo de tiempo (por ejemplo, 10 segundos) antes de enviar las actualizaciones nuevamente
-            time.sleep(10)
-
-        self.producer.close()
-        
-        
-# En la clase ADEngine o en un módulo separado
-class CityTemperatureConsumer(threading.Thread):
-    def __init__(self, KAFKA_SERVER):
-        threading.Thread.__init__(self)
-        self.stop_event = threading.Event()
-        self.server = KAFKA_SERVER
-
-    def stop(self):
-        self.stop_event.set()
-
-    def run(self):
-        consumer = kafka.KafkaConsumer(
-            'city_temperature', bootstrap_servers=self.server, auto_offset_reset='latest')
-
-        while not self.stop_event.is_set():
-            for message in consumer:
-                # Procesa las actualizaciones de temperatura de la ciudad (cambia este nombre y la lógica a la real en tu código)
-                print(f"Actualización de temperatura de la ciudad: {message.value.decode('utf-8')}")
-                if self.stop_event.is_set():
-                    break
-
-        consumer.close()

@@ -1,6 +1,5 @@
 import socket
 import json
-import ConsumerProducer as cp
 from kafka import KafkaConsumer, KafkaProducer
 import pymongo
 import re
@@ -141,28 +140,42 @@ class ADEngine:
         print("El espectáculo ha comenzado.")
         self.send_start_instructions()
         self.initiate_movement_sequence()
+        progress_thread = threading.Thread(target=self.monitor_progress)
+        progress_thread.start()
 
     def send_start_instructions(self):
         for dron_id in self.connected_drones:
-            self.send_instruction(dron_id, INSTRUCTION_START)
+            self.send_movement_instructions_to_drone(dron_id, INSTRUCTION_START)
     
     def send_stop_instructions(self):
         for dron_id in self.connected_drones:
-            self.send_instruction(dron_id, INSTRUCTION_STOP)
+            self.send_movement_instructions_to_drone(dron_id, INSTRUCTION_STOP)
 
-    def send_instruction(self, dron_id, instruction_type):
+    def send_movement_instructions_to_drone(self, dron_id, target_position):
         message = {
             'type': 'instruction',
             'dron_id': dron_id,
-            'instruction': instruction_type
+            'instruction': f"{INSTRUCTION_MOVE}:{target_position}"
         }
-        self.kafka_producer.send('drone_messages_topic', value=message)
+        self.kafka_producer.send('drone_messages_topic', message)
         self.kafka_producer.flush()
-        print(f"Instrucción {instruction_type} enviada al dron {dron_id}")
-
-    def send_movement_instructions_to_drone(self, dron_id, target_position):
-        # Asumiendo que esta función ya está definida y envía instrucciones de movimiento
-        self.send_instruction(dron_id, INSTRUCTION_MOVE + ':' + str(target_position))
+        print(f"Instrucción {message} enviada al dron {dron_id}")
+        
+    def publish_final_position(self, dron_id):
+        try:
+            final_position = self.get_final_position(dron_id)
+            message = {
+                'type': 'final_position',
+                'dron_id': dron_id,
+                'final_position': final_position
+            }
+            self.kafka_producer.send('drone_final_positions', json.dumps(message).encode('utf-8'))
+            self.kafka_producer.flush()
+        except Exception as e:
+            print(f"Error al publicar la posición final del dron {dron_id}: {e}")
+            
+    def respond_to_final_position_request(self, dron_id):
+        self.publish_final_position(dron_id)
 
     def calculate_next_position(self, current_position, final_position):
         # Desempaca las posiciones actuales y finales
@@ -274,9 +287,17 @@ class ADEngine:
             drone_thread.start()  # Esto iniciará el método run() del hilo en paralelo
             # Puedes mantener una referencia a los hilos si necesitas interactuar con ellos más tarde
             self.drone_threads[dron_id] = drone_thread
+            
+    def show_in_progress(self):
+        for dron_id, position in self.current_positions.items():
+            if position != self.final_positions.get(dron_id, position):
+                # Si algún dron no está en su posición final, el espectáculo sigue en progreso
+                return True
+        # Si todos los drones están en su posición final, el espectáculo no está en progreso
+        return False
 
     def monitor_progress(self):
-        while self.show_in_progress:
+        while self.show_in_progress():
             for dron_id in self.connected_drones:
                 if self.drone_threads[dron_id].status == "COMPLETED":
                     continue
@@ -349,6 +370,8 @@ class ADEngine:
             # Si la siguiente posición es diferente a la actual, envía la nueva instrucción
             if next_position != position:
                 self.send_movement_instructions_to_drone(dron_id, next_position)
+                self.current_positions[dron_id] = position
+                self.check_figure_completion()
 
 
 if __name__ == "__main__":

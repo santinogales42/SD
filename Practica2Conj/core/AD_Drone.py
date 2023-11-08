@@ -100,7 +100,6 @@ class ADDrone:
             print(f"Error al enviar mensaje Kafka: {e}")
 
         
-    
 
     def authenticate(self):
         if self.dron_id in self.registered_drones:
@@ -109,7 +108,6 @@ class ADDrone:
             if stored_token == self.access_token:
                 return True
         return False
-
 
 
     def consume_kafka_messages(self):
@@ -127,17 +125,32 @@ class ADDrone:
         for message in consumer:
             message_data = json.loads(message.value.decode('utf-8'))
             if message_data.get('dron_id') == self.dron_id:
+                if message_data['type'] == 'final_position' and message_data['dron_id'] == self.dron_id:
+                    self.final_position = tuple(message_data['final_position'])
+                    print(f"Posición final recibida: {self.final_position}")
                 instruction = message_data.get('instruction')
                 if instruction:
+                    # Manejar la instrucción START
                     if instruction == 'START':
                         self.handle_start()
+
+                    # Manejar la instrucción STOP
                     elif instruction == 'STOP':
                         self.handle_stop()
-                    elif instruction.startswith('MOVE'):
-                        # Extracción de la posición objetivo de la instrucción MOVE
-                        target_position = tuple(map(int, instruction.lstrip('MOVE:').strip('()').split(',')))
-                        self.move_to_position(*target_position)
 
+                    # Manejar las instrucciones de movimiento
+                    elif instruction.startswith('MOVE:'):
+                        # Extraer la posición objetivo de la instrucción MOVE
+                        try:
+                            # Asegúrate de que los paréntesis y el prefijo "MOVE:" se eliminen correctamente antes de hacer split
+                            target_position = tuple(map(int, instruction.replace('MOVE:', '').strip('()').split(',')))
+                            self.move_to_position(*target_position)
+                        except ValueError as e:
+                            print(f"Error al procesar la instrucción de movimiento: {e}")
+
+                    # Otras instrucciones desconocidas
+                    else:
+                        print(f"Instrucción desconocida: {instruction}")
 
             
     def handle_start(self):
@@ -242,40 +255,45 @@ class ADDrone:
             'new_position': new_position
         }
         self.kafka_producer.send('drone_position_updates', json.dumps(update_message).encode('utf-8'))
-        self.kafka_producer.flush()
-
+        self.kafka_producer.flush()    
 
     def move_to_position(self, target_x, target_y):
-        if self.final_position and self.current_position == self.final_position:
-            print(f"El dron {self.dron_id} ya ha alcanzado la posición final: {self.final_position}")
-            # Aquí puedes implementar una lógica adicional para cuando el dron haya terminado su ruta
+        # Asegurarse de que el dron sepa su posición final, si es que existe
+        if not self.final_position:
+            print("No se pudo obtener la posición final del dron.")
             return
 
-        # Comprueba si el dron ya está en la posición de destino del movimiento actual
+        # Comprueba si el dron ya está en la posición de destino
         if self.current_position == (target_x, target_y):
             print(f"El dron {self.dron_id} ya está en la posición deseada ({target_x}, {target_y}).")
             return
-        
-        else:
-            print(f"Moviendo el dron {self.dron_id} a la posición ({target_x}, {target_y})")
 
-            while self.current_position != (target_x, target_y):
-                if self.current_position[0] < target_x:
-                    self.current_position = (self.current_position[0] + 1, self.current_position[1])
-                elif self.current_position[0] > target_x:
-                    self.current_position = (self.current_position[0] - 1, self.current_position[1])
+        print(f"Moviendo el dron {self.dron_id} a la posición ({target_x}, {target_y})")
 
-                if self.current_position[1] < target_y:
-                    self.current_position = (self.current_position[0], self.current_position[1] + 1)
-                elif self.current_position[1] > target_y:
-                    self.current_position = (self.current_position[0], self.current_position[1] - 1)
+        # Mover el dron hacia la posición de destino
+        while self.current_position != (target_x, target_y) and self.current_position != self.final_position:
+            new_x, new_y = self.current_position
+            if new_x < target_x:
+                new_x += 1
+            elif new_x > target_x:
+                new_x -= 1
 
-                time.sleep(1)  # Simular el movimiento de una celda a otra
-                self.current_position = (target_x, target_y)  # Actualiza con las nuevas coordenadas después del movimiento
-                self.update_position_in_engine(self.current_position)
+            if new_y < target_y:
+                new_y += 1
+            elif new_y > target_y:
+                new_y -= 1
 
-            print(f"Dron {self.dron_id} ha llegado a la posición ({target_x}, {target_y}).")
-            self.update_position_in_engine((target_x, target_y))  
+            # Actualizar la posición actual del dron y notificar a AD_Engine
+            self.current_position = (new_x, new_y)
+            self.update_position_in_engine(self.current_position)
+            time.sleep(1)  # Simular el movimiento del dron
+
+            print(f"Posición actualizada: {self.current_position}")
+
+        # Verificar si se ha llegado a la posición final
+        if self.current_position == self.final_position:
+            print(f"El dron {self.dron_id} ha alcanzado la posición final: {self.final_position}")
+  
     
     
     def delete_drones(self):
