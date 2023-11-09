@@ -110,8 +110,12 @@ class ADDrone:
         drone_data = drones_collection.find_one({"ID": self.dron_id})
 
         if drone_data and "FinalPosition" in drone_data:
+            # Si la posición final ha cambiado, imprimir el mensaje de la nueva figura
+            if self.final_position and self.final_position != drone_data["FinalPosition"]:
+                print("\nSiguiente figura con esta posición final:")
+            
             self.final_position = drone_data["FinalPosition"]
-            print(f"Final position received: {self.final_position}")
+            print(f"{self.final_position}")
         else:
             print(f"No se pudo obtener la posición final para el dron ID: {self.dron_id}")
         # Cerrar la conexión con la base de datos
