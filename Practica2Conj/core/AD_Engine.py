@@ -4,6 +4,7 @@ from kafka import KafkaConsumer, KafkaProducer
 import pymongo
 import threading
 import time
+#import MapViewer as mv
 
 # Constantes para instrucciones
 INSTRUCTION_START = 'START'
@@ -333,6 +334,7 @@ class ADEngine:
     def show_in_progress(self):
         for dron_id, position in self.current_positions.items():
             if position != self.final_positions.get(dron_id, position):
+                print(f"Dron {dron_id} está en la posición {position}")
                 # Si algún dron no está en su posición final, el espectáculo sigue en progreso
                 return True
         # Si todos los drones están en su posición final, el espectáculo no está en progreso
@@ -378,13 +380,10 @@ class ADEngine:
         return self.final_positions.get(dron_id)
     
     
-    def update_current_position(self, dron_id, position):
+    #def update_current_position(self, dron_id, position):
         # Actualiza la posición actual del dron en el sistema
-        self.current_positions[dron_id] = position
-
-    def show_in_progress(self):
-        for dron_id, position in self.current_positions.items():
-            print(f"Dron {dron_id} está en la posición {position}")
+        #self.current_positions[dron_id] = position
+            
             
     def fetch_weather_data(self):
         try:
@@ -409,28 +408,23 @@ class ADEngine:
     def update_drone_position(self, dron_id, position):
         # Actualiza la posición actual del dron en el sistema
         self.current_positions[dron_id] = position
-        
+
         # Verifica si el dron ha llegado a la posición final
         final_position = self.final_positions.get(dron_id)
         if final_position is None:
             print(f"Error: No se encontró la posición final para el dron {dron_id}.")
             return  # Salir del método si no hay posición final
 
-        next_position = self.calculate_next_position(position, final_position)
-        
-        if position == self.final_positions[dron_id]:
+        if tuple(position) == final_position:
             print(f"Dron {dron_id} ha confirmado llegada a la posición final.")
             self.send_instruction_to_drone(dron_id, INSTRUCTION_STOP)
             self.check_figure_completion()
         else:
             print(f"Dron {dron_id} ha confirmado llegada a la posición intermedia {position}.")
-            # Actualiza la posición actual del dron y calcula el siguiente movimiento
-            next_position = self.calculate_next_position(position, self.final_positions.get(dron_id))
-            # Si la siguiente posición es diferente a la actual, envía la nueva instrucción
+            next_position = self.calculate_next_position(position, final_position)
             if next_position != position:
                 self.send_movement_instructions_to_drone(dron_id, next_position)
-                self.current_positions[dron_id] = position
-                self.check_figure_completion()
+
 
 
 if __name__ == "__main__":
@@ -440,5 +434,13 @@ if __name__ == "__main__":
     weather_address = "127.0.0.1:8082"
     
     engine = ADEngine(listen_port, broker_address, database_address, weather_address)
+
+    # Iniciar la visualización del mapa
+    #map_viewer_thread = mv.run_map_viewer()
+    
+    # Procesar datos de figuras y comenzar a escuchar en el puerto
     engine.procesar_datos_json("PRUEBAS/AwD_figuras_Correccion.json")
     engine.start()
+
+    # Espera a que el visualizador del mapa termine antes de cerrar el programa.
+    #map_viewer_thread.join()

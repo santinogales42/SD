@@ -1,26 +1,21 @@
 import pygame
 import sys
 import json
+import threading
 from kafka import KafkaConsumer
 
-# Inicializar Pygame
-pygame.init()
-
-# Constantes de colores
-BEIGE = (245, 245, 220)
-BLACK = (0, 0, 0)
-GREEN = (0, 255, 0)
-RED = (255, 0, 0)
-
-# Dimensiones de la ventana
+# Constantes de configuración
 WINDOW_WIDTH = 800
 WINDOW_HEIGHT = 600
 CELL_SIZE = 20
 MAP_OFFSET = 300
 
-# Tamaño del mapa
-MAP_WIDTH = CELL_SIZE * 20
-MAP_HEIGHT = CELL_SIZE * 20
+# Colores
+BEIGE = (245, 245, 220)
+BLACK = (0, 0, 0)
+
+# Inicializar Pygame
+pygame.init()
 
 # Configurar la ventana
 screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
@@ -29,76 +24,74 @@ pygame.display.set_caption("Drone Map Visualization")
 # Función para dibujar el mapa
 def draw_map():
     screen.fill(BEIGE)  # Color de fondo
-    for x in range(0, MAP_WIDTH, CELL_SIZE):
-        for y in range(0, MAP_HEIGHT, CELL_SIZE):
+    # Dibujar la cuadrícula
+    for x in range(0, WINDOW_WIDTH - MAP_OFFSET, CELL_SIZE):
+        for y in range(0, WINDOW_HEIGHT, CELL_SIZE):
             rect = pygame.Rect(MAP_OFFSET + x, y, CELL_SIZE, CELL_SIZE)
             pygame.draw.rect(screen, BLACK, rect, 1)
 
-# Función para dibujar la tabla de drones
-def draw_drones_table(drones_info):
-    # Dibuja el fondo de la tabla
-    pygame.draw.rect(screen, BEIGE, (0, 0, MAP_OFFSET, WINDOW_HEIGHT))
+# Función para dibujar los drones en el mapa
+def draw_drones(drones_info):
     # Configurar fuente
     font = pygame.font.Font(None, 24)
-    # Dibuja los encabezados de la tabla
-    headings = ["ID", "Position"]
-    for i, heading in enumerate(headings):
-        text = font.render(heading, True, BLACK)
-        screen.blit(text, (10, i * CELL_SIZE))
-    
-    # Dibuja la información de los drones
-    for i, drone in enumerate(drones_info):
-        # ID del dron
-        text_id = font.render(str(drone['ID']), True, BLACK)
-        screen.blit(text_id, (10, (i+1) * CELL_SIZE))
-        # Posición del dron
-        text_pos = font.render(str(drone['Position']), True, BLACK)
-        screen.blit(text_pos, (10 + MAP_OFFSET // len(headings), (i+1) * CELL_SIZE))
-        
-        
-kafka_consumer = KafkaConsumer(
-    'drone_position_updates',
-    bootstrap_servers=['localhost:29092'],
-    auto_offset_reset='latest',
-    group_id='map_viewer_group'
-)
+    for drone in drones_info:
+        # Dibujar dron
+        drone_pos = drones_info[drone]
+        pygame.draw.circle(screen, BLACK, (MAP_OFFSET + drone_pos[0]*CELL_SIZE + CELL_SIZE//2, drone_pos[1]*CELL_SIZE + CELL_SIZE//2), CELL_SIZE//2 - 1)
+        # Dibujar ID del dron
+        text = font.render(str(drone), True, BEIGE)
+        screen.blit(text, (MAP_OFFSET + drone_pos[0]*CELL_SIZE + CELL_SIZE//4, drone_pos[1]*CELL_SIZE + CELL_SIZE//4))
 
-# Función para obtener la información actualizada de los drones desde Kafka
-def get_drones_info_from_kafka(consumer):
-    drones_info = []
+# Función para obtener la información de los drones desde Kafka
+def get_drones_info_from_kafka(consumer, drones_info):
     for message in consumer:
-        # Decodifica el mensaje de bytes a dict
-        drone_update = json.loads(message.value)
-        drones_info.append(drone_update)
-        # Dependiendo de cómo quieras manejar la actualización,
-        # puedes actualizar la lista completa de drones o solo el dron específico.
-    return drones_info
+        drone_update = message.value  # Asumiendo que message.value es un diccionario
+        dron_id = drone_update.get('ID')
+        if 'Position' in drone_update:
+            drones_info[dron_id] = drone_update['Position']
+            draw_map()
+            draw_drones(drones_info)
+            pygame.display.flip()
+        else:
+            print(f"No se encontró la clave 'Position' en el mensaje para el dron {dron_id}")
+            # Maneja la situación, por ejemplo, asignando un valor por defecto o ignorando la actualización
 
-# Bucle principal
-running = True
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
+        
 
-    # Intenta consumir mensajes de Kafka para obtener la información más reciente de los drones
-    try:
-        drones_info = get_drones_info_from_kafka(kafka_consumer)
-    except:
-        # Maneja aquí cualquier excepción que pueda ocurrir durante el consumo de Kafka
-        # Por ejemplo, podrías querer imprimir un error y continuar con la última información conocida de drones_info
-        pass
+# Bucle principal para la visualización de drones
+def map_viewer_loop():
+    # Diccionario para almacenar la información de los drones
+    drones_info = {}
 
-    # Dibujar mapa y tabla con la información actualizada de los drones
-    draw_map()
-    draw_drones_table(drones_info)
+    kafka_consumer = KafkaConsumer(
+        'drone_position_updates',
+        bootstrap_servers=['localhost:29092'],
+        auto_offset_reset='latest',
+        group_id='map_viewer_group',
+        value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+    )
 
-    # Actualizar la ventana
-    pygame.display.flip()
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
 
-    # Puedes ajustar este tiempo de espera para controlar la frecuencia de actualización de la pantalla
-    pygame.time.wait(15)
+        # Obtener información de drones desde Kafka
+        get_drones_info_from_kafka(kafka_consumer, drones_info)
 
-# Salir
-pygame.quit()
-sys.exit()
+        # Limitar la velocidad de actualización
+        pygame.time.wait(100)
+
+    pygame.quit()
+    sys.exit()
+
+# Función para iniciar el visualizador de mapa
+def run_map_viewer():
+    map_viewer_thread = threading.Thread(target=map_viewer_loop)
+    map_viewer_thread.start()
+    return map_viewer_thread
+
+# Si MapViewer es el punto de entrada principal
+#if __name__ == "__main__":
+    #run_map_viewer()
