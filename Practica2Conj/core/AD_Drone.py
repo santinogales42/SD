@@ -98,6 +98,24 @@ class ADDrone:
             self.kafka_producer.flush()
         except Exception as e:
             print(f"Error al enviar mensaje Kafka: {e}")
+            
+            
+    def request_final_position_from_db(self):
+        # Conectar a la base de datos de MongoDB
+        mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
+        db = mongo_client["dronedb"]
+        drones_collection = db["drones_fp"]
+
+        # Consultar la posición final del dron por su ID
+        drone_data = drones_collection.find_one({"ID": self.dron_id})
+
+        if drone_data and "FinalPosition" in drone_data:
+            self.final_position = drone_data["FinalPosition"]
+            print(f"Final position received: {self.final_position}")
+        else:
+            print(f"No se pudo obtener la posición final para el dron ID: {self.dron_id}")
+        # Cerrar la conexión con la base de datos
+        mongo_client.close()
 
         
 
@@ -116,39 +134,31 @@ class ADDrone:
             bootstrap_servers=self.broker_address,
             auto_offset_reset='latest',
             enable_auto_commit=True,
-            group_id='drone-group-{}'.format(self.dron_id)
+            group_id='drone-group-{}'.format(self.dron_id),
+            value_deserializer=lambda m: json.loads(m.decode('utf-8'))
         )
 
         # Suscripción al tópico de Kafka
         consumer.subscribe(['drone_messages_topic'])
 
         for message in consumer:
-            message_data = json.loads(message.value.decode('utf-8'))
+            message_data = message.value
             if message_data.get('dron_id') == self.dron_id:
-                if message_data['type'] == 'final_position' and message_data['dron_id'] == self.dron_id:
-                    self.final_position = tuple(message_data['final_position'])
-                    print(f"Posición final recibida: {self.final_position}")
                 instruction = message_data.get('instruction')
                 if instruction:
-                    # Manejar la instrucción START
-                    if instruction == 'START':
-                        self.handle_start()
-
-                    # Manejar la instrucción STOP
-                    elif instruction == 'STOP':
-                        self.handle_stop()
-
-                    # Manejar las instrucciones de movimiento
-                    elif instruction.startswith('MOVE:'):
-                        # Extraer la posición objetivo de la instrucción MOVE
+                    # Asegurarse de que la instrucción es del tipo MOVE
+                    if instruction.startswith('MOVE:'):
                         try:
-                            # Asegúrate de que los paréntesis y el prefijo "MOVE:" se eliminen correctamente antes de hacer split
-                            target_position = tuple(map(int, instruction.replace('MOVE:', '').strip('()').split(',')))
+                            # Extracción segura de la posición objetivo
+                            pos_str = instruction.replace('MOVE:', '').strip('()')
+                            target_position = tuple(map(int, pos_str.split(',')))
                             self.move_to_position(*target_position)
                         except ValueError as e:
                             print(f"Error al procesar la instrucción de movimiento: {e}")
-
-                    # Otras instrucciones desconocidas
+                    elif instruction == 'START':
+                        self.handle_start()
+                    elif instruction == 'STOP':
+                        self.handle_stop()
                     else:
                         print(f"Instrucción desconocida: {instruction}")
 
@@ -159,7 +169,7 @@ class ADDrone:
 
     def handle_stop(self):
         print(f"Dron {self.dron_id} ha recibido la instrucción de STOP.")
-        # Aquí puedes detener el dron o cambiar su estado a inactivo
+        # Aquí puedes detener el dron o cambiar su estado a inactivo<s
 
 
     def join_show(self, dron_id):
@@ -178,12 +188,14 @@ class ADDrone:
             join_message = {'action': 'join', 'ID': self.dron_id}
             engine_socket.send(json.dumps(join_message).encode('utf-8'))
             
+            self.request_final_position_from_db()
+            
             # Conectar a Kafka para recibir actualizaciones de posición del dron
             consumer_producer = cp.ConsumerProducer(broker_address, dron_id)
             consumer_producer.start_consumer()
             print(f"El dron con ID {self.dron_id} se ha unido al espectáculo.")
                 
-            try:
+            try:            
                 while True:
                     instruction = self.consume_kafka_messages()
                     if instruction is None:
