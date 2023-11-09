@@ -21,22 +21,29 @@ class DroneThread(threading.Thread):
 
     def run(self):
         # Esperar a recibir la instrucción START
-        while not self.is_started and not self._stop_event.is_set():
+        while not self.engine_instance.drones_started[self.dron_id]:
             time.sleep(1)
         # Una vez iniciado, procesar las posiciones
         while not self.is_completed and not self._stop_event.is_set():
+            print(f"Procesando posición del dron {self.dron_id}")
             current_position = self.engine_instance.get_current_position(self.dron_id)
             final_position = self.engine_instance.get_final_position(self.dron_id)
             if current_position == final_position:
-                self.engine_instance.send_instruction_to_drone(self.dron_id, INSTRUCTION_STOP)
+                print(f"Dron {self.dron_id} ha llegado a su posición final.")
+                self.engine_instance.update_drone_position(self.dron_id, current_position)
                 self.is_completed = True
             else:
+                print(f"Dron {self.dron_id} está en la posición {current_position}.")
                 next_position = self.engine_instance.calculate_next_position(current_position, final_position)
                 self.engine_instance.send_instruction_to_drone(self.dron_id, f"{INSTRUCTION_MOVE}:{next_position}")
                 time.sleep(5)  # Intervalo para simular tiempo de movimiento
 
     def stop(self):
         self._stop_event.set()
+        
+    def start_drone(self):
+        self.is_started = True
+
 
 class ADEngine:
     def __init__(self, listen_port, broker_address, database_address, weather_address):
@@ -58,6 +65,7 @@ class ADEngine:
         self.required_drones = None
         self.connected_drones = set()
         self.drone_threads = {}
+        self.drones_started = {}
 
         # Configuración del socket del servidor
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -162,6 +170,7 @@ class ADEngine:
         
     def initiate_movement_sequence(self):
         for dron_id in self.connected_drones:
+            self.drones_started[dron_id] = False
             drone_thread = DroneThread(dron_id, self)
             drone_thread.start()
             self.drone_threads[dron_id] = drone_thread
@@ -169,6 +178,8 @@ class ADEngine:
     def send_start_instructions(self):
         for dron_id in self.connected_drones:
             self.send_instruction_to_drone(dron_id, INSTRUCTION_START)
+            # Aquí establecemos que el dron debe empezar
+            self.drones_started[dron_id] = True
     
     def send_stop_instructions(self):
         for dron_id in self.connected_drones:
@@ -299,12 +310,18 @@ class ADEngine:
         )
         if all_in_position:
             print(f"Figura {self.indice_figura_actual + 1} completada.")
+            # Marcar todos los drones como no iniciados para la siguiente figura
+            for dron_id in self.connected_drones:
+                self.drones_started[dron_id] = False
             self.indice_figura_actual += 1  # Moverse a la siguiente figura
             if self.indice_figura_actual < len(self.figuras):
                 self.cargar_figura(self.indice_figura_actual)  # Cargar la siguiente figura
+                # Enviar instrucción START para la siguiente figura después de una breve pausa
+                time.sleep(5)
+                self.send_start_instructions()
             else:
                 print("Todas las figuras se han completado.")
-                self.end_show()  # Finalizar el espectáculo si todas las figuras se completaron
+                self.end_show()  
                 
     def initiate_movement_sequence(self):
         for dron_id in self.connected_drones:
@@ -392,6 +409,7 @@ class ADEngine:
     def update_drone_position(self, dron_id, position):
         # Actualiza la posición actual del dron en el sistema
         self.current_positions[dron_id] = position
+        
         # Verifica si el dron ha llegado a la posición final
         final_position = self.final_positions.get(dron_id)
         if final_position is None:
@@ -400,11 +418,10 @@ class ADEngine:
 
         next_position = self.calculate_next_position(position, final_position)
         
-        if position == self.final_positions.get(dron_id):
+        if position == self.final_positions[dron_id]:
             print(f"Dron {dron_id} ha confirmado llegada a la posición final.")
-            # Aquí podrías marcar al dron como que ha alcanzado su posición final
-            # para evitar enviarle más instrucciones
-            # Por ejemplo, podrías tener un conjunto de drones 'en posición'
+            self.send_instruction_to_drone(dron_id, INSTRUCTION_STOP)
+            self.check_figure_completion()
         else:
             print(f"Dron {dron_id} ha confirmado llegada a la posición intermedia {position}.")
             # Actualiza la posición actual del dron y calcula el siguiente movimiento

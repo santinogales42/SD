@@ -147,7 +147,7 @@ class ADDrone:
                 instruction = message_data.get('instruction')
                 if instruction:
                     # Asegurarse de que la instrucción es del tipo MOVE
-                    if instruction.startswith('MOVE:'):
+                    if instruction.startswith('MOVE:') and self.status == "ACTIVE":
                         try:
                             # Extracción segura de la posición objetivo
                             pos_str = instruction.replace('MOVE:', '').strip('()')
@@ -157,6 +157,7 @@ class ADDrone:
                             print(f"Error al procesar la instrucción de movimiento: {e}")
                     elif instruction == 'START':
                         self.handle_start()
+                        self.status = "ACTIVE"
                     elif instruction == 'STOP':
                         self.handle_stop()
                     else:
@@ -165,6 +166,7 @@ class ADDrone:
             
     def handle_start(self):
         print(f"Dron {self.dron_id} ha recibido la instrucción de START.")
+        self.status = "ACTIVE"
         # Aquí puedes cambiar el estado del dron a activo o iniciar alguna secuencia
 
     def handle_stop(self):
