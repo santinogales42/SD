@@ -3,6 +3,7 @@ import sys
 import json
 import threading
 from kafka import KafkaConsumer
+import time
 
 # Constantes de configuración
 WINDOW_WIDTH = 800
@@ -13,6 +14,8 @@ MAP_OFFSET = 300
 # Colores
 BEIGE = (245, 245, 220)
 BLACK = (0, 0, 0)
+
+INSTRUCTION_START = 'START'
 
 # Inicializar Pygame
 pygame.init()
@@ -70,7 +73,13 @@ def map_viewer_loop():
         group_id='map_viewer_group',
         value_deserializer=lambda m: json.loads(m.decode('utf-8'))
     )
-
+    show_started = False
+    while not show_started:
+        for message in kafka_consumer:
+            if message.value.get('type') == 'control' and message.value.get('instruction') == INSTRUCTION_START:
+                show_started = True
+                break
+        time.sleep(1)  # Espera un segundo antes de verificar de nuevo
     running = True
     while running:
         for event in pygame.event.get():
@@ -93,5 +102,5 @@ def run_map_viewer():
     return map_viewer_thread
 
 # Si MapViewer es el punto de entrada principal
-#if __name__ == "__main__":
-    #run_map_viewer()
+if __name__ == "__main__":
+    run_map_viewer()

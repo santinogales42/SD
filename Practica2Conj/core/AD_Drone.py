@@ -19,6 +19,7 @@ class ADDrone:
         self.registered_drones = {}
         self.joined_drones = []
         self.current_position = (1,1)
+        self.base_position = (1,1)
         self.final_position = None
         self.broker_address = broker_address
         self.consumer_producer = cp.ConsumerProducer(self.broker_address)
@@ -149,34 +150,29 @@ class ADDrone:
             message_data = message.value
             if message_data.get('dron_id') == self.dron_id:
                 instruction = message_data.get('instruction')
-                if instruction:
-                    # Asegurarse de que la instrucción es del tipo MOVE
-                    if instruction.startswith('MOVE:') and self.status == "ACTIVE":
-                        try:
-                            # Extracción segura de la posición objetivo
-                            pos_str = instruction.replace('MOVE:', '').strip('()')
-                            target_position = tuple(map(int, pos_str.split(',')))
-                            self.move_to_position(*target_position)
-                        except ValueError as e:
-                            print(f"Error al procesar la instrucción de movimiento: {e}")
-                    elif instruction == 'START':
-                        self.handle_start()
-                        self.status = "ACTIVE"
-                    elif instruction == 'STOP':
-                        self.handle_stop()
-                    else:
+                if instruction == 'START':
+                    self.handle_start()
+                elif instruction == 'END':
+                    self.handle_end()
+                elif instruction == 'STOP':
+                    self.handle_stop()  # Asegúrate de manejar STOP
+                elif instruction.startswith('MOVE:') and self.status == "ACTIVE":
+                    try:
+                        # Extracción segura de la posición objetivo
+                        pos_str = instruction.replace('MOVE:', '').strip('()')
+                        target_position = tuple(map(int, pos_str.split(',')))
+                        self.move_to_position(*target_position)
+                    except ValueError as e:
+                        print(f"Error al procesar la instrucción de movimiento: {e}")
+                else:
+                    if self.status == "ACTIVE":
                         print(f"Instrucción desconocida: {instruction}")
-
             
     def handle_start(self):
         print(f"Dron {self.dron_id} ha recibido la instrucción de START.")
         self.status = "ACTIVE"
         # Aquí puedes cambiar el estado del dron a activo o iniciar alguna secuencia
-
-    def handle_stop(self):
-        print(f"Dron {self.dron_id} ha recibido la instrucción de STOP.")
-        # Aquí puedes detener el dron o cambiar su estado a inactivo<s
-
+        
 
     def join_show(self, dron_id):
         if not self.authenticate():
@@ -207,10 +203,6 @@ class ADDrone:
                     if instruction is None:
                         print("No se recibió ninguna instrucción válida.")
                         break
-
-                    if instruction == "EXIT":
-                        print("Saliendo del programa.")
-                        break
                     elif instruction == "SHOW_MAP":
                         self.show_map(engine_socket)
                     elif "MOVE" in instruction:
@@ -229,8 +221,8 @@ class ADDrone:
                             self.show_map(engine_socket)
                         except Exception as e:
                             print("ERROR: ", e)
-                    elif "STOP" in instruction:
-                        print("STOP instruction received.")
+                    elif "END" in instruction:
+                        print("END instruction received.")
                         self.status = "IDLE"
                     else:
                         print(f"Instrucción desconocida: {instruction}")
@@ -250,10 +242,8 @@ class ADDrone:
         mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
         db = mongo_client["dronedb"]
         drones_collection = db["drones"]
-
         # Actualizar la posición de todos los drones en la base de datos
         drones_collection.update_many({}, {"$set": {"InitialPosition": (1, 1)}})
-
         # Cerrar la conexión con la base de datos
         mongo_client.close()
     
@@ -275,12 +265,17 @@ class ADDrone:
         self.kafka_producer.send('drone_position_updates', json.dumps(update_message).encode('utf-8'))
         self.kafka_producer.flush()    
 
-    def move_to_position(self, target_x, target_y):
-        # Asegurarse de que el dron sepa su posición final, si es que existe
-        if not self.final_position:
-            print("No se pudo obtener la posición final del dron.")
-            return
+    def handle_end(self):
+        print(f"Dron {self.dron_id} ha recibido la instrucción de END y ha alcanzado su posición final.")
+        self.status = "INACTIVE"
+        # Aquí puedes agregar lógica adicional si necesitas realizar alguna acción cuando el dron alcanza la posición final.
 
+    def handle_stop(self):
+        print(f"Dron {self.dron_id} ha recibido la instrucción de STOP y se está moviendo a la base.")
+        self.move_to_position(*self.base_position)
+        self.status = "IDLE"
+
+    def move_to_position(self, target_x, target_y):
         # Comprueba si el dron ya está en la posición de destino
         if self.current_position == (target_x, target_y):
             print(f"El dron {self.dron_id} ya está en la posición deseada ({target_x}, {target_y}).")
@@ -289,7 +284,7 @@ class ADDrone:
         print(f"Moviendo el dron {self.dron_id} a la posición ({target_x}, {target_y})")
 
         # Mover el dron hacia la posición de destino
-        while self.current_position != (target_x, target_y) and self.current_position != self.final_position:
+        while self.current_position != (target_x, target_y) and self.current_position != self.final_position and self.status == "ACTIVE":
             new_x, new_y = self.current_position
             if new_x < target_x:
                 new_x += 1
@@ -301,6 +296,9 @@ class ADDrone:
             elif new_y > target_y:
                 new_y -= 1
 
+            if self.status == "INACTIVE":
+                break
+
             # Actualizar la posición actual del dron y notificar a AD_Engine
             self.current_position = (new_x, new_y)
             self.update_position_in_engine(self.current_position)
@@ -311,8 +309,7 @@ class ADDrone:
         # Verificar si se ha llegado a la posición final
         if self.current_position == self.final_position:
             print(f"El dron {self.dron_id} ha alcanzado la posición final: {self.final_position}")
-  
-    
+
     
     def delete_drones(self):
         #Input para buscar el ID del dron

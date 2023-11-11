@@ -4,6 +4,7 @@ import threading
 import random
 from kafka import KafkaProducer
 import time
+import os
 
 
 class ADWeather:
@@ -35,19 +36,35 @@ class ADWeather:
         return self.chosen_city
 
     def start_weather_producer(self):
+        last_modified_time = None  # Guarda la última vez que el archivo fue modificado
         while True:
-            # Actualiza la temperatura de la ciudad elegida aleatoriamente entre -10 y 40
-            self.city_temperatures[self.chosen_city] = random.randint(1, 40)
+            # Verifica si el archivo 'ciudades.json' ha sido modificado desde la última vez
+            current_modified_time = os.path.getmtime('ciudades.json')
+            if last_modified_time is None or last_modified_time < current_modified_time:
+                # Recarga el archivo si ha sido modificado
+                self.city_temperatures = self.load_city_temperatures()
+                last_modified_time = current_modified_time
+                manually_updated = True
+            else:
+                manually_updated = False
+            
+            if self.chosen_city in self.city_temperatures and manually_updated:
+                # Si la ciudad elegida está en el archivo con una nueva temperatura, úsala
+                new_temperature = self.city_temperatures[self.chosen_city]
+            else:
+                # Si no, actualiza la temperatura de la ciudad elegida aleatoriamente entre 0 y 40
+                new_temperature = random.randint(0, 40)
+                self.city_temperatures[self.chosen_city] = new_temperature
+
             # Construye el mensaje
             weather_update = {
                 'city': self.chosen_city,
-                'temperature': self.city_temperatures[self.chosen_city]
+                'temperature': new_temperature
             }
             # Enviar la actualización de la temperatura a través de Kafka
-            self.kafka_producer.send('get_temperature', value=weather_update)
+            self.kafka_producer.send('weather_updates', value=weather_update)
             self.kafka_producer.flush()
             time.sleep(15)
-            
             
 
     def handle_client_request(self, client_socket):
