@@ -1,9 +1,8 @@
-import pygame
-import sys
+import tkinter as tk
 import json
 import threading
 from kafka import KafkaConsumer
-import time
+from queue import Queue
 
 # Constantes de configuración
 WINDOW_WIDTH = 800
@@ -12,94 +11,137 @@ CELL_SIZE = 20
 MAP_OFFSET = 300
 
 # Colores
-BEIGE = (245, 245, 220)
-BLACK = (0, 0, 0)
+DRONE_MOVING_COLOR = "green"
+DRONE_FINAL_COLOR = "red"
+FINAL_POSITION_COLOR = "gray"
 
-INSTRUCTION_START = 'START'
+# Función para actualizar los drones y su color según el estado
+def update_drones(canvas, drones_info, drones_drawings, drone_update):
+    dron_id = drone_update['ID']
+    position = drone_update['Position']
+    state = drone_update.get('State', 'MOVING')  # El estado por defecto es 'MOVING'
 
-# Inicializar Pygame
-pygame.init()
+    # Determinar el color del dron basado en su estado
+    if state == 'FINAL':
+        color = DRONE_FINAL_COLOR
+    elif state == 'MOVING':
+        color = DRONE_MOVING_COLOR
+    else:
+        color = "black"  # Color por defecto
 
-# Configurar la ventana
-screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-pygame.display.set_caption("Drone Map Visualization")
+    # Si el dron ya se dibujó, actualiza su posición y color
+    if dron_id in drones_drawings:
+        canvas.itemconfig(drones_drawings[dron_id], fill=color)
+        canvas.coords(drones_drawings[dron_id],
+                      MAP_OFFSET + position[0]*CELL_SIZE, 
+                      position[1]*CELL_SIZE, 
+                      MAP_OFFSET + (position[0]+1)*CELL_SIZE, 
+                      (position[1]+1)*CELL_SIZE)
+    # De lo contrario, dibuja un nuevo dron
+    else:
+        drone = canvas.create_oval(MAP_OFFSET + position[0]*CELL_SIZE, 
+                                   position[1]*CELL_SIZE, 
+                                   MAP_OFFSET + (position[0]+1)*CELL_SIZE, 
+                                   (position[1]+1)*CELL_SIZE, 
+                                   fill=color)
+        drones_drawings[dron_id] = drone
 
-# Función para dibujar el mapa
-def draw_map():
-    screen.fill(BEIGE)  # Color de fondo
-    # Dibujar la cuadrícula
-    for x in range(0, WINDOW_WIDTH - MAP_OFFSET, CELL_SIZE):
-        for y in range(0, WINDOW_HEIGHT, CELL_SIZE):
-            rect = pygame.Rect(MAP_OFFSET + x, y, CELL_SIZE, CELL_SIZE)
-            pygame.draw.rect(screen, BLACK, rect, 1)
+    # Actualizar la información almacenada del dron
+    drones_info[dron_id] = position
 
-# Función para dibujar los drones en el mapa
-def draw_drones(drones_info):
-    # Configurar fuente
-    font = pygame.font.Font(None, 24)
-    for drone in drones_info:
-        # Dibujar dron
-        drone_pos = drones_info[drone]
-        pygame.draw.circle(screen, BLACK, (MAP_OFFSET + drone_pos[0]*CELL_SIZE + CELL_SIZE//2, drone_pos[1]*CELL_SIZE + CELL_SIZE//2), CELL_SIZE//2 - 1)
-        # Dibujar ID del dron
-        text = font.render(str(drone), True, BEIGE)
-        screen.blit(text, (MAP_OFFSET + drone_pos[0]*CELL_SIZE + CELL_SIZE//4, drone_pos[1]*CELL_SIZE + CELL_SIZE//4))
-
-# Función para obtener la información de los drones desde Kafka
-def get_drones_info_from_kafka(consumer, drones_info):
-    for message in consumer:
-        drone_update = message.value  # Asumiendo que message.value es un diccionario
-        dron_id = drone_update.get('ID')
-        if 'Position' in drone_update:
-            drones_info[dron_id] = drone_update['Position']
-            draw_map()
-            draw_drones(drones_info)
-            pygame.display.flip()
-        else:
-            print(f"No se encontró la clave 'Position' en el mensaje para el dron {dron_id}")
-            # Maneja la situación, por ejemplo, asignando un valor por defecto o ignorando la actualización
-
-        
-
-# Bucle principal para la visualización de drones
-def map_viewer_loop():
-    # Diccionario para almacenar la información de los drones
-    drones_info = {}
-
-    kafka_consumer = KafkaConsumer(
+# Esta es la función que será llamada en el hilo secundario
+def kafka_listener(canvas, drones_info, drones_drawings, queue):
+    consumer = KafkaConsumer(
         'drone_position_updates',
         bootstrap_servers=['localhost:29092'],
         auto_offset_reset='latest',
         group_id='map_viewer_group',
         value_deserializer=lambda m: json.loads(m.decode('utf-8'))
     )
-    show_started = False
-    while not show_started:
-        for message in kafka_consumer:
-            if message.value.get('type') == 'control' and message.value.get('instruction') == INSTRUCTION_START:
-                show_started = True
-                break
-        time.sleep(1)  # Espera un segundo antes de verificar de nuevo
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
+    
+    for message in consumer:
+        drone_update = message.value
+        if drone_update.get('Position'):
+            # En lugar de actualizar la interfaz directamente,
+            # ponemos el mensaje en una cola que el hilo principal estará revisando.
+            queue.put(lambda: update_drones(canvas, drones_info, drones_drawings, drone_update))
 
-        # Obtener información de drones desde Kafka
-        get_drones_info_from_kafka(kafka_consumer, drones_info)
+# Esta es la función que se ejecutará en el hilo principal
+def process_queue(canvas, queue):
+    try:
+        while True:
+            update_func = queue.get_nowait()
+            canvas.after(0, update_func)
+    except queue.Empty:
+        # Programamos la función process_queue para que se ejecute nuevamente después de un corto tiempo
+        canvas.after(100, process_queue, canvas, queue)
 
-        # Limitar la velocidad de actualización
-        pygame.time.wait(100)
+# Supongamos que tienes una función que puede obtener las posiciones finales desde AD_Engine
+def get_final_positions_from_engine(canvas, final_positions_drawings):
+    # Esta función debe conectarse al AD_Engine y obtener las posiciones finales.
+    consumer = KafkaConsumer(
+        'final_positions_topic',
+        bootstrap_servers=['localhost:29092'],
+        auto_offset_reset='latest',
+        group_id='final_positions_group',
+        value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+    )
 
-    pygame.quit()
-    sys.exit()
+    for message in consumer:
+        final_positions = message.value
+        if 'final_positions' in final_positions:
+            # Dibujar las posiciones finales en el mapa
+            for final_pos in final_positions['final_positions']:
+                x, y = final_pos
+                rect = canvas.create_rectangle(MAP_OFFSET + x*CELL_SIZE, 
+                                               y*CELL_SIZE, 
+                                               MAP_OFFSET + (x+1)*CELL_SIZE, 
+                                               (y+1)*CELL_SIZE, 
+                                               fill=FINAL_POSITION_COLOR)
+                final_positions_drawings[(x, y)] = rect
+
+            # Podemos detener la escucha una vez que tenemos las posiciones finales
+            break
+
+# Función para dibujar las posiciones finales
+def draw_final_positions(canvas, final_positions):
+    for final_pos in final_positions:
+        canvas.create_rectangle(MAP_OFFSET + final_pos[0]*CELL_SIZE, 
+                                final_pos[1]*CELL_SIZE, 
+                                MAP_OFFSET + (final_pos[0]+1)*CELL_SIZE, 
+                                (final_pos[1]+1)*CELL_SIZE, 
+                                fill=FINAL_POSITION_COLOR)
 
 # Función para iniciar el visualizador de mapa
 def run_map_viewer():
-    map_viewer_thread = threading.Thread(target=map_viewer_loop)
-    map_viewer_thread.start()
-    return map_viewer_thread
+    root = tk.Tk()
+    root.title("Drone Map Visualization")
+
+    # Crear un lienzo (Canvas) para dibujar el mapa
+    canvas = tk.Canvas(root, width=WINDOW_WIDTH, height=WINDOW_HEIGHT, bg="beige")
+    canvas.pack()
+
+    # Dibujar la cuadrícula en el mapa
+    for x in range(MAP_OFFSET, WINDOW_WIDTH, CELL_SIZE):
+        for y in range(0, WINDOW_HEIGHT, CELL_SIZE):
+            canvas.create_rectangle(x, y, x+CELL_SIZE, y+CELL_SIZE, outline="black")
+
+    # Diccionarios para almacenar la información de los drones y sus representaciones en el lienzo
+    drones_info = {}
+    drones_drawings = {}
+    final_positions_drawings = {}
+    queue = queue.Queue()  # Importar queue desde el módulo 'queue'
+
+    # Iniciar el hilo de escucha de Kafka para las actualizaciones de los drones
+    threading.Thread(target=kafka_listener, args=(canvas, drones_info, drones_drawings, queue), daemon=True).start()
+
+    # Procesar la cola en el hilo principal
+    process_queue(canvas, queue)
+    # Llama a la función para obtener las posiciones finales desde el motor de drones
+    get_final_positions_from_engine(canvas, final_positions_drawings)
+
+    # Iniciar el bucle principal de Tkinter
+    root.mainloop()
 
 # Si MapViewer es el punto de entrada principal
 if __name__ == "__main__":

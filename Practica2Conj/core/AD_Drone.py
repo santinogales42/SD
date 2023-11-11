@@ -22,7 +22,7 @@ class ADDrone:
         self.base_position = (1,1)
         self.final_position = None
         self.broker_address = broker_address
-        self.consumer_producer = cp.ConsumerProducer(self.broker_address)
+        #self.consumer_producer = cp.ConsumerProducer(self.broker_address)
         self.kafka_producer = KafkaProducer(bootstrap_servers=self.broker_address)
         
 
@@ -179,8 +179,8 @@ class ADDrone:
             print("Autenticación fallida. El dron no puede unirse al espectáculo.")
             return
 
-        producer_thread = cp.ProducerShow(self.broker_address, self.dron_id)
-        producer_thread.start()
+        #producer_thread = cp.ProducerShow(self.broker_address, self.dron_id)
+        #producer_thread.start()
             
         try:
             engine_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -193,8 +193,8 @@ class ADDrone:
             self.request_final_position_from_db()
             
             # Conectar a Kafka para recibir actualizaciones de posición del dron
-            consumer_producer = cp.ConsumerProducer(broker_address, dron_id)
-            consumer_producer.start_consumer()
+            #consumer_producer = cp.ConsumerProducer(broker_address, dron_id)
+            #consumer_producer.start_consumer()
             print(f"El dron con ID {self.dron_id} se ha unido al espectáculo.")
                 
             try:            

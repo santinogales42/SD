@@ -5,7 +5,6 @@ import pymongo
 import threading
 import time
 import traceback
-#import MapViewer as mv
 
 # Constantes para instrucciones
 INSTRUCTION_START = 'START'
@@ -43,8 +42,6 @@ class DroneThread(threading.Thread):
                 self.engine_instance.send_instruction_to_drone(self.dron_id, f"{INSTRUCTION_MOVE}:{next_position}")
                 time.sleep(5)  # Intervalo para simular tiempo de movimiento
 
-
-
     def stop(self):
         self._stop_event.set()
         
@@ -78,6 +75,7 @@ class ADEngine:
         self.base_position = (1, 1)
         self.auto_return_thread = None
         self.drones_ready = {}
+        self.drones_waiting = {}
 
         # Configuración del socket del servidor
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -141,8 +139,12 @@ class ADEngine:
                         self.drones_ready[dron_id] = True
                         print(f"Drone con ID={dron_id} se ha unido y está listo.")
                         self.check_all_drones_connected()
+                        self.drones_ready[dron_id] = True
+                        self.send_instruction_to_drone(dron_id, INSTRUCTION_START)
                     else:
-                        print(f"Drone con ID={dron_id} ya está unido.")
+                        self.drones_waiting.add(dron_id)
+                        print(f"Drone con ID={dron_id} se ha unido pero no es necesario para la figura actual. Quedará en espera.")
+                        
                 else:
                     # Manejo de drones adicionales que no son parte de la figura actual.
                     print(f"Drone con ID={dron_id} se ha unido pero no es necesario para la figura actual. Quedará en espera.")
@@ -173,6 +175,13 @@ class ADEngine:
         else:
             remaining_drones = self.required_drones - len(connected_required_drones)
             print(f"Esperando por {remaining_drones} drones más para iniciar la figura.")
+            # Actualiza el estado de los drones que ahora son necesarios
+            for dron_id in self.drones_waiting:
+                if dron_id in self.final_positions:
+                    self.drones_ready[dron_id] = True
+                    self.send_instruction_to_drone(dron_id, INSTRUCTION_START)
+                    self.drones_waiting.remove(dron_id)  # Elimina el dron del conjunto de espera
+
 
 
         
@@ -199,9 +208,9 @@ class ADEngine:
 
     def send_start_instructions(self):
         for dron_id in self.connected_drones:
-            if not self.drones_completed.get(dron_id, False):  # Usa get para evitar KeyError
-                self.send_instruction_to_drone(dron_id, INSTRUCTION_START)
-                self.drones_started[dron_id] = True
+            self.send_instruction_to_drone(dron_id, INSTRUCTION_START)
+            self.drones_started[dron_id] = True  # Marcar el dron como iniciado
+
 
 
     def send_stop_instructions(self):
@@ -253,24 +262,28 @@ class ADEngine:
             return None
         
     def start_kafka_consumer(self):
-        # Configurar el consumidor de Kafka
         consumer = KafkaConsumer(
-            'drone_position_updates', # Asegúrate de que el tópico sea el correcto
+            'drone_position_updates',  # Asegúrate de que el topic sea el correcto
             bootstrap_servers=self.broker_address,
             auto_offset_reset='latest',
             enable_auto_commit=True,
-            group_id='engine-group'  # Un group_id para el engine
+            group_id='engine-group',  # Un group_id para el engine
+            value_deserializer=lambda x: json.loads(x.decode('utf-8'))
         )
 
         for message in consumer:
-            message_data = json.loads(message.value.decode('utf-8'))
-            if message_data['type'] == 'position_update':
-                # Actualiza la posición actual del dron en AD_Engine
-                self.update_drone_position(message_data['ID'], message_data['new_position'])
-            if message_data['type'] == 'request_final_position':
-                dron_id = message_data['dron_id']   
-                # Responde a la solicitud de posición final
-                self.respond_to_final_position_request(dron_id)
+            message_data = message.value
+            # Comprueba si 'type' está en el mensaje antes de proceder
+            if 'type' in message_data:
+                if message_data['type'] == 'position_update':
+                    self.update_drone_position(message_data['ID'], message_data['new_position'])
+                elif message_data['type'] == 'request_final_position':
+                    # Responde a la solicitud de posición final
+                    dron_id = message_data['dron_id']
+                    self.respond_to_final_position_request(dron_id)
+                # Añade más condiciones según sea necesario
+            else:
+                print("Mensaje recibido sin clave 'type':", message_data)
 
     def send_stop_instructions_to_all_drones(self):
         for dron_id in self.connected_drones:
@@ -361,10 +374,15 @@ class ADEngine:
     def start_show(self):
         print("Todos los drones requeridos están conectados. El espectáculo ha comenzado.")
         self.send_start_instructions()
-        self.start_map_viewer()
-        self.initiate_movement_sequence()
-        self.monitor_progress()  # Esta línea se ha añadido para iniciar el monitoreo del progreso del espectáculo.
+        
+        # Iniciar el visualizador de mapa aquí
+        from MapViewer import run_map_viewer
+        self.map_viewer_thread = threading.Thread(target=run_map_viewer)
+        self.map_viewer_thread.start()
 
+        self.initiate_movement_sequence()
+        self.monitor_progress()
+        
 # Método modificado para monitorear el progreso
     def monitor_progress(self):
         # Mientras haya figuras para completar, sigue monitoreando.
@@ -379,17 +397,22 @@ class ADEngine:
         return all(self.drones_completed.get(dron_id) for dron_id in drones_for_current_figure)
 
     def load_next_figure(self):
-        # Carga la siguiente figura si hay más figuras disponibles.
-        self.indice_figura_actual += 1
-        if self.indice_figura_actual < len(self.figuras):
-            self.cargar_figura(self.indice_figura_actual)
-            # Reinicia el estado de completado para los drones de la nueva figura.
-            for dron_id in self.final_positions:
-                self.drones_completed[dron_id] = False
-            self.send_start_instructions()
-        else:
-            print("Todas las figuras se han completado.")
-            self.end_show()
+        if self.check_figure_completion():
+            # Imprime los IDs de todos los drones conectados al finalizar la figura
+            print("Drones unidos al engine al finalizar la figura:")
+            for dron_id in self.connected_drones:
+                print(f"Dron ID: {dron_id}")
+            # Carga la siguiente figura si hay más figuras disponibles.
+            self.indice_figura_actual += 1
+            if self.indice_figura_actual < len(self.figuras):
+                self.cargar_figura(self.indice_figura_actual)
+                # Reinicia el estado de completado para los drones de la nueva figura.
+                for dron_id in self.final_positions:
+                    self.drones_completed[dron_id] = False
+                self.send_start_instructions()
+            else:
+                print("Todas las figuras se han completado.")
+                self.end_show()
         
     
     
@@ -429,9 +452,11 @@ class ADEngine:
             time.sleep(15)
 
     def update_drone_position(self, dron_id, position):
+        if not self.drones_started.get(dron_id, False):
+            return
         # Actualiza la posición actual del dron en el sistema
         self.current_positions[dron_id] = position
-
+        
         # Verifica si el dron ha llegado a la posición final
         final_position = self.final_positions.get(dron_id)
         if final_position is None:
@@ -447,6 +472,24 @@ class ADEngine:
             next_position = self.calculate_next_position(position, final_position)
             if next_position != position:
                 self.send_movement_instructions_to_drone(dron_id, next_position)
+        state = 'FINAL' if position == self.get_final_position(dron_id) else 'MOVING'
+
+        # Envía la actualización al MapViewer
+        self.send_message_to_map_viewer(dron_id, position, state)
+        
+    def send_message_to_map_viewer(self, dron_id, position, state):
+        message = {
+            'ID': dron_id,
+            'Position': position,
+            'State': state  # Puede ser 'MOVING', 'FINAL' o cualquier otro estado relevante
+        }
+
+        # Envía el mensaje al topic de Kafka para el MapViewer
+        try:
+            self.kafka_producer.send('map_viewer_topic', value=message)
+            self.kafka_producer.flush()
+        except Exception as e:
+            print(f"Error al enviar mensaje al MapViewer: {e}")
 
 
     def start_map_viewer(self):
@@ -465,13 +508,7 @@ if __name__ == "__main__":
     weather_address = "127.0.0.1:8082"
     
     engine = ADEngine(listen_port, broker_address, database_address, weather_address)
-
-    # Iniciar la visualización del mapa
-    #map_viewer_thread = mv.run_map_viewer()
     
     # Procesar datos de figuras y comenzar a escuchar en el puerto
     engine.procesar_datos_json("PRUEBAS/AwD_figuras_Correccion.json")
-    engine.start()
-
-    # Espera a que el visualizador del mapa termine antes de cerrar el programa.
-    #map_viewer_thread.join()
+    engine.start()    
