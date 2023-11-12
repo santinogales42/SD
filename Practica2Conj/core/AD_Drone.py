@@ -302,7 +302,7 @@ class ADDrone:
             # Actualizar la posición actual del dron y notificar a AD_Engine
             self.current_position = (new_x, new_y)
             self.update_position_in_engine(self.current_position)
-            time.sleep(1)  # Simular el movimiento del dron
+            time.sleep(3)  # Simular el movimiento del dron
 
             print(f"Posición actualizada: {self.current_position}")
 
