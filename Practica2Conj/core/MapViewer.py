@@ -2,7 +2,7 @@ import tkinter as tk
 import json
 import threading
 from kafka import KafkaConsumer
-from queue import Queue
+from queue import Queue, Empty
 
 # Constantes de configuración
 WINDOW_WIDTH = 800
@@ -17,6 +17,7 @@ FINAL_POSITION_COLOR = "gray"
 
 # Función para actualizar los drones y su color según el estado
 def update_drones(canvas, drones_info, drones_drawings, drone_update):
+    print("Actualizando drones en el mapa...")
     dron_id = drone_update['ID']
     position = drone_update['Position']
     state = drone_update.get('State', 'MOVING')  # El estado por defecto es 'MOVING'
@@ -49,32 +50,53 @@ def update_drones(canvas, drones_info, drones_drawings, drone_update):
     # Actualizar la información almacenada del dron
     drones_info[dron_id] = position
 
-# Esta es la función que será llamada en el hilo secundario
-def kafka_listener(canvas, drones_info, drones_drawings, queue):
+def kafka_listener(canvas, drones_info, drones_drawings, final_positions_drawings, queue):
     consumer = KafkaConsumer(
         'drone_position_updates',
+        'final_positions_topic',
         bootstrap_servers=['localhost:29092'],
         auto_offset_reset='latest',
         group_id='map_viewer_group',
         value_deserializer=lambda m: json.loads(m.decode('utf-8'))
     )
-    
-    for message in consumer:
-        drone_update = message.value
-        if drone_update.get('Position'):
-            # En lugar de actualizar la interfaz directamente,
-            # ponemos el mensaje en una cola que el hilo principal estará revisando.
-            queue.put(lambda: update_drones(canvas, drones_info, drones_drawings, drone_update))
 
-# Esta es la función que se ejecutará en el hilo principal
+    for message in consumer:
+        if message.topic == 'drone_position_updates':
+            drone_update = message.value
+            if drone_update.get('Position'):
+                queue.put(lambda: update_drones(canvas, drones_info, drones_drawings, drone_update))
+        elif message.topic == 'final_positions_topic':
+            final_positions_data = message.value
+            if 'final_positions' in final_positions_data:
+                queue.put(lambda: update_final_positions(canvas, final_positions_drawings, final_positions_data['final_positions']))
+
+            
+def kafka_final_positions_listener(canvas, final_positions_drawings, queue):
+    consumer = KafkaConsumer(
+        'final_positions_topic',
+        bootstrap_servers=['localhost:29092'],
+        auto_offset_reset='latest',
+        group_id='final_positions_group',
+        value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+    )
+
+    for message in consumer:
+        final_positions_data = message.value
+        if 'final_positions' in final_positions_data:
+            for final_pos in final_positions_data['final_positions']:
+                # Usamos la cola para actualizar el canvas en el hilo principal
+                queue.put(lambda: update_final_positions(canvas, final_positions_drawings, final_pos))
+
+
+
 def process_queue(canvas, queue):
     try:
         while True:
             update_func = queue.get_nowait()
             canvas.after(0, update_func)
-    except queue.Empty:
+    except Empty:  # Cambiado de queue.Empty a Empty
         # Programamos la función process_queue para que se ejecute nuevamente después de un corto tiempo
-        canvas.after(100, process_queue, canvas, queue)
+        canvas.after(100, lambda: process_queue(canvas, queue))
 
 # Supongamos que tienes una función que puede obtener las posiciones finales desde AD_Engine
 def get_final_positions_from_engine(canvas, final_positions_drawings):
@@ -103,6 +125,20 @@ def get_final_positions_from_engine(canvas, final_positions_drawings):
             # Podemos detener la escucha una vez que tenemos las posiciones finales
             break
 
+def update_final_positions(canvas, final_positions_drawings, final_positions):
+    for final_pos in final_positions:
+        x, y = final_pos
+        if (x, y) not in final_positions_drawings:
+            rect = canvas.create_rectangle(
+                MAP_OFFSET + x * CELL_SIZE, 
+                y * CELL_SIZE, 
+                MAP_OFFSET + (x + 1) * CELL_SIZE, 
+                (y + 1) * CELL_SIZE, 
+                fill=FINAL_POSITION_COLOR
+            )
+            final_positions_drawings[(x, y)] = rect
+
+
 # Función para dibujar las posiciones finales
 def draw_final_positions(canvas, final_positions):
     for final_pos in final_positions:
@@ -116,8 +152,6 @@ def draw_final_positions(canvas, final_positions):
 def run_map_viewer():
     root = tk.Tk()
     root.title("Drone Map Visualization")
-
-    # Crear un lienzo (Canvas) para dibujar el mapa
     canvas = tk.Canvas(root, width=WINDOW_WIDTH, height=WINDOW_HEIGHT, bg="beige")
     canvas.pack()
 
@@ -130,17 +164,12 @@ def run_map_viewer():
     drones_info = {}
     drones_drawings = {}
     final_positions_drawings = {}
-    queue = queue.Queue()  # Importar queue desde el módulo 'queue'
+    queue = Queue()
 
-    # Iniciar el hilo de escucha de Kafka para las actualizaciones de los drones
-    threading.Thread(target=kafka_listener, args=(canvas, drones_info, drones_drawings, queue), daemon=True).start()
+    threading.Thread(target=kafka_listener, args=(canvas, drones_info, drones_drawings, final_positions_drawings, queue), daemon=True).start()
 
-    # Procesar la cola en el hilo principal
     process_queue(canvas, queue)
-    # Llama a la función para obtener las posiciones finales desde el motor de drones
-    get_final_positions_from_engine(canvas, final_positions_drawings)
 
-    # Iniciar el bucle principal de Tkinter
     root.mainloop()
 
 # Si MapViewer es el punto de entrada principal

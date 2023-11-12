@@ -481,12 +481,12 @@ class ADEngine:
         message = {
             'ID': dron_id,
             'Position': position,
-            'State': state  # Puede ser 'MOVING', 'FINAL' o cualquier otro estado relevante
+            'State': state
         }
-
-        # Envía el mensaje al topic de Kafka para el MapViewer
+        # Elige el tópico correcto basado en el estado del dron
+        topic = 'final_positions_topic' if state == 'FINAL' else 'drone_position_updates'
         try:
-            self.kafka_producer.send('map_viewer_topic', value=message)
+            self.kafka_producer.send(topic, value=message)
             self.kafka_producer.flush()
         except Exception as e:
             print(f"Error al enviar mensaje al MapViewer: {e}")
