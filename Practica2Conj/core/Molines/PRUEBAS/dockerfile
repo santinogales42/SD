@@ -1,0 +1,8 @@
+# Use an official Python runtime as the base image
+FROM python:3.8
+
+# Set the working directory in the container
+WORKDIR /app
+
+# Expose a port if your application listens on a specific port
+# EXPOSE 8083
