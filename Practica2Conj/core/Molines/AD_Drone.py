@@ -3,21 +3,27 @@ import json
 import threading
 from kafka import KafkaProducer, KafkaConsumer
 import argparse
-import sys
 import pymongo
+import sys
 
-# Clase ADDrone modificado para trabajar con hilos
 class ADDrone(threading.Thread):
     def __init__(self, engine_address, broker_address):
         super().__init__()
         self.engine_address = engine_address
         self.broker_address = broker_address
         self.kafka_producer = KafkaProducer(bootstrap_servers=self.broker_address)
+        self.registry_address = ('localhost', 8081)
         self.final_position = None
         self.current_position = (1, 1)
+        self.dron_id = None
+        self.alias = None
+        self.access_token = None
+        self.mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
+        self.db = self.mongo_client["dronedb"]
+        
+        self.registered_drones = {}
         
     def run(self):
-        # Aquí puedes iniciar la lógica de conexión al ADEngine y recibir la posición final
         self.show_menu()
 
     def connect_to_engine(self):
@@ -30,9 +36,8 @@ class ADDrone(threading.Thread):
         engine_socket.close()
 
     def start_consuming_messages(self):
-        # Conectar al Kafka Consumer para recibir mensajes
         consumer = KafkaConsumer(
-            'drone_messages_topic',
+            'drone_instructions_topic',  # Asegúrate de usar el topic correcto
             bootstrap_servers=self.broker_address,
             auto_offset_reset='latest',
             enable_auto_commit=True,
@@ -40,8 +45,23 @@ class ADDrone(threading.Thread):
             value_deserializer=lambda m: json.loads(m.decode('utf-8'))
         )
         for message in consumer:
-            # Aquí puedes implementar la lógica para manejar los mensajes
-            pass
+            # Procesa cada mensaje
+            instruction = message.value.get('instruction')
+            if instruction == 'START':
+                # Iniciar alguna acción, como moverse hacia la posición final
+                pass
+            elif instruction == 'STOP':
+                # Detener cualquier movimiento y posiblemente regresar a la base
+                pass
+            # Agrega más condiciones según las instrucciones que puedas recibir
+
+    def send_kafka_message(self, topic, message):
+        try:
+            self.kafka_producer.send(topic, value=json.dumps(message).encode('utf-8'))
+            self.kafka_producer.flush()
+        except Exception as e:
+            print(f"Error al enviar mensaje Kafka: {e}")
+
 
     def send_position_update(self):
         # Enviar la posición actualizada al ADEngine
@@ -57,15 +77,6 @@ class ADDrone(threading.Thread):
         # Calcular la ruta hacia la posición final y actualizar la posición actual
         pass  # Implementar la lógica de movimiento aquí
     
-    def authenticate(self):
-        if self.dron_id in self.registered_drones:
-            # Si el ID del dron está registrado, verificar el token
-            stored_token = self.registered_drones[self.dron_id]
-            if stored_token == self.access_token:
-                return True
-        return False
-    
-    
     def input_drone_data(self):
         while True:
             user_input = input("Introduce el ID del dron (número entre 1 y 99): ")
@@ -74,6 +85,7 @@ class ADDrone(threading.Thread):
             if user_input.strip() and alias.strip():  # Verifica que ambas entradas no estén vacías
                 try:
                     dron_id = int(user_input)
+
                     if 1 <= dron_id <= 99:
                         # Conectar a la base de datos de MongoDB y verificar si el ID ya existe
                         mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
@@ -81,13 +93,14 @@ class ADDrone(threading.Thread):
                         drones_collection = db["drones"]
 
                         existing_dron = drones_collection.find_one({"ID": dron_id})
-
+                        
                         if existing_dron:
                             print("ID de dron ya existe. Introduce un ID diferente.")
                         else:
                             # ID válido y no duplicado, se puede continuar
                             self.dron_id = dron_id
                             self.alias = alias
+                            self.register_drone()
                             break  # La entrada es un número válido y está en el rango, sal del bucle
                     else:
                         print("El ID del dron debe estar entre 1 y 99. Inténtalo de nuevo.")
@@ -194,46 +207,72 @@ class ADDrone(threading.Thread):
         # Cerrar la conexión con la base de datos
         mongo_client.close()
             
-            
+    def join_show(self):
+        if not self.dron_id or not self.alias:
+            print("Drone ID and alias must be set before joining the show.")
+            return
+
+        # Conectar al ADEngine para unirse al show
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as engine_socket:
+                engine_socket.connect(self.engine_address)
+                join_message = {'action': 'join', 'ID': self.dron_id, 'Alias': self.alias}
+                engine_socket.send(json.dumps(join_message).encode('utf-8'))
+                
+                # Recibir la respuesta del ADEngine
+                response_data = engine_socket.recv(1024).decode()
+                if response_data:
+                    response = json.loads(response_data)
+                    if 'final_position' in response:
+                        # Asegurarse de que la posición final es una lista antes de convertirla en tupla
+                        if isinstance(response['final_position'], list):
+                            self.final_position = tuple(response['final_position'])
+                        else:
+                            print("Invalid format for final position received from the server.")
+                        print(f"Drone {self.dron_id} has received final position: {self.final_position}")
+                    else:
+                        print(f"Drone {self.dron_id} failed to join the show. Server response: {response}")
+                else:
+                    print(f"Drone {self.dron_id} failed to join the show. No response from server.")
+        except json.JSONDecodeError:
+            print("Failed to decode the server response. Ensure the server sends a valid JSON.")
+        except ConnectionError as e:
+            print(f"Unable to connect to the ADEngine: {e}")
+        finally:
+            engine_socket.close()
+
+
+    
             
     def show_menu(self):
+        options = {
+            "1": self.input_drone_data,
+            "2": self.join_show,
+            "3": self.list_drones,
+            "4": self.delete_drones
+        }
         try:
             while True:
-                print("\nDron Menu:")
-                print("1. Registrar dron")
-                print("2. Unirse al espectáculo")
-                print("3. Listar todos los drones")
-                print("4. Eliminar drones")
-                print("5. Salir")
-
-                choice = input("Seleccione una opción: ")
-
-                if choice == "1":
-                    if not self.dron_id:
-                        self.input_drone_data()
-                    if not self.access_token:
-                        self.register_drone()
-                elif choice == "2":
-                    if self.access_token:
-                        dron_id = self.dron_id
-                        t = threading.Thread(target=self.join_show, args=(dron_id,))
-                        t.start()
-                        self.joined_drones.append(dron_id)
-                    else:
-                        print("Debe registrar el dron primero.")
-                elif choice == "3":
-                    self.list_drones()
-                elif choice == "4":
-                    self.delete_drones()
-                elif choice == "5":
+                print("\nDrone Menu:")
+                print("1. Enter Drone Data")
+                print("2. Join Show")
+                print("3. List Drones")
+                print("4. Delete Drone")
+                print("5. Exit")
+                choice = input("Select an option: ")
+                if choice == "5":
                     break
+                action = options.get(choice)
+                if action:
+                    action()
                 else:
-                    print("Opción no válida. Seleccione una opción válida.")
+                    print("Invalid option. Please select a valid one.")
         except KeyboardInterrupt:
-            print("Se ha presionado Ctrl+C. Saliendo del programa...")
-        except ConnectionResetError:
-            print("Error de conexión. Saliendo del programa...")
+            print("Ctrl+C pressed. Shutting down...")
+        except Exception as e:
+            print(f"An error occurred: {e}")
         finally:
+            self.mongo_client.close()
             sys.exit()
     
     
@@ -246,16 +285,11 @@ if __name__ == "__main__":
     parser.add_argument('--broker_address', type=str, default='localhost:29092', help='Address of the Kafka broker')
     args = parser.parse_args()
 
+
+    drones = []
     dron = ADDrone((args.engine_ip, args.engine_port), args.broker_address)
-    dron.start()
+    drones.append(dron)
 
-        
-
-    
-
-            
-            
-    
-        
-
-    
+    # Inicia cada dron como un hilo separado
+    for dron in drones:
+        dron.start()

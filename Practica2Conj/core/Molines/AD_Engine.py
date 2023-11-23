@@ -34,18 +34,42 @@ class ADEngine:
             client_socket, _ = self.server_socket.accept()
             threading.Thread(target=self.handle_drone_connection, args=(client_socket,)).start()
 
+    # En la clase ADEngine
     def handle_drone_connection(self, client_socket):
         try:
             data = client_socket.recv(1024).decode('utf-8')
             message = json.loads(data)
+            
             if message.get('action') == 'join':
                 dron_id = message['ID']
-                self.connected_drones.add(dron_id)
-                final_position = self.final_positions.get(dron_id)
-                if final_position:
-                    self.send_final_position(dron_id, final_position)
+                
+                if dron_id in self.final_positions:
+                    # Se verifica si el dron es necesario para la figura actual
+                    self.connected_drones.add(dron_id)
+                    remaining_drones = self.required_drones - len(self.connected_drones)
+                    print(f"Drone ID {dron_id} has joined. {remaining_drones} drones are still required.")
+                    
+                    # Enviar la posición final al dron si es necesario
+                    final_position = self.final_positions[dron_id]
+                    response_message = {
+                        'status': 'success',
+                        'final_position': final_position
+                    }
+                else:
+                    # El dron no es necesario para la figura actual
+                    print(f"Drone ID {dron_id} has joined but is not needed for the current figure.")
+                    response_message = {'status': 'not_required'}
+                
+                client_socket.send(json.dumps(response_message).encode('utf-8'))
+            else:
+                print(f"Received unknown action from drone: {message.get('action')}")
+        
+        except Exception as e:
+            print(f"An error occurred while handling drone connection: {e}")
         finally:
             client_socket.close()
+
+
 
     def send_final_position(self, dron_id, final_position):
         message = {
