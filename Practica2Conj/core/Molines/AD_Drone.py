@@ -5,6 +5,7 @@ from kafka import KafkaProducer, KafkaConsumer
 import argparse
 import pymongo
 import sys
+import time
 
 class ADDrone(threading.Thread):
     def __init__(self, engine_address, broker_address):
@@ -15,6 +16,7 @@ class ADDrone(threading.Thread):
         self.registry_address = ('localhost', 8081)
         self.final_position = None
         self.current_position = (1, 1)
+        self.base_position = (1, 1)
         self.dron_id = None
         self.alias = None
         self.access_token = None
@@ -22,49 +24,107 @@ class ADDrone(threading.Thread):
         self.db = self.mongo_client["dronedb"]
         
         self.registered_drones = {}
+        self.in_show_mode = False
         
-    def run(self):
+    def start(self):
         self.show_menu()
+        
 
     def connect_to_engine(self):
-        # Conectar al ADEngine para recibir la posición final
         engine_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         engine_socket.connect(self.engine_address)
         engine_socket.send(json.dumps({'action': 'join', 'ID': self.dron_id}).encode())
         response = json.loads(engine_socket.recv(1024).decode())
         self.final_position = tuple(response['final_position'])
         engine_socket.close()
+        
+        
+    def handle_drone_registered_message(self, message):
+        if message.value.get('ID') == self.dron_id:
+            self.access_token = message.value.get('AccessToken')
+            print(f"ADDrone: Registrado exitosamente con AccessToken: {self.access_token}")
+    
 
     def start_consuming_messages(self):
+        print("ADDrone: Esperando mensajes de Kafka...")
         consumer = KafkaConsumer(
-            'drone_instructions_topic',  # Asegúrate de usar el topic correcto
+            'drone_messages_topic',
+            'drones_registered',
+            'drone_final_position',
             bootstrap_servers=self.broker_address,
             auto_offset_reset='latest',
             enable_auto_commit=True,
-            group_id=f'drone_{self.dron_id}',
+            group_id='drone-group-{}'.format(self.dron_id),
             value_deserializer=lambda m: json.loads(m.decode('utf-8'))
         )
+
         for message in consumer:
-            # Procesa cada mensaje
-            instruction = message.value.get('instruction')
-            if instruction == 'START':
-                # Iniciar alguna acción, como moverse hacia la posición final
-                pass
-            elif instruction == 'STOP':
-                # Detener cualquier movimiento y posiblemente regresar a la base
-                pass
-            # Agrega más condiciones según las instrucciones que puedas recibir
+            if message.topic == 'drones_registered':
+                self.handle_drone_registered_message(message)
+            if message.topic == 'drone_messages_topic':
+                self.handle_instruction_message(message)
+            elif message.topic == 'drone_final_position':
+                self.handle_final_position_message(message)
+
+    def handle_instruction_message(self, message):
+        instruction = message.value.get('instruction')
+        if instruction == 'START':
+            print("ADDrone: Instrucción START recibida, moviéndose hacia la posición final...")
+            self.move_to_final_position()
+        elif instruction == 'STOP':
+            print("ADDrone: Instrucción STOP recibida, deteniendo y regresando a la base...")
+            self.current_position = self.base_position
+            self.in_show_mode = False
+            self.send_position_update()
+
+    def handle_final_position_message(self, message):
+        if message.value.get('dron_id') == self.dron_id:
+            final_position = message.value.get('final_position')
+            if final_position:
+                self.final_position = tuple(final_position)
+
+    def move_to_final_position(self):
+        while self.current_position != self.final_position:
+            self.calculate_movement()
+            self.send_position_update()
+            time.sleep(1)
+
+        # Envía un mensaje Kafka una vez que el dron ha llegado a su posición final
+        self.send_kafka_message('drone_position_reached', {
+            'type': 'position_reached',
+            'dron_id': self.dron_id,
+            'final_position': self.final_position
+        })
+        print(f"ADDrone: Posición final alcanzada: {self.final_position}")
+
+
+    def calculate_movement(self):
+        # Ejemplo simple de movimiento: moverse en línea recta hacia el objetivo
+        next_x, next_y = self.current_position
+        final_x, final_y = self.final_position
+
+        if next_x < final_x:
+            next_x += 1
+        elif next_x > final_x:
+            next_x -= 1
+
+        if next_y < final_y:
+            next_y += 1
+        elif next_y > final_y:
+            next_y -= 1
+
+        self.current_position = (next_x, next_y)
 
     def send_kafka_message(self, topic, message):
         try:
             self.kafka_producer.send(topic, value=json.dumps(message).encode('utf-8'))
             self.kafka_producer.flush()
+            print(f"Mensaje Kafka enviado: {message}")
         except Exception as e:
             print(f"Error al enviar mensaje Kafka: {e}")
 
 
     def send_position_update(self):
-        # Enviar la posición actualizada al ADEngine
         message = {
             'type': 'position_update',
             'ID': self.dron_id,
@@ -72,10 +132,7 @@ class ADDrone(threading.Thread):
         }
         self.kafka_producer.send('drone_position_updates', json.dumps(message).encode('utf-8'))
         self.kafka_producer.flush()
-
-    def calculate_movement(self):
-        # Calcular la ruta hacia la posición final y actualizar la posición actual
-        pass  # Implementar la lógica de movimiento aquí
+        print(f"Nueva posición: {self.current_position}")
     
     def input_drone_data(self):
         while True:
@@ -212,24 +269,25 @@ class ADDrone(threading.Thread):
             print("Drone ID and alias must be set before joining the show.")
             return
 
-        # Conectar al ADEngine para unirse al show
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as engine_socket:
                 engine_socket.connect(self.engine_address)
                 join_message = {'action': 'join', 'ID': self.dron_id, 'Alias': self.alias}
                 engine_socket.send(json.dumps(join_message).encode('utf-8'))
                 
-                # Recibir la respuesta del ADEngine
                 response_data = engine_socket.recv(1024).decode()
                 if response_data:
                     response = json.loads(response_data)
                     if 'final_position' in response:
-                        # Asegurarse de que la posición final es una lista antes de convertirla en tupla
                         if isinstance(response['final_position'], list):
                             self.final_position = tuple(response['final_position'])
                         else:
                             print("Invalid format for final position received from the server.")
                         print(f"Drone {self.dron_id} has received final position: {self.final_position}")
+
+                        # Iniciar el consumo de mensajes en un hilo separado
+                        self.in_show_mode = True
+                        threading.Thread(target=self.start_consuming_messages, daemon=True).start()
                     else:
                         print(f"Drone {self.dron_id} failed to join the show. Server response: {response}")
                 else:
@@ -238,11 +296,7 @@ class ADDrone(threading.Thread):
             print("Failed to decode the server response. Ensure the server sends a valid JSON.")
         except ConnectionError as e:
             print(f"Unable to connect to the ADEngine: {e}")
-        finally:
-            engine_socket.close()
 
-
-    
             
     def show_menu(self):
         options = {
@@ -253,20 +307,21 @@ class ADDrone(threading.Thread):
         }
         try:
             while True:
-                print("\nDrone Menu:")
-                print("1. Enter Drone Data")
-                print("2. Join Show")
-                print("3. List Drones")
-                print("4. Delete Drone")
-                print("5. Exit")
-                choice = input("Select an option: ")
-                if choice == "5":
-                    break
-                action = options.get(choice)
-                if action:
-                    action()
-                else:
-                    print("Invalid option. Please select a valid one.")
+                if not self.in_show_mode:
+                    print("\nDrone Menu:")
+                    print("1. Enter Drone Data")
+                    print("2. Join Show")
+                    print("3. List Drones")
+                    print("4. Delete Drone")
+                    print("5. Exit")
+                    choice = input("Select an option: ")
+                    if choice == "5":
+                        break
+                    action = options.get(choice)
+                    if action:
+                        action()
+                    else:
+                        print("Invalid option. Please select a valid one.")
         except KeyboardInterrupt:
             print("Ctrl+C pressed. Shutting down...")
         except Exception as e:
@@ -274,9 +329,6 @@ class ADDrone(threading.Thread):
         finally:
             self.mongo_client.close()
             sys.exit()
-    
-    
-    
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='ADDrone start-up arguments')

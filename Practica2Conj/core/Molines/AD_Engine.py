@@ -1,6 +1,6 @@
 import socket
 import json
-from kafka import KafkaProducer
+from kafka import KafkaProducer, KafkaConsumer
 import pymongo
 import threading
 import argparse
@@ -17,7 +17,10 @@ class ADEngine:
         self.weather_address = (weather_ip, int(weather_port_str))
         self.client = pymongo.MongoClient(self.database_address)
         self.db = self.client["dronedb"]
+        self.state_lock = threading.Lock()
+        self.drones_state = {}
         self.final_positions = {}
+        self.current_positions = {}
         self.connected_drones = set()
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind(("127.0.0.1", self.listen_port))
@@ -55,6 +58,9 @@ class ADEngine:
                         'status': 'success',
                         'final_position': final_position
                     }
+
+                    # Verifica si es el momento de iniciar el show
+                    self.check_all_drones_connected()
                 else:
                     # El dron no es necesario para la figura actual
                     print(f"Drone ID {dron_id} has joined but is not needed for the current figure.")
@@ -68,6 +74,33 @@ class ADEngine:
             print(f"An error occurred while handling drone connection: {e}")
         finally:
             client_socket.close()
+
+    def check_all_drones_connected(self):
+        if len(self.connected_drones) == self.required_drones:
+            print("Todos los drones necesarios para la figura actual están conectados.")
+            for dron_id in self.connected_drones:
+                self.send_final_position(dron_id, self.final_positions[dron_id])
+                self.send_instruction_to_drone(dron_id, 'START')
+            print("Instrucciones START y posiciones finales enviadas a todos los drones.")
+
+    def send_instruction_to_drone(self, dron_id, instruction):
+        message = {
+            'type': 'instruction',
+            'dron_id': dron_id,
+            'instruction': instruction
+        }
+        self.kafka_producer.send('drone_messages_topic', message)
+        self.kafka_producer.flush()
+        print(f"Instrucción {instruction} enviada al dron {dron_id}")
+        with self.state_lock:  # Asegurar el acceso al diccionario de estados
+            self.drones_state[dron_id] = {'instruction': instruction, 'reached': False}
+        
+        
+    def start_show(self):
+        # Envía la instrucción START a todos los drones conectados
+        for dron_id in self.connected_drones:
+            self.send_instruction_to_drone(dron_id, 'START')
+        print("Instrucción START enviada a todos los drones.")
 
 
 
@@ -92,6 +125,9 @@ class ADEngine:
         print(f"AD_Engine en funcionamiento. Escuchando en el puerto {self.listen_port}...")
         self.weather_thread = threading.Thread(target=self.update_weather_conditions)
         self.weather_thread.start()
+        
+        self.kafka_consumer_thread = threading.Thread(target=self.start_kafka_consumer)
+        self.kafka_consumer_thread.start()
         try:
             while True:
                 client_socket, addr = self.server_socket.accept()
@@ -116,30 +152,6 @@ class ADEngine:
             self.kafka_producer.flush()
 
 
-    def check_all_drones_connected(self):
-        # Comprueba si todos los drones requeridos para la figura actual están conectados.
-        connected_required_drones = [dron_id for dron_id in self.connected_drones if dron_id in self.final_positions]
-        if len(connected_required_drones) == self.required_drones:
-            print("Todos los drones requeridos para la figura están conectados. Iniciando la figura.")
-            self.start_show()
-        else:
-            remaining_drones = self.required_drones - len(connected_required_drones)
-            print(f"Esperando por {remaining_drones} drones más para iniciar la figura.")
-            # Actualiza el estado de los drones que ahora son necesarios
-        
-    def send_instruction_to_drone(self, dron_id, instruction):
-        message = {
-            'type': 'instruction',
-            'dron_id': dron_id,
-            'instruction': instruction
-        }
-        self.kafka_producer.send('drone_messages_topic', message)
-        self.kafka_producer.flush()
-        print(f"Instrucción {instruction} enviada al dron {dron_id}")
-        if instruction.startswith("MOVE") and self.get_final_position(dron_id) is None:
-            print(f"No se puede mover el dron {dron_id}: posición final no establecida.")
-            return
-
     def end_show(self):
         print("El espectáculo ha finalizado.")
         # Finalmente, limpia o reinicia variables si es necesario.
@@ -155,6 +167,54 @@ class ADEngine:
         self.server_socket.close()
         self.kafka_producer.close()
         print("AD_Engine ha cerrado todos los recursos.")
+        
+        
+        
+    def start_kafka_consumer(self):
+        consumer = KafkaConsumer(
+            'drone_position_reached',
+            bootstrap_servers=self.broker_address,
+            auto_offset_reset='latest',
+            enable_auto_commit=True,
+            group_id='engine-group',
+            value_deserializer=lambda x: json.loads(x.decode('utf-8'))
+        )
+
+        for message in consumer:
+            if message.value['type'] == 'position_reached':
+                dron_id = message.value['dron_id']
+                final_position = message.value['final_position']
+                self.handle_drone_position_reached(dron_id, final_position)
+
+    def handle_drone_position_reached(self, dron_id, final_position):
+        # Convertir la posición reportada a una tupla si es una lista
+        final_position_tuple = tuple(final_position) if isinstance(final_position, list) else final_position
+        
+        self.current_positions[dron_id] = final_position_tuple
+        print(f"Drone {dron_id} ha alcanzado su posición final: {final_position_tuple}")
+
+        if self.check_all_drones_in_position():
+            self.load_next_figure()
+        with self.state_lock:
+            if dron_id in self.drones_state:
+                self.drones_state[dron_id]['reached'] = True
+
+    def check_all_drones_in_position(self):
+        with self.state_lock:
+            for dron_id, self.final_position in self.final_positions.items():
+                drone_state = self.drones_state.get(dron_id)
+                if not drone_state or not drone_state.get('reached'):
+                    return False
+        return True
+
+
+    def load_next_figure(self):
+        self.indice_figura_actual += 1
+        if self.indice_figura_actual < len(self.figuras):
+            self.cargar_figura(self.indice_figura_actual)
+        else:
+            print("Todas las figuras han sido completadas.")
+            self.end_show()
 
     def procesar_datos_json(self, ruta_archivo_json):
         with open(ruta_archivo_json, 'r') as archivo:

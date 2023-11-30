@@ -79,7 +79,6 @@ class ADWeather:
             if request_json['action'] == 'get_temperature':
                 self.send_weather_info(client_socket)
                
-
             # Puedes añadir más acciones según sea necesario
         except Exception as e:
             print(f"Error al manejar la solicitud del cliente: {e}")
