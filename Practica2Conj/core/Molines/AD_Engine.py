@@ -5,6 +5,7 @@ import pymongo
 import threading
 import argparse
 import time
+from MapViewer import run_map_viewer
 
 class ADEngine:
     def __init__(self, listen_port, max_drones, broker_address, database_address, weather_address):
@@ -94,14 +95,6 @@ class ADEngine:
         print(f"Instrucción {instruction} enviada al dron {dron_id}")
         with self.state_lock:  # Asegurar el acceso al diccionario de estados
             self.drones_state[dron_id] = {'instruction': instruction, 'reached': False}
-        
-        
-    def start_show(self):
-        # Envía la instrucción START a todos los drones conectados
-        for dron_id in self.connected_drones:
-            self.send_instruction_to_drone(dron_id, 'START')
-        print("Instrucción START enviada a todos los drones.")
-
 
 
     def send_final_position(self, dron_id, final_position):
@@ -128,6 +121,9 @@ class ADEngine:
         
         self.kafka_consumer_thread = threading.Thread(target=self.start_kafka_consumer)
         self.kafka_consumer_thread.start()
+        
+        
+        run_map_viewer()
         try:
             while True:
                 client_socket, addr = self.server_socket.accept()
@@ -157,6 +153,9 @@ class ADEngine:
         # Finalmente, limpia o reinicia variables si es necesario.
         self.connected_drones.clear()
         self.final_positions.clear()
+        if self.map_viewer_process:
+            self.map_viewer_process.terminate()
+            print("Mapa visual finalizado.")
 
     def close(self):
         self.stop_event.set()
@@ -251,6 +250,13 @@ class ADEngine:
                 self.drones_state[dron_id] = {'instruction': 'PENDING', 'reached': False}
 
         self.send_positions_and_start_commands()
+        final_positions_message = {
+            'type': 'final_positions_update',
+            'final_positions': [(dron['ID'], tuple(map(int, dron['POS'].split(','))))
+                                for dron in figura_actual['Drones']]
+        }
+        self.kafka_producer.send('final_positions_topic', final_positions_message)        
+        self.kafka_producer.flush()
 
     def send_positions_and_start_commands(self):
         for dron_id in self.connected_drones:
@@ -334,15 +340,6 @@ class ADEngine:
             self.kafka_producer.flush()
         except Exception as e:
             print(f"Error al enviar mensaje al MapViewer: {e}")
-
-
-    def start_map_viewer(self):
-        message = {
-            'type': 'control',
-        }
-        self.kafka_producer.send('map_control', message)
-        self.kafka_producer.flush()
-        print("Se ha enviado la señal de inicio al visualizador del mapa.")
 
 if __name__ == "__main__":
     # Crear el analizador de argumentos

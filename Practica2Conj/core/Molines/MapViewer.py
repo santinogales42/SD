@@ -13,8 +13,8 @@ MAP_OFFSET = 300
 LEFT_PANEL_WIDTH = 200
 
 # Colores
-DRONE_MOVING_COLOR = "green"
-DRONE_FINAL_COLOR = "red"
+DRONE_MOVING_COLOR = "red"
+DRONE_FINAL_COLOR = "green"
 FINAL_POSITION_COLOR = "gray"
 TEXT_COLOR = "black"
 
@@ -91,9 +91,8 @@ def kafka_listener(canvas, queue):
 
 def update_final_positions(canvas, final_positions_update):
     if 'final_positions' in final_positions_update:
-        # Dibujar las posiciones finales en el mapa
-        for final_pos in final_positions_update['final_positions']:
-            x, y = final_pos
+        for dron_id, pos in final_positions_update['final_positions']:
+            x, y = pos  # Asegúrate de que pos es una tupla
             if (x, y) not in final_positions_drawings:
                 rect = canvas.create_rectangle(MAP_OFFSET + x*CELL_SIZE, 
                                                y*CELL_SIZE, 
@@ -101,6 +100,7 @@ def update_final_positions(canvas, final_positions_update):
                                                (y+1)*CELL_SIZE, 
                                                fill=FINAL_POSITION_COLOR)
                 final_positions_drawings[(x, y)] = rect
+
 
 def process_queue(canvas, queue):
     try:
