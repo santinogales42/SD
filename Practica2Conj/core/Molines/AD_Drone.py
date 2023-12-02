@@ -69,8 +69,11 @@ class ADDrone(threading.Thread):
     def handle_instruction_message(self, message):
         instruction = message.value.get('instruction')
         if instruction == 'START':
-            print("ADDrone: Instrucción START recibida, moviéndose hacia la posición final...")
-            self.move_to_final_position()
+            if self.final_position != self.current_position:
+                print("ADDrone: Instrucción START recibida, moviéndose hacia la posición final...")
+                self.move_to_final_position()
+            else:
+                print("ADDrone: Ya en posición final, ignorando instrucción START.")
         elif instruction == 'STOP':
             print("ADDrone: Instrucción STOP recibida, deteniendo y regresando a la base...")
             self.current_position = self.base_position

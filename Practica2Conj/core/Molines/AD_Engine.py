@@ -189,29 +189,37 @@ class ADEngine:
     def handle_drone_position_reached(self, dron_id, final_position):
         # Convertir la posición reportada a una tupla si es una lista
         final_position_tuple = tuple(final_position) if isinstance(final_position, list) else final_position
-        
         self.current_positions[dron_id] = final_position_tuple
         print(f"Drone {dron_id} ha alcanzado su posición final: {final_position_tuple}")
-
-        if self.check_all_drones_in_position():
-            self.load_next_figure()
         with self.state_lock:
             if dron_id in self.drones_state:
                 self.drones_state[dron_id]['reached'] = True
-
+        if self.check_all_drones_in_position():
+            self.load_next_figure()
+                
+    
     def check_all_drones_in_position(self):
         with self.state_lock:
-            for dron_id, self.final_position in self.final_positions.items():
-                drone_state = self.drones_state.get(dron_id)
-                if not drone_state or not drone_state.get('reached'):
+            for dron_id, state in self.drones_state.items():
+                if not state['reached']:
                     return False
-        return True
+            return True            
+    
+
+    def check_all_drones_connected(self):
+        if len(self.connected_drones) == self.required_drones:
+            print("Todos los drones están conectados para la figura actual.")
+            for dron_id in self.connected_drones:
+                # Enviar la nueva posición final y luego la instrucción de START
+                self.send_final_position(dron_id, self.final_positions[dron_id])
+                self.send_instruction_to_drone(dron_id, 'START')
 
 
     def load_next_figure(self):
         self.indice_figura_actual += 1
         if self.indice_figura_actual < len(self.figuras):
             self.cargar_figura(self.indice_figura_actual)
+            self.send_positions_and_start_commands()
         else:
             print("Todas las figuras han sido completadas.")
             self.end_show()
@@ -224,31 +232,33 @@ class ADEngine:
         self.indice_figura_actual = 0  # Índice para seguir la figura actual
         self.cargar_figura(self.indice_figura_actual)
 
+    # En la clase ADEngine
+
     def cargar_figura(self, indice_figura):
         figura_actual = self.figuras[indice_figura]
-        print(f"Figura actual: {figura_actual['Nombre']}")
-        self.required_drones = len(figura_actual['Drones'])  # Número de drones necesarios para la figura actual
-        print(f"Se requieren {self.required_drones} drones para esta figura.")
-        self.final_positions.clear()  # Limpiar las posiciones finales anteriores
-        # Acceder a la nueva colección para las posiciones finales
-        drones_fp_collection = self.db["drones_fp"]
+        print(f"Cargando nueva figura: {figura_actual['Nombre']}")
+        self.required_drones = len(figura_actual['Drones'])
+        self.final_positions.clear()
 
-        for dron in figura_actual['Drones']:
-            dron_id = dron['ID']
-            final_position = tuple(map(int, dron['POS'].split(',')))  # Convertir la posición a una tupla de enteros
+        # Asegurar el acceso al diccionario de estados
+        with self.state_lock:
+            for dron in figura_actual['Drones']:
+                dron_id = dron['ID']
+                final_position = tuple(map(int, dron['POS'].split(',')))
+                self.final_positions[dron_id] = final_position
+                print(f"Posición final del dron {dron_id}: {final_position}")
+                # Actualizar estado del dron
+                self.drones_state[dron_id] = {'instruction': 'PENDING', 'reached': False}
 
-            # Actualizar la nueva colección con la posición final
-            drones_fp_collection.update_one(
-                {"ID": dron_id},
-                {"$set": {"FinalPosition": final_position}},
-                upsert=True
-            )
-            self.final_positions[dron_id] = final_position  # Nuevas posiciones finales
-            print(f"Dron ID: {dron_id}, Posición final: {final_position}")  # Imprime el ID del dron y su posición final
+        self.send_positions_and_start_commands()
 
-        # Asegúrate de que todos los drones requeridos están conectados antes de comenzar
-        self.check_all_drones_connected()
-        self.last_figure_time = time.time()
+    def send_positions_and_start_commands(self):
+        for dron_id in self.connected_drones:
+            self.send_final_position(dron_id, self.final_positions[dron_id])
+            self.send_instruction_to_drone(dron_id, 'START')
+
+# Resto del código...
+
 
     def check_drone_position(self, dron_id):
         current_position = self.get_current_position(dron_id)
