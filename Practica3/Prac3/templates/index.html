@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Art with Drones</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        .top-bar {
+            background-color: #008d18; /* Rojo oscuro */
+            padding: 10px;
+            text-align: center;
+            color: #000; /* Texto negro */
+        }
+
+        nav {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+        }
+
+        nav ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            background-color: #000; /* Negro */
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            display: none; /* Inicialmente oculto */
+        }
+
+        nav li {
+            display: inline-block;
+            margin: 0;
+        }
+
+        nav a {
+            display: block;
+            padding: 10px 15px;
+            text-decoration: none;
+            color: #FFF; /* Texto blanco para mayor contraste */
+        }
+
+        nav a:hover {
+            background-color: #333; /* Color de fondo al pasar el ratón */
+        }
+
+        .dropdown-btn {
+            cursor: pointer;
+            background-color: #000; /* Negro */
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+        }
+
+        .burger-icon {
+            width: 20px;
+            height: 20px;
+            fill: white; /* Color del icono */
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar">
+        <h1>ART WITH DRONES</h1>
+    </div>
+
+    <nav>
+        <button class="dropdown-btn" onclick="toggleDropdown()">
+            <svg class="burger-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+                <path d="M0 0h24v24H0z" fill="none"/>
+                <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+            </svg>
+            MENÚ
+        </button>
+        <ul id="dropdown-menu">
+            <li><a href="/mapa">MAPA</a></li>
+            <li><a href="/registro">REGISTRO</a></li>
+            <li><a href="/errores">ERRORES</a></li>
+        </ul>
+    </nav>
+
+    <!-- Contenido de la página va aquí -->
+
+    <script>
+        function toggleDropdown() {
+            var dropdownMenu = document.getElementById("dropdown-menu");
+            dropdownMenu.style.display = (dropdownMenu.style.display === "block") ? "none" : "block";
+        }
+    </script>
+</body>
+</html>
