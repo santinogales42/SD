@@ -7,7 +7,7 @@ db = client.dronedb
 
 @app.route('/registro', methods=['POST'])
 def register_drone():
-    # Aquí procesas la solicitud POST para registrar un dron.
+    # Procesa la solicitud POST para registrar un dron
     data = request.json
     drone_id = data.get('ID')
     alias = data.get('Alias')
@@ -16,4 +16,5 @@ def register_drone():
     return jsonify({'status': 'success', 'drone_id': result.inserted_id})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Configuración de Flask para usar HTTPS
+    app.run(debug=True, ssl_context=('ruta/a/certificado_CA.crt', 'ruta/a/clave_privada_CA.pem'))
