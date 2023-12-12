@@ -1,5 +1,6 @@
 import socket
 import json
+import requests
 import threading
 from pymongo import MongoClient
 from kafka import KafkaProducer, KafkaConsumer
@@ -63,6 +64,17 @@ class ADRegistry:
             server_socket.close()
             kafka_thread.close()
             client_thread.close()
+            
+    # API_REST
+    def register_drone_via_api(self, drone_id, alias):
+        url = 'http://localhost:5000/register'  # Ajusta la URL según sea necesario
+        data = {'ID': drone_id, 'Alias': alias}
+        response = requests.post(url, json=data)
+        if response.status_code == 200:
+            return response.json()  # Trata el caso de éxito
+        else:
+            return {'status': 'error', 'message': 'Error en la solicitud API'}  # Maneja errores
+
 
     def register_drone(self, drone_id, alias, access_token):
         producer = KafkaProducer(
