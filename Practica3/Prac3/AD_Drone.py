@@ -6,6 +6,7 @@ import argparse
 import pymongo
 import sys
 import time
+import requests
 
 class ADDrone(threading.Thread):
     def __init__(self, engine_address, broker_address):
@@ -160,7 +161,7 @@ class ADDrone(threading.Thread):
                             # ID válido y no duplicado, se puede continuar
                             self.dron_id = dron_id
                             self.alias = alias
-                            self.register_drone()
+                            self.choose_registration_method()
                             break  # La entrada es un número válido y está en el rango, sal del bucle
                     else:
                         print("El ID del dron debe estar entre 1 y 99. Inténtalo de nuevo.")
@@ -203,6 +204,29 @@ class ADDrone(threading.Thread):
             print("Error: El registro no está funcionando. Por favor, inicia el módulo de registro.")
         except Exception as e:
             print(f"Error inesperado: {e}")
+            
+            
+            
+    def register_via_api(self):
+        data = {'ID': self.dron_id, 'Alias': self.alias}
+        response = requests.post('http://localhost:5000/registro', json=data)
+        if response.status_code == 200:
+            self.access_token = response.json().get('token')
+            print(f"Registrado via API. Token: {self.access_token}")
+        else:
+            print(f"Error al registrar via API: {response.text}")
+
+    def choose_registration_method(self):
+        method = input("Elige el método de registro (1: Socket, 2: API): ")
+        if method == "1":
+            self.register_drone()
+        elif method == "2":
+            self.register_via_api()
+        else:
+            print("Método de registro no válido.")
+    
+    
+    
     
     
     def request_final_position_from_db(self):

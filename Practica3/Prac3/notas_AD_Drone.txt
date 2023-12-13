@@ -1,0 +1,11 @@
+Para adaptar AD_Drone.py para que se conecte tanto a través de sockets como mediante la API REST, puedes realizar los siguientes cambios:
+
+    Agrega una Función de Registro vía API REST: Implementa una función que permita al dron registrarse utilizando la API REST. Esto requerirá el uso del módulo requests para enviar una solicitud POST con los datos del dron (ID y Alias) a la API.
+
+    Conserva la Función de Registro vía Socket: Mantén la función register_drone() que se conecta a AD_Registry a través de sockets para permitir el registro usando este método.
+
+    Añade una Opción de Método de Registro: Introduce una opción o parámetro que permita elegir el método de registro (socket o API REST). Podrías utilizar una variable de entorno o un argumento de línea de comandos para esto.
+
+    Procesa las Respuestas Adecuadamente: Asegúrate de que AD_Drone.py maneje correctamente las respuestas y los posibles errores tanto del registro por socket como por la API REST.
+
+    Implementa una Función para Decidir el Método de Registro: Basándose en la opción elegida, el dron debería poder decidir si se registra a través de la API REST o mediante sockets.

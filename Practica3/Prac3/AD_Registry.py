@@ -18,6 +18,8 @@ class ADRegistry:
         self.db = self.client[self.db_name]
         self.broker_address = broker_address
 
+
+#####SOCKET#####
     def handle_client(self, client_socket, addr):
         try:
             request_data = client_socket.recv(1024).decode()
@@ -64,17 +66,6 @@ class ADRegistry:
             server_socket.close()
             kafka_thread.close()
             client_thread.close()
-            
-    # API_REST
-    def register_drone_via_api(self, drone_id, alias):
-        url = 'http://localhost:5000/register'  # Ajusta la URL según sea necesario
-        data = {'ID': drone_id, 'Alias': alias}
-        response = requests.post(url, json=data)
-        if response.status_code == 200:
-            return response.json()  # Trata el caso de éxito
-        else:
-            return {'status': 'error', 'message': 'Error en la solicitud API'}  # Maneja errores
-
 
     def register_drone(self, drone_id, alias, access_token):
         producer = KafkaProducer(
@@ -98,6 +89,17 @@ class ADRegistry:
         producer.close()  # Cierra el productor después de enviar el mensaje
         self.db.drones.insert_one(drone_data_message)
         return drone_data_message
+
+            
+    # Función para registrar un dron en la base de datos
+    def register_drone_via_api(self, drone_id, alias):
+        url = 'http://localhost:5000/registro'  # Ajusta la URL según sea necesario
+        data = {'ID': drone_id, 'Alias': alias}
+        response = requests.post(url, json=data)
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return {'status': 'error', 'message': 'Error en la solicitud API'}
     
     def consume_drone_registered_messages(self):
         consumer = KafkaConsumer(
