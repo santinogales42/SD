@@ -207,6 +207,8 @@ class ADDrone(threading.Thread):
             
             
             
+            
+            
     def register_via_api(self):
         data = {'ID': self.dron_id, 'Alias': self.alias}
         response = requests.post('http://localhost:5000/registro', json=data)
