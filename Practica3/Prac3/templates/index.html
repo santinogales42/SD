@@ -26,13 +26,16 @@
         </ul>
     </nav>
 
-    <!-- Contenido de la página va aquí -->
+    <div id="drone-map"></div>
 
-    <script>
-        function toggleDropdown() {
-            var dropdownMenu = document.getElementById("dropdown-menu");
-            dropdownMenu.style.display = (dropdownMenu.style.display === "block") ? "none" : "block";
-        }
-    </script>
+    <div id="drone-list-section">
+        <h2>Drones</h2>
+        <ul id="drone-list">
+            <!-- Aquí se agregarán los drones -->
+        </ul>
+        <button id="add-drone-btn" onclick="addDrone()">Añadir</button>
+    </div>
+
+    <script src="../static/js/scripts.js"></script>
 </body>
 </html>

@@ -1,0 +1,22 @@
+Basándome en los documentos proporcionados y en tu código para el API_Registry en Flask, hay algunos aspectos a considerar para cumplir con los requisitos del proyecto y mejorar la seguridad y funcionalidad de la API:
+    Seguridad y Autenticación:
+    El código actual no implementa mecanismos de autenticación o seguridad. Para seguir las recomendaciones de los PDFs, deberías:
+        Implementar autenticación, por ejemplo, mediante tokens JWT (JSON Web Tokens) (no).
+        Asegurar las comunicaciones usando HTTPS, lo que requiere un certificado SSL. Puedes seguir las instrucciones del tutorial de securización con certificados para Flask.
+
+    Manejo de Errores y Validaciones (hecho):
+    Tu API debería manejar adecuadamente los errores, como entradas incorrectas o situaciones inesperadas (por ejemplo, cuando se intenta modificar un dron que no existe). Asegúrate de que la API responda con mensajes de error apropiados y códigos de estado HTTP correctos.
+
+    Registro de Drones con Datos Adicionales (hecho, solo Initial_Position):
+    Actualmente, tu API solo registra el alias y genera un id. Puedes mejorar esto incluyendo más información sobre cada dron, como posición inicial, estado del dron, etc.
+
+    Certificados SSL y Configuración HTTPS (hecho creo):
+    Para configurar Flask para usar HTTPS, sigue las instrucciones del tutorial proporcionado. Necesitarás generar certificados SSL y modificar la forma en que inicias tu aplicación Flask para que utilice estos certificados.
+
+    Integración con Otros Componentes del Sistema:
+    Asegúrate de que tu API se integre correctamente con otros componentes del sistema, como el Kafka Producer/Consumer en tu AD_Registry y la base de datos MongoDB.
+
+    Refactorización del AD_Registry (hecho):
+    Modifica el AD_Registry para que utilice tu nueva API REST para registrar drones. Esto implicará cambiar las conexiones de socket por solicitudes HTTP a la API.
+
+Necesita mejoras en seguridad, manejo de errores, validaciones, y documentación. Además, necesitas integrarla con el resto de tu sistema y asegurarte de que todas las partes interactúen correctamente.
