@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from pymongo import MongoClient, errors
 from bson import ObjectId
 import os
@@ -7,15 +7,22 @@ app = Flask(__name__)
 client = MongoClient(os.environ.get('MONGO_URI', 'mongodb://localhost:27017/'))
 db = client.dronedb
 
+
+@app.route('/')
+def home():
+    return render_template('index.html')
+
 def error_response(message, status_code):
     return jsonify({'error': message}), status_code
 
 @app.route('/registro', methods=['POST'])
 def registro():
     try:
+        print(request.data)  # Ver los datos brutos que llegan
+        print(request.json)  # Ver la interpretación JSON de Flask
         data = request.json
-        alias = data.get('alias', '').strip()
-        drone_id = data.get('id', '').strip()
+        drone_id = str(data.get('ID', '')).strip()
+        alias = data.get('Alias', '').strip()
         initial_position = [1, 1]  # Posición inicial predeterminada
 
         if not alias or not drone_id:
@@ -73,4 +80,6 @@ def reiniciar_registro():
 
 if __name__ == '__main__':
     context = ('ssl/certificado_CA.crt', 'ssl/clave_privada_CA.pem')
-    app.run(debug=True, ssl_context=context, host='0.0.0.0', port=5000)
+    #SSL
+    #app.run(debug=True, ssl_context=context, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)

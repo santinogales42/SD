@@ -83,18 +83,17 @@
             MENÚ
         </button>
         <ul id="dropdown-menu">
-            <li><a href="/mapa">MAPA</a></li>
-            <li><a href="/registro">REGISTRO</a></li>
+            <li><a href="#" onclick="mostrarMapa()">MAPA</a></li>
+            <li><a href="#" onclick="mostrarRegistro()">REGISTRO</a></li>
             <li><a href="/errores">ERRORES</a></li>
         </ul>
     </nav>
 
 
-    <!-- Sección de Registro de Drones -->
-    <!--
-    <section id="registro">
+    <!-- Contenido de la página va aquí -->
+    <section id="seccion-registro" style="display:none;">
         <h2>Registro de Drones</h2>
-        <form id="formulario-registro">
+        <form id="formulario-registro" action="/registro" method="post">
             <label for="alias-dron">Alias del Dron:</label>
             <input type="text" id="alias-dron" name="alias">
             <br>
@@ -104,15 +103,54 @@
             <button type="submit">Registrar</button>
         </form>
     </section>
-    -->
 
 
-    <!-- Contenido de la página va aquí -->
+    <section id="seccion-mapa" style="display:none;">
+        <div id="tablero" style="float: left;"></div>
+        <table id="tabla-drones" style="float: right;">
+            <tr>
+                <th>Dron ID</th>
+                <th>Posición Actual</th>
+            </tr>
+            <!-- Aquí se añadirán las filas de los drones dinámicamente -->
+        </table>
+    </section>
+    
+    
+    
 
     <script>
         function toggleDropdown() {
             var dropdownMenu = document.getElementById("dropdown-menu");
             dropdownMenu.style.display = (dropdownMenu.style.display === "block") ? "none" : "block";
+        }
+        function mostrarRegistro() {
+            document.getElementById('seccion-registro').style.display = 'block';
+            document.getElementById('seccion-mapa').style.display = 'none'; // Ocultar sección del mapa
+        }
+        
+        function mostrarMapa() {
+            document.getElementById('seccion-mapa').style.display = 'block';
+            document.getElementById('seccion-registro').style.display = 'none'; // Ocultar sección de registro
+            crearTablero();
+        }
+    
+        function crearTablero() {
+            var tablero = document.getElementById('tablero');
+            tablero.innerHTML = ''; // Limpiar el tablero si ya tiene contenido
+            for (var i = 0; i < 20; i++) {
+                for (var j = 0; j < 20; j++) {
+                    var celda = document.createElement('div');
+                    celda.style.width = '20px';
+                    celda.style.height = '20px';
+                    celda.style.border = '1px solid black';
+                    celda.style.float = 'left';
+                    tablero.appendChild(celda);
+                }
+                var saltoDeLinea = document.createElement('div');
+                saltoDeLinea.style.clear = 'both';
+                tablero.appendChild(saltoDeLinea);
+            }
         }
     </script>
 </body>

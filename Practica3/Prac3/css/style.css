@@ -62,3 +62,18 @@ nav a:hover {
     fill: white; /* Color del icono */
     margin-right: 5px;
 }
+
+#tablero div {
+    width: 20px;
+    height: 20px;
+    border: 1px solid black;
+    float: left;
+}
+#tabla-drones {
+    border-collapse: collapse;
+    margin-left: 20px;
+}
+#tabla-drones, #tabla-drones th, #tabla-drones td {
+    border: 1px solid black;
+}
+
