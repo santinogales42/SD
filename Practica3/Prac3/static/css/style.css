@@ -1,16 +1,15 @@
-/* styles.css */
-
 body {
     margin: 0;
     padding: 0;
     font-family: Arial, sans-serif;
+    background-color: #fca738;
 }
 
 .top-bar {
-    background-color: #008d18; /* Rojo oscuro */
+    background-color: #000a02;
     padding: 10px;
     text-align: center;
-    color: #000; /* Texto negro */
+    color: #fca738;
 }
 
 nav {
@@ -23,10 +22,10 @@ nav ul {
     list-style: none;
     padding: 0;
     margin: 0;
-    background-color: #000; /* Negro */
+    background-color: #000;
     border-radius: 5px;
     box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-    display: none; /* Inicialmente oculto */
+    display: none;
 }
 
 nav li {
@@ -38,16 +37,16 @@ nav a {
     display: block;
     padding: 10px 15px;
     text-decoration: none;
-    color: #FFF; /* Texto blanco para mayor contraste */
+    color: #FFF;
 }
 
 nav a:hover {
-    background-color: #333; /* Color de fondo al pasar el ratón */
+    background-color: #333;
 }
 
 .dropdown-btn {
     cursor: pointer;
-    background-color: #000; /* Negro */
+    background-color: #000;
     color: white;
     border: none;
     padding: 10px;
@@ -59,21 +58,67 @@ nav a:hover {
 .burger-icon {
     width: 20px;
     height: 20px;
-    fill: white; /* Color del icono */
+    fill: white;
     margin-right: 5px;
 }
 
-#tablero div {
-    width: 20px;
-    height: 20px;
-    border: 1px solid black;
-    float: left;
-}
-#tabla-drones {
-    border-collapse: collapse;
-    margin-left: 20px;
-}
-#tabla-drones, #tabla-drones th, #tabla-drones td {
-    border: 1px solid black;
+/* Estilos para el mapa de drones */
+#drone-map {
+    display: grid;
+    grid-template-columns: repeat(20, 1fr);
+    grid-template-rows: repeat(20, 1fr);
+    gap: 2px;
+    margin-left: 300px;
+    margin-top: 80px;
+    width: 700px;
+    height: 700px;
 }
 
+.drone-cell {
+    border: 1px solid black;
+    background-color: black;
+}
+
+/* Estilos para la sección de la lista de drones */
+#drone-list-section {
+    position: absolute;
+    top: 250px;
+    right: 400px;
+    width: 200px;
+    background-color: black;
+    color:#fca738;
+    padding: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    border-radius: 5px;
+}
+
+#drone-list {
+    list-style: none;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 0;
+    margin: 0;
+}
+
+#drone-list li {
+    margin-bottom: 5px;
+    padding: 5px;
+    background-color: #fca738;
+    color: black;
+    border-radius: 3px;
+}
+
+#add-drone-btn {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    background-color: #fca738;
+    color: black;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#add-drone-btn:hover {
+    background-color: #fca738;
+}
