@@ -1,16 +1,55 @@
 from flask import Flask, request, jsonify, render_template
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required
 from pymongo import MongoClient, errors
 from bson import ObjectId
+from datetime import timedelta
 import os
+import logging
 
 app = Flask(__name__)
 client = MongoClient(os.environ.get('MONGO_URI', 'mongodb://localhost:27017/'))
 db = client.dronedb
+app.config["JWT_SECRET_KEY"] = "tu_clave_secreta"  # Cambia esto por una clave segura
+jwt = JWTManager(app)
 
 
 @app.route('/')
 def home():
     return render_template('index.html')
+
+
+###### SEGURIDAD ######
+@app.route('/login', methods=['POST'])
+def login():
+    username = request.json.get("username", None)
+    password = request.json.get("password", None)
+    
+    # Aquí debes validar las credenciales del dron
+    if username != "dron_test" or password != "password_test":
+        return jsonify({"msg": "Credenciales incorrectas"}), 401
+
+    expires = timedelta(seconds=20)
+    access_token = create_access_token(identity=username, expires_delta=expires)
+
+    return jsonify(access_token=access_token)
+
+@app.route('/protegido', methods=['GET'])
+@jwt_required()
+def protegido():
+    return jsonify(msg="Ruta protegida")
+
+
+##### AUDITORIA #####
+#logging.basicConfig(filename='registro_auditoria.log', level=logging.INFO)
+
+#@app.route('/evento', methods=['GET'])
+#def evento():
+    #logging.info("Evento registrado")
+    #return jsonify(msg="Evento registrado")
+
+
+
+##### API #####
 
 def error_response(message, status_code):
     return jsonify({'error': message}), status_code
@@ -40,8 +79,8 @@ def registro():
 @app.route('/listar_drones', methods=['GET'])
 def listar_drones():
     try:
-        drones = list(db.drones.find({}, {'_id': 1, 'alias': 1}))
-        return jsonify([{'id': str(drone['_id']), 'alias': drone['alias']} for drone in drones])
+        drones = list(db.drones.find({}, {'ID': 1, 'Alias': 1}))
+        return jsonify([{'ID': str(drone['ID']), 'Alias': drone['Alias']} for drone in drones])
     except errors.PyMongoError as e:
         return error_response(f'Error de base de datos: {e}', 500)
 
@@ -49,11 +88,11 @@ def listar_drones():
 def modificar_dron(drone_id):
     try:
         data = request.json
-        alias = data.get('alias', '').strip()
+        alias = data.get('Alias', '').strip()
         if not alias:
             return error_response('Falta el alias del dron o es inválido', 400)
 
-        result = db.drones.update_one({'_id': ObjectId(drone_id)}, {'$set': {'alias': alias}})
+        result = db.drones.update_one({'_id': ObjectId(drone_id)}, {'$set': {'Alias': alias}})
         if result.matched_count == 0:
             return error_response('Dron no encontrado', 404)
         return jsonify({'message': 'Dron modificado correctamente'}), 200
@@ -79,7 +118,7 @@ def reiniciar_registro():
         return error_response(f'Error de base de datos: {e}', 500)
 
 if __name__ == '__main__':
-    context = ('ssl/certificado_CA.crt', 'ssl/clave_privada_CA.pem')
+    context = ('ssl/service.crt', 'ssl/service.key')
     #SSL
     #app.run(debug=True, ssl_context=context, host='0.0.0.0', port=5000)
     app.run(debug=True, host='0.0.0.0', port=5000)
