@@ -4,70 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Art with Drones</title>
-    <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: Arial, sans-serif;
-        }
-
-        .top-bar {
-            background-color: #008d18; /* Rojo oscuro */
-            padding: 10px;
-            text-align: center;
-            color: #000; /* Texto negro */
-        }
-
-        nav {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-        }
-
-        nav ul {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-            background-color: #000; /* Negro */
-            border-radius: 5px;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-            display: none; /* Inicialmente oculto */
-        }
-
-        nav li {
-            display: inline-block;
-            margin: 0;
-        }
-
-        nav a {
-            display: block;
-            padding: 10px 15px;
-            text-decoration: none;
-            color: #FFF; /* Texto blanco para mayor contraste */
-        }
-
-        nav a:hover {
-            background-color: #333; /* Color de fondo al pasar el ratón */
-        }
-
-        .dropdown-btn {
-            cursor: pointer;
-            background-color: #000; /* Negro */
-            color: white;
-            border: none;
-            padding: 10px;
-            border-radius: 5px;
-            display: flex;
-            align-items: center;
-        }
-
-        .burger-icon {
-            width: 20px;
-            height: 20px;
-            fill: white; /* Color del icono */
-            margin-right: 5px;
-        }
-    </style>
+    <link rel="stylesheet" href="../static/css/style.css">
 </head>
 <body>
     <div class="top-bar">
@@ -83,75 +20,22 @@
             MENÚ
         </button>
         <ul id="dropdown-menu">
-            <li><a href="#" onclick="mostrarMapa()">MAPA</a></li>
-            <li><a href="#" onclick="mostrarRegistro()">REGISTRO</a></li>
+            <li><a href="/mapa">MAPA</a></li>
+            <li><a href="/registro">REGISTRO</a></li>
             <li><a href="/errores">ERRORES</a></li>
         </ul>
     </nav>
 
+    <div id="drone-map"></div>
 
-    <!-- Contenido de la página va aquí -->
-    <section id="seccion-registro" style="display:none;">
-        <h2>Registro de Drones</h2>
-        <form id="formulario-registro" action="/registro" method="post">
-            <label for="alias-dron">Alias del Dron:</label>
-            <input type="text" id="alias-dron" name="alias">
-            <br>
-            <label for="id-dron">ID del Dron:</label>
-            <input type="text" id="id-dron" name="id">
-            <br>
-            <button type="submit">Registrar</button>
-        </form>
-    </section>
+    <div id="drone-list-section">
+        <h2>Drones</h2>
+        <ul id="drone-list">
+            <!-- Aquí se agregarán los drones -->
+        </ul>
+        <button id="add-drone-btn" onclick="addDrone()">Añadir</button>
+    </div>
 
-
-    <section id="seccion-mapa" style="display:none;">
-        <div id="tablero" style="float: left;"></div>
-        <table id="tabla-drones" style="float: right;">
-            <tr>
-                <th>Dron ID</th>
-                <th>Posición Actual</th>
-            </tr>
-            <!-- Aquí se añadirán las filas de los drones dinámicamente -->
-        </table>
-    </section>
-    
-    
-    
-
-    <script>
-        function toggleDropdown() {
-            var dropdownMenu = document.getElementById("dropdown-menu");
-            dropdownMenu.style.display = (dropdownMenu.style.display === "block") ? "none" : "block";
-        }
-        function mostrarRegistro() {
-            document.getElementById('seccion-registro').style.display = 'block';
-            document.getElementById('seccion-mapa').style.display = 'none'; // Ocultar sección del mapa
-        }
-        
-        function mostrarMapa() {
-            document.getElementById('seccion-mapa').style.display = 'block';
-            document.getElementById('seccion-registro').style.display = 'none'; // Ocultar sección de registro
-            crearTablero();
-        }
-    
-        function crearTablero() {
-            var tablero = document.getElementById('tablero');
-            tablero.innerHTML = ''; // Limpiar el tablero si ya tiene contenido
-            for (var i = 0; i < 20; i++) {
-                for (var j = 0; j < 20; j++) {
-                    var celda = document.createElement('div');
-                    celda.style.width = '20px';
-                    celda.style.height = '20px';
-                    celda.style.border = '1px solid black';
-                    celda.style.float = 'left';
-                    tablero.appendChild(celda);
-                }
-                var saltoDeLinea = document.createElement('div');
-                saltoDeLinea.style.clear = 'both';
-                tablero.appendChild(saltoDeLinea);
-            }
-        }
-    </script>
+    <script src="../static/js/scripts.js"></script>
 </body>
 </html>
