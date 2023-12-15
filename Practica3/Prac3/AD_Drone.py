@@ -210,9 +210,9 @@ class ADDrone(threading.Thread):
             
             
     def register_via_api(self):
-        data = {'ID': self.dron_id, 'Alias': self.alias}
+        data = {'ID': str(self.dron_id), 'Alias': self.alias}
         response = requests.post('http://localhost:5000/registro', json=data)
-        if response.status_code == 200:
+        if response.status_code == 201:
             self.access_token = response.json().get('token')
             print(f"Registrado via API. Token: {self.access_token}")
         else:
