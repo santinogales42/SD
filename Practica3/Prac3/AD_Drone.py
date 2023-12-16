@@ -203,8 +203,6 @@ class ADDrone(threading.Thread):
             
             
             
-            
-            
     def register_via_api(self):
         data = {'ID': str(self.dron_id), 'Alias': self.alias}
         headers = {'Authorization': f'Bearer {self.access_token}'}
@@ -259,7 +257,7 @@ class ADDrone(threading.Thread):
         response = requests.delete(f'http://localhost:5000/borrar_dron/{self.dron_id}', headers=headers)
         
         if response.status_code == 200:
-            print("Dron eliminado exitosamente en la API.")
+            print("Dron eliminado exitosamente.")
         else:
             print(f"Error al eliminar dron en la API: {response.text}")
 

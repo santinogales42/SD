@@ -8,7 +8,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import requests
 import logging
-
+from api_w import WEATHER_API_KEY
 
 app = Flask(__name__)
 client = MongoClient(os.environ.get('MONGO_URI', 'mongodb://localhost:27017/'))
@@ -16,7 +16,6 @@ db = client.dronedb
 app.config["JWT_SECRET_KEY"] = "tu_clave_secreta"  # Cambia esto por una clave segura
 jwt = JWTManager(app)
 
-WEATHER_API_KEY = '3fe46e00ff563d40f636df014ce6073e'
 BASE_URL = "http://api.openweathermap.org/data/2.5/weather"
 
 def get_weather(city_name):
@@ -66,8 +65,6 @@ def registro_usuario():
     return jsonify({"msg": "Usuario registrado exitosamente"}), 201
 
 
-
-
 @app.route('/login', methods=['POST'])
 def login():
     username = request.json.get("username")
@@ -109,31 +106,40 @@ def error_response(e):
 @jwt_required()
 def registro():
     try:
-        print(request.data)  # Ver los datos brutos que llegan
-        print(request.json)  # Ver la interpretación JSON de Flask
         data = request.json
-        drone_id = str(data.get('ID', '')).strip()
-        alias = data.get('Alias', '').strip()
-        initial_position = [1, 1]  # Posición inicial predeterminada
-        
-        if not alias or not drone_id:
-            return jsonify({'error': 'Falta el alias o el ID del dron'}), 400
+        Alias = data.get('Alias', '').strip()  # Usar 'Alias' con mayúscula
+        drone_id = int(data.get('ID')) # Obtener el ID proporcionado
 
-        if db.drones.find_one({'_id': drone_id}):
+        if not Alias or not drone_id:
+            return jsonify({'error': 'Falta el Alias o el ID del dron'}), 400
+
+        # Verificar si el ID ya existe
+        if db.drones.find_one({'ID': drone_id}):
             return jsonify({'error': 'El ID ya existe'}), 409
 
-        db.drones.insert_one({'_id': drone_id, 'alias': alias, 'initial_position': initial_position})
+        new_drone = {
+            '_id': ObjectId(),  # Generar ObjectId automáticamente
+            'type': 'register',
+            'ID': drone_id,  # Usar el ID proporcionado
+            'Alias': Alias,
+            'InitialPosition': [1, 1]
+        }
+
+        db.drones.insert_one(new_drone)
+
         return jsonify({'status': 'success', 'drone_id': drone_id}), 201
     except errors.PyMongoError as e:
         return jsonify({'error': str(e)}), 500
 
 
+
+
+
 @app.route('/listar_drones', methods=['GET'])
-@jwt_required()
 def listar_drones():
     try:
-        drones = list(db.drones.find({}, {'_id': 1, 'alias': 1}))
-        return jsonify([{'id': str(drone['_id']), 'alias': drone.get('alias', 'Sin alias')} for drone in drones])
+        drones = list(db.drones.find({}, {'ID': 1, 'alias': 1}))
+        return jsonify([{'ID': str(drone['ID']), 'Alias': drone.get('Alias', 'Sin alias')} for drone in drones])
     except errors.PyMongoError as e:
         return error_response(f'Error de base de datos: {e}', 500)
 
@@ -161,24 +167,14 @@ def borrar_dron(drone_id):
             result = db.drones.delete_many({})
             return jsonify({'message': f'{result.deleted_count} drones eliminados correctamente'}), 200
         else:
-            # Borrar un solo dron
-            result = db.drones.delete_one({'_id': ObjectId(drone_id)})
+            #Borrar un solo dron
+            result = db.drones.delete_one({'ID': int(drone_id)})
             if result.deleted_count == 0:
                 return error_response('Dron no encontrado', 404)
             return jsonify({'message': 'Dron eliminado correctamente'}), 200
     except errors.PyMongoError as e:
         return jsonify({'error': str(e)}), 500
 
-
-
-
-@app.route('/reiniciar_registro', methods=['DELETE'])
-def reiniciar_registro():
-    try:
-        db.drones.delete_many({})
-        return jsonify({'message': 'Registro reiniciado correctamente'}), 200
-    except errors.PyMongoError as e:
-        return error_response(f'Error de base de datos: {e}', 500)
 
 if __name__ == '__main__':
     context = ('ssl/service.crt', 'ssl/service.key')

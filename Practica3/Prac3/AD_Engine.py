@@ -2,6 +2,7 @@ import socket
 import json
 from kafka import KafkaProducer, KafkaConsumer
 import pymongo
+import logging
 import threading
 import argparse
 import time
@@ -196,13 +197,16 @@ class ADEngine:
         if self.check_all_drones_in_position():
             self.load_next_figure()
                 
-    
+    #Cambiado
     def check_all_drones_in_position(self):
-        with self.state_lock:
-            for dron_id, state in self.drones_state.items():
-                if not state['reached']:
-                    return False
-            return True            
+        all_in_position = True
+        for dron_id, state in self.drones_state.items():
+            if not state['reached']:
+                all_in_position = False
+                break
+        if all_in_position:
+            logging.info("Todos los drones han alcanzado sus posiciones finales.")
+        return all_in_position          
     
 
     def check_all_drones_connected(self):
