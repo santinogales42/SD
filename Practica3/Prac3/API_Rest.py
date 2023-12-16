@@ -6,7 +6,9 @@ from datetime import timedelta
 from cryptography.fernet import Fernet
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
+import requests
 import logging
+
 
 app = Flask(__name__)
 client = MongoClient(os.environ.get('MONGO_URI', 'mongodb://localhost:27017/'))
@@ -14,10 +16,39 @@ db = client.dronedb
 app.config["JWT_SECRET_KEY"] = "tu_clave_secreta"  # Cambia esto por una clave segura
 jwt = JWTManager(app)
 
+WEATHER_API_KEY = '3fe46e00ff563d40f636df014ce6073e'
+BASE_URL = "http://api.openweathermap.org/data/2.5/weather"
+
+def get_weather(city_name):
+    params = {
+        'q': city_name,
+        'appid': WEATHER_API_KEY,
+        'units': 'metric'
+    }
+    response = requests.get(BASE_URL, params=params)
+    if response.status_code == 200:
+        data = response.json()
+        temperature = data['main']['temp']
+        return temperature
+    else:
+        return None
 
 @app.route('/')
-def home():
+def index():
     return render_template('index.html')
+
+
+@app.route('/weather/<city>', methods=['GET'])
+def weather(city):
+    temperature = get_weather(city)
+    if temperature is not None:
+        return jsonify({'city': city, 'temperature': temperature})
+    else:
+        return jsonify({'error': 'No se pudo obtener el clima'}), 404
+
+
+def error_response(message, status_code):
+    return jsonify({'error': message}), status_code
 
 
 ###### SEGURIDAD ######
@@ -73,6 +104,7 @@ def error_response(e):
     return jsonify(error=str(e)), 500
 
 
+
 @app.route('/registro', methods=['POST'])
 @jwt_required()
 def registro():
@@ -101,7 +133,7 @@ def registro():
 def listar_drones():
     try:
         drones = list(db.drones.find({}, {'_id': 1, 'alias': 1}))
-        return jsonify([{'ID': str(drone['_id']), 'Alias': drone.get('alias', 'Sin Alias')} for drone in drones])
+        return jsonify([{'id': str(drone['_id']), 'alias': drone.get('alias', 'Sin alias')} for drone in drones])
     except errors.PyMongoError as e:
         return error_response(f'Error de base de datos: {e}', 500)
 
@@ -124,13 +156,20 @@ def modificar_dron(drone_id):
 @app.route('/borrar_dron/<drone_id>', methods=['DELETE'])
 def borrar_dron(drone_id):
     try:
-        drone_id = int(drone_id) if drone_id.isdigit() else ObjectId(drone_id)
-        result = db.drones.delete_one({'_id': drone_id})
-        if result.deleted_count == 0:
-            return jsonify({'error': 'Dron no encontrado'}), 404
-        return jsonify({'message': 'Dron eliminado correctamente'}), 200
+        if drone_id == "-1":
+            # Borrar todos los drones
+            result = db.drones.delete_many({})
+            return jsonify({'message': f'{result.deleted_count} drones eliminados correctamente'}), 200
+        else:
+            # Borrar un solo dron
+            result = db.drones.delete_one({'_id': ObjectId(drone_id)})
+            if result.deleted_count == 0:
+                return error_response('Dron no encontrado', 404)
+            return jsonify({'message': 'Dron eliminado correctamente'}), 200
     except errors.PyMongoError as e:
         return jsonify({'error': str(e)}), 500
+
+
 
 
 @app.route('/reiniciar_registro', methods=['DELETE'])
@@ -145,4 +184,4 @@ if __name__ == '__main__':
     context = ('ssl/service.crt', 'ssl/service.key')
     #SSL
     #app.run(debug=True, ssl_context=context, host='0.0.0.0', port=5000)
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(debug=False, host='0.0.0.0', port=5000)
