@@ -69,7 +69,7 @@ nav a:hover {
     grid-template-rows: repeat(20, 1fr);
     gap: 2px;
     margin-left: 300px;
-    margin-top: 80px;
+    margin-top: 50px;
     width: 700px;
     height: 700px;
 }
@@ -122,3 +122,41 @@ nav a:hover {
 #add-drone-btn:hover {
     background-color: #fca738;
 }
+
+.black-container {
+    background-color: black;
+    padding: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 20%;
+    margin-left:400px;
+    margin-top:20px;
+}
+
+.orange-background {
+    background-color: #fca738;
+    color: black;
+    border: none;
+    border-radius: 5px;
+    padding: 10px;
+    width: 50%; /* Puedes ajustar el ancho según tus necesidades */
+}
+
+#city-name::placeholder {
+    color: black; /* Cambia el color del placeholder a negro */
+}
+
+.orange-button {
+    background-color: #fca738;
+    color: black;
+    border: none;
+    border-radius: 5px;
+    padding: 10px;
+    cursor: pointer;
+}
+
+.orange-button:hover {
+    background-color: #fca738;
+}
+

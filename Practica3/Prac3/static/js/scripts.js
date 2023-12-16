@@ -26,3 +26,15 @@ function addDrone() {
 }
 
 window.onload = createDroneMap;
+
+function getWeather(city) {
+    fetch('/weather/' + city)
+    .then(response => response.json())
+    .then(data => {
+        if(data.temperature) {
+            alert("La temperatura en " + city + " es: " + data.temperature + "°C");
+        } else {
+            alert("Error al obtener el clima.");
+        }
+    });
+}
