@@ -28,6 +28,11 @@
 
     <div id="drone-map"></div>
 
+    <div id="weather-input" class="black-container">
+        <input type="text" id="city-name" placeholder="Ingrese nombre de ciudad" class="orange-background">
+        <button class="orange-button" onclick="getWeather(document.getElementById('city-name').value)">Obtener Clima</button>
+    </div>
+
     <div id="drone-list-section">
         <h2>Drones</h2>
         <ul id="drone-list">
