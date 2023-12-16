@@ -28,10 +28,9 @@ class ADRegistry:
             if 'ID' in request_json and 'Alias' in request_json:
                 drone_id = request_json['ID']
                 alias = request_json['Alias']
-                access_token = str(uuid4())
 
-                drone_data = self.register_drone(drone_id, alias, access_token)
-                response = {'status': 'success', 'message': 'Registro exitoso', 'token': access_token}
+                drone_data = self.register_drone(drone_id, alias)
+                response = {'status': 'success', 'message': 'Registro exitoso'}
                 
             else:
                 response = {'status': 'error', 'message': 'Solicitud de registro incorrecta'}
@@ -67,7 +66,7 @@ class ADRegistry:
             kafka_thread.close()
             client_thread.close()
 
-    def register_drone(self, drone_id, alias, access_token):
+    def register_drone(self, drone_id, alias):
         producer = KafkaProducer(
             bootstrap_servers=self.broker_address,
             key_serializer=str.encode,  # Asegúrate de que las claves se serializan a bytes
@@ -79,7 +78,6 @@ class ADRegistry:
             'type': 'register',
             'ID': drone_id,
             'Alias': alias,
-            'AccessToken': access_token,
             'InitialPosition': initial_position
         }
         

@@ -1,10 +1,11 @@
 from flask import Flask, render_template, request, jsonify
 import requests
+from api_w import WEATHER_API_KEY
+
 
 front = Flask(__name__)
 front.debug = True
 
-WEATHER_API_KEY = '3fe46e00ff563d40f636df014ce6073e'
 BASE_URL = "http://api.openweathermap.org/data/2.5/weather"
 
 def get_weather(city_name):

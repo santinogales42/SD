@@ -2,6 +2,7 @@ import socket
 import json
 import threading
 from kafka import KafkaProducer, KafkaConsumer
+from bson import ObjectId
 import argparse
 import pymongo
 import sys
@@ -42,8 +43,7 @@ class ADDrone(threading.Thread):
         
     def handle_drone_registered_message(self, message):
         if message.value.get('ID') == self.dron_id:
-            self.access_token = message.value.get('AccessToken')
-            print(f"ADDrone: Registrado exitosamente con AccessToken: {self.access_token}")
+            print(f"ADDrone: Registrado exitosamente")
     
 
     def start_consuming_messages(self):
@@ -93,7 +93,6 @@ class ADDrone(threading.Thread):
             self.send_position_update()
             time.sleep(1)
 
-        # Envía un mensaje Kafka una vez que el dron ha llegado a su posición final
         self.send_kafka_message('drone_position_reached', {
             'type': 'position_reached',
             'dron_id': self.dron_id,
@@ -103,7 +102,6 @@ class ADDrone(threading.Thread):
 
 
     def calculate_movement(self):
-        # Ejemplo simple de movimiento: moverse en línea recta hacia el objetivo
         next_x, next_y = self.current_position
         final_x, final_y = self.final_position
 
@@ -143,12 +141,11 @@ class ADDrone(threading.Thread):
             user_input = input("Introduce el ID del dron (número entre 1 y 99): ")
             alias = input("Introduce el alias del dron: ")
 
-            if user_input.strip() and alias.strip():  # Verifica que ambas entradas no estén vacías
+            if user_input.strip() and alias.strip(): 
                 try:
                     dron_id = int(user_input)
 
                     if 1 <= dron_id <= 99:
-                        # Conectar a la base de datos de MongoDB y verificar si el ID ya existe
                         mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
                         db = mongo_client["dronedb"]
                         drones_collection = db["drones"]
@@ -158,11 +155,10 @@ class ADDrone(threading.Thread):
                         if existing_dron:
                             print("ID de dron ya existe. Introduce un ID diferente.")
                         else:
-                            # ID válido y no duplicado, se puede continuar
                             self.dron_id = dron_id
                             self.alias = alias
                             self.choose_registration_method()
-                            break  # La entrada es un número válido y está en el rango, sal del bucle
+                            break  
                     else:
                         print("El ID del dron debe estar entre 1 y 99. Inténtalo de nuevo.")
                 except ValueError:
@@ -171,23 +167,24 @@ class ADDrone(threading.Thread):
                 print("Ambos campos son obligatorios. Introduce el ID y el alias del dron.")
 
 
+    def id_exists(self, drone_id):
+        return self.db.drones.find_one({'_id': drone_id}) is not None
+    
+
     def register_drone(self):
         try:
-            # Conectar al módulo de registro (AD_Registry) para registrar el dron
             registry_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             registry_socket.connect(self.registry_address)
-
-            dron_data = {
-                'ID': self.dron_id,
-                'Alias': self.alias
-            }
+            dron_data = {'ID': self.dron_id, 'Alias': self.alias}
             registry_socket.send(json.dumps(dron_data).encode())
             response = registry_socket.recv(1024).decode()
+            response_json = json.loads(response)  # Convertir la respuesta a JSON
             registry_socket.close()
-
-            response_json = json.loads(response)
-            if response_json['status'] == 'success':
-                self.access_token = response_json['token']
+            if self.id_exists(self.dron_id):
+                print("ID de dron ya existe. Introduce un ID diferente.")
+                return
+            if response_json.get('status') == 'success':
+                self.access_token = response_json.get('token', '')
                 self.registered_drones[self.dron_id] = self.access_token
                 print(f"Registro exitoso. Token de acceso: {self.access_token}")
                 
@@ -195,7 +192,6 @@ class ADDrone(threading.Thread):
                     'type': 'register',
                     'ID': self.dron_id,
                     'Alias': self.alias,
-                    'AccessToken': self.access_token,
                     'InitialPosition': self.current_position
                 })
             else:
@@ -211,10 +207,13 @@ class ADDrone(threading.Thread):
             
     def register_via_api(self):
         data = {'ID': str(self.dron_id), 'Alias': self.alias}
-        response = requests.post('http://localhost:5000/registro', json=data)
+        headers = {'Authorization': f'Bearer {self.access_token}'}
+        response = requests.post('http://localhost:5000/registro', json=data, headers=headers)
+        if self.id_exists(self.dron_id):
+            print("ID de dron ya existe. Introduce un ID diferente.")
+            return
         if response.status_code == 201:
-            self.access_token = response.json().get('token')
-            print(f"Registrado via API. Token: {self.access_token}")
+            print(f"Registrado via API para el dron {self.dron_id}.")
         else:
             print(f"Error al registrar via API: {response.text}")
 
@@ -253,50 +252,57 @@ class ADDrone(threading.Thread):
         mongo_client.close()
 
     def delete_drones(self):
-        #Input para buscar el ID del dron
-        self.dron_id=int(input("Introduce el ID del dron: "))
+        self.dron_id = input("Introduce el ID del dron: ")
+
+        # Primero intenta eliminar el dron a través de la API
+        headers = {'Authorization': f'Bearer {self.access_token}'}
+        response = requests.delete(f'http://localhost:5000/borrar_dron/{self.dron_id}', headers=headers)
         
-        # Conectar a la base de datos de MongoDB
-        mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
-        db = mongo_client["dronedb"]
-        drones_collection = db["drones"]
-
-        # Recuperar el dron desde la base de datos
-        drone = drones_collection.find_one({"ID": self.dron_id})
-
-        if drone:
-            result = drones_collection.delete_one({"ID": self.dron_id})
-            if result.deleted_count == 1:
-                print(f"Dron con ID {self.dron_id} eliminado.")
-                self.dron_id = None
-                self.access_token = None
-            else:
-                print(f"No se encontró el dron.")
+        if response.status_code == 200:
+            print("Dron eliminado exitosamente en la API.")
         else:
-            print(f"No se encontró el dron con ID {self.dron_id} en la base de datos.")
+            print(f"Error al eliminar dron en la API: {response.text}")
+
+            # Si la API falla, intenta eliminarlo de la base de datos local
+            mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
+            db = mongo_client["dronedb"]
+            drones_collection = db["drones"]
+
+            try:
+                result = drones_collection.delete_one({'ID': int(self.dron_id)})
+                if result.deleted_count == 1:
+                    print(f"Dron con ID {self.dron_id} eliminado de la base de datos.")
+                else:
+                    print(f"No se encontró el dron con ID {self.dron_id} en la base de datos.")
+            except Exception as e:
+                print(f"Error al eliminar dron de la base de datos: {e}")
 
 
     def list_drones(self):
-        # Conectar a la base de datos de MongoDB
-        mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
-        db = mongo_client["dronedb"]
-        drones_collection = db["drones"]
+        # Asegúrate de incluir el encabezado de autorización con el token JWT
+        headers = {'Authorization': f'Bearer {self.access_token}'}
 
-        # Recuperar todos los drones desde la base de datos
-        drones = drones_collection.find()
+        try:
+            # Haz la solicitud a la API
+            response = requests.get('http://localhost:5000/listar_drones', headers=headers)
 
-        # Imprimir la información de los drones
-        for drone in drones:
-            print(f"ID: {drone['ID']}")
-            print(f'Alias: {drone["Alias"]}')
-            print()  # Línea en blanco para separar los drones
-        # Cerrar la conexión con la base de datos
-        mongo_client.close()
+            if response.status_code == 200:
+                drones = response.json()
+                for drone in drones:
+                    print(f"ID: {drone['ID']}, Alias: {drone['Alias']}")
+            else:
+                print(f"Error al listar drones: {response.text}")
+        except Exception as e:
+            print(f"Error: {e}")
+
             
     def join_show(self):
-        if not self.dron_id or not self.alias:
-            print("Drone ID and alias must be set before joining the show.")
+        if not (self.dron_id and self.alias and self.access_token):
+            print("Es necesario registrarse y obtener un token antes de unirse al show.")
             return
+
+        headers = {'Authorization': f'Bearer {self.access_token}'}
+        
 
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as engine_socket:
@@ -326,13 +332,61 @@ class ADDrone(threading.Thread):
         except ConnectionError as e:
             print(f"Unable to connect to the ADEngine: {e}")
 
+
+
+    def register_user(self):
+        while True:
+            username = input("Introduce tu nombre de usuario: ")
+            password = input("Introduce tu contraseña: ")
+
+            if not username or not password:
+                print("Nombre de usuario y contraseña son obligatorios.")
+                continue
+
+            response = requests.post('http://localhost:5000/registro_usuario', json={'username': username, 'password': password})
+
+            if response.status_code == 201:
+                print("Usuario registrado exitosamente.")
+                break
+            elif response.status_code == 409:
+                print("El nombre de usuario ya está en uso. Por favor, elige otro.")
+            else:
+                print(f"Error al registrar usuario: {response.json().get('msg', 'Error desconocido')}")
+                break
+
+
+    def get_jwt_token(self):
+        print("¿Ya tienes un usuario? (si/no): ")
+        tiene_usuario = input().strip().lower()
+
+        if tiene_usuario != "si":
+            self.register_user()
+
+        username = input("Introduce tu nombre de usuario: ")
+        password = input("Introduce tu contraseña: ")
+        self.access_token = self.request_jwt_token(username, password)
+        if self.access_token:
+            print("Token JWT obtenido con éxito.")
+        else:
+            print("Error al obtener token JWT")
+
+    def request_jwt_token(self, username, password):
+        # Solicitar el token JWT a la API
+        response = requests.post('http://localhost:5000/login', json={'username': username, 'password': password})
+        if response.status_code == 200:
+            return response.json().get('access_token')
+        else:
+            print(f"Error al obtener token JWT: {response.text}")
+            return None
+    
             
     def show_menu(self):
         options = {
             "1": self.input_drone_data,
             "2": self.join_show,
             "3": self.list_drones,
-            "4": self.delete_drones
+            "4": self.delete_drones,
+            "5": self.get_jwt_token
         }
         try:
             while True:
@@ -342,9 +396,10 @@ class ADDrone(threading.Thread):
                     print("2. Join Show")
                     print("3. List Drones")
                     print("4. Delete Drone")
-                    print("5. Exit")
+                    print("5. Get Token")
+                    print("6. Exit")
                     choice = input("Select an option: ")
-                    if choice == "5":
+                    if choice == "6":
                         break
                     action = options.get(choice)
                     if action:
