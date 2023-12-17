@@ -179,7 +179,7 @@ def borrar_dron(drone_id):
 
 
 if __name__ == '__main__':
-    context = ('ssl/service.crt', 'ssl/service.key')
+    context = ('ssl/certificado_registry.crt', 'ssl/clave_privada_registry.pem')
     #SSL
-    #app.run(debug=True, ssl_context=context, host='0.0.0.0', port=5000)
-    app.run(debug=False, host='0.0.0.0', port=5000)
+    app.run(debug=True, ssl_context=context, host='0.0.0.0', port=5000)
+    #app.run(debug=False, host='0.0.0.0', port=5000)
