@@ -31,7 +31,7 @@ class ADEngine:
         self.server_socket.listen(15)
         self.kafka_producer = KafkaProducer(
             bootstrap_servers=[self.broker_address],
-            value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+            value_serializer=lambda m: json.dumps(m).encode('utf-8'),
             #security_protocol='SSL',
             ssl_cafile='ssl/certificado_CA.crt',  # El certificado de la Autoridad Certificadora
             ssl_certfile='ssl/certificado_registry.crt',  # Certificado de tu servidor

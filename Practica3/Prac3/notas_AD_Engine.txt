@@ -10,10 +10,24 @@ Visualización de Datos: Desarrolla una interfaz gráfica (en la página web o u
 
 
 
-MAS:
+Paso 1: Configuración del Backend
 
-Implementación de Cifrado en el Canal con Drones
+    Actualizar la API para recibir actualizaciones de posición: Tu servidor backend debe tener un endpoint para recibir las actualizaciones de posición de los drones. Este endpoint puede recibir solicitudes POST con los datos de posición del dron.
 
-    En la comunicación Kafka (parte del código de AD_Engine y ADDrone):
-        Asegura las comunicaciones Kafka implementando cifrado SSL/TLS. Kafka soporta SSL para la autenticación y el cifrado.
-        En las configuraciones de KafkaProducer y KafkaConsumer, incluye los parámetros necesarios para el cifrado SSL como security_protocol, ssl_cafile, ssl_certfile, y ssl_keyfile.
+    Almacenar la información de posición: Cuando tu backend recibe una actualización, debe almacenar esta información. Esto podría ser en una base de datos o en memoria, dependiendo de tus requisitos (por ejemplo, si necesitas persistencia a largo plazo o no).
+
+    Enviar actualizaciones al frontend: Hay varias formas de enviar datos del servidor al cliente en tiempo real. Una forma común es utilizando WebSockets, que permiten una comunicación bidireccional entre el cliente y el servidor. Otra opción podría ser el uso de una solución de polling, donde el frontend periódicamente solicita la última información al servidor.
+
+Paso 2: Configuración del Frontend
+
+    Mostrar un mapa: Puedes utilizar bibliotecas como Google Maps API, Leaflet o Mapbox para mostrar un mapa en tu página web.
+
+    Recibir y procesar datos del backend: Dependiendo de cómo decidas enviar datos desde el backend, necesitarás escribir código en tu frontend para manejar estos datos. Por ejemplo, si estás utilizando WebSockets, deberás establecer una conexión WebSocket y escuchar los mensajes que llegan del servidor.
+
+    Actualizar el mapa con la información de posición: Cada vez que recibas una nueva posición de un dron, actualiza su ubicación en el mapa. Esto puede implicar mover un marcador o actualizar una línea que muestre su trayectoria.
+
+Paso 3: Integración de Drones con Backend
+
+    Enviar datos desde los drones: Tus drones (o más precisamente, tu código que simula los drones) necesitarán enviar sus posiciones actualizadas al backend. Esto se puede hacer haciendo solicitudes POST al endpoint que creaste en el backend.
+
+    Manejar errores y reconexiones: Asegúrate de manejar situaciones donde la conexión con el backend pueda fallar o donde un dron pueda perder su conexión temporalmente.
