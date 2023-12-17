@@ -20,10 +20,8 @@ Paso 1: Configuración del Backend
 
 Paso 2: Configuración del Frontend
 
-    Mostrar un mapa: Puedes utilizar bibliotecas como Google Maps API, Leaflet o Mapbox para mostrar un mapa en tu página web.
-
     Recibir y procesar datos del backend: Dependiendo de cómo decidas enviar datos desde el backend, necesitarás escribir código en tu frontend para manejar estos datos. Por ejemplo, si estás utilizando WebSockets, deberás establecer una conexión WebSocket y escuchar los mensajes que llegan del servidor.
-
+ 
     Actualizar el mapa con la información de posición: Cada vez que recibas una nueva posición de un dron, actualiza su ubicación en el mapa. Esto puede implicar mover un marcador o actualizar una línea que muestre su trayectoria.
 
 Paso 3: Integración de Drones con Backend
