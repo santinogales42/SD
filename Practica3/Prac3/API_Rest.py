@@ -5,12 +5,14 @@ from bson import ObjectId
 from datetime import timedelta
 from cryptography.fernet import Fernet
 from werkzeug.security import generate_password_hash, check_password_hash
+from flask_cors import CORS
 import os
 import requests
 import logging
 from api_w import WEATHER_API_KEY
 
 app = Flask(__name__)
+CORS(app)
 client = MongoClient(os.environ.get('MONGO_URI', 'mongodb://localhost:27017/'))
 db = client.dronedb
 app.config["JWT_SECRET_KEY"] = "tu_clave_secreta"  # Cambia esto por una clave segura

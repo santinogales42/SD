@@ -1,4 +1,4 @@
-import socket
+import socket, ssl
 import json
 from kafka import KafkaProducer, KafkaConsumer
 import pymongo
@@ -7,6 +7,8 @@ import threading
 import argparse
 import time
 from MapViewer import run_map_viewer
+from flask import Flask
+
 
 class ADEngine:
     def __init__(self, listen_port, max_drones, broker_address, database_address, weather_address):
@@ -33,6 +35,15 @@ class ADEngine:
         )
         self.accept_thread = threading.Thread(target=self.accept_connections)
         self.accept_thread.start()
+        #Para conexiones seguras
+        self.context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        self.context.load_cert_chain(certfile="ssl/service.crt", keyfile="ssl/service.key")
+    
+    #def accept_connections(self):
+    #    while True:
+    #        client_socket, _ = self.server_socket.accept()
+    #        secure_socket = self.context.wrap_socket(client_socket, server_side=True)
+    #        threading.Thread(target=self.handle_drone_connection, args=(secure_socket,)).start()
 
     def accept_connections(self):
         while True:
@@ -117,8 +128,6 @@ class ADEngine:
 
     def start(self):
         print(f"AD_Engine en funcionamiento. Escuchando en el puerto {self.listen_port}...")
-        self.weather_thread = threading.Thread(target=self.update_weather_conditions)
-        self.weather_thread.start()
         
         self.kafka_consumer_thread = threading.Thread(target=self.start_kafka_consumer)
         self.kafka_consumer_thread.start()
@@ -160,8 +169,6 @@ class ADEngine:
 
     def close(self):
         self.stop_event.set()
-        if self.weather_thread:
-            self.weather_thread.join()
         if self.kafka_consumer_thread:
             self.kafka_consumer_thread.join()
         self.server_socket.close()
@@ -301,27 +308,6 @@ class ADEngine:
     def get_final_position(self, dron_id):
         # Supongamos que las posiciones finales se almacenan en un diccionario
         return self.final_positions.get(dron_id)
-            
-            
-    def fetch_weather_data(self):
-        try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-                sock.connect(self.weather_address)
-                sock.send(json.dumps({'action': 'get_temperature'}).encode('utf-8'))
-                weather_data = json.loads(sock.recv(1024).decode())
-                print(f"Datos del clima recibidos: {weather_data}")
-                return weather_data['temperature']
-        except Exception as e:
-            print(f"Error al conectar con AD_Weather: {e}")
-            return None  # O manejar de otra manera
-
-    def update_weather_conditions(self):
-        while True:
-            temperature = self.fetch_weather_data()
-            if temperature is not None and temperature < 0:
-                print("Condiciones climáticas adversas. Espectáculo finalizado.")
-                self.end_show()
-            time.sleep(15)
 
     def update_drone_position(self, dron_id, position):
         # Solo verifica si el dron ha llegado a la posición final

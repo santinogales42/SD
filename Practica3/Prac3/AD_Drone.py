@@ -3,6 +3,7 @@ import json
 import threading
 from kafka import KafkaProducer, KafkaConsumer
 from bson import ObjectId
+from flask import Flask
 import argparse
 import pymongo
 import sys
@@ -86,6 +87,8 @@ class ADDrone(threading.Thread):
             final_position = message.value.get('final_position')
             if final_position:
                 self.final_position = tuple(final_position)
+
+
 
     def move_to_final_position(self):
         while self.current_position != self.final_position:
@@ -376,6 +379,41 @@ class ADDrone(threading.Thread):
         else:
             print(f"Error al obtener token JWT: {response.text}")
             return None
+        
+        
+    def take_over_drone(self):
+        print("Seleccionando un dron existente para controlar...")
+        drones = self.list_drones_in_db()
+        if not drones:
+            print("No hay drones disponibles para controlar.")
+            return
+
+        for idx, drone in enumerate(drones, start=1):
+            print(f"{idx}. ID: {drone['ID']}, Alias: {drone['Alias']}")
+
+        choice = input("Selecciona el número del dron que deseas controlar: ")
+        try:
+            selected_idx = int(choice) - 1
+            if 0 <= selected_idx < len(drones):
+                selected_drone = drones[selected_idx]
+                self.dron_id = selected_drone['ID']
+                self.alias = selected_drone['Alias']
+                print(f"Has tomado el control del dron ID: {self.dron_id}, Alias: {self.alias}")
+            else:
+                print("Selección inválida.")
+        except ValueError:
+            print("Por favor, introduce un número válido.")
+
+    def list_drones_in_db(self):
+        try:
+            drones = list(self.db.drones.find({}, {'ID': 1, 'Alias': 1}))
+            return [{'ID': drone['ID'], 'Alias': drone.get('Alias', 'Sin alias')} for drone in drones]
+        except Exception as e:
+            print(f"Error al listar drones: {e}")
+            return []
+
+    
+    
     
             
     def show_menu(self):
@@ -384,7 +422,8 @@ class ADDrone(threading.Thread):
             "2": self.join_show,
             "3": self.list_drones,
             "4": self.delete_drones,
-            "5": self.get_jwt_token
+            "5": self.get_jwt_token,
+            "6": self.take_over_drone  # Agregar la nueva opción aquí
         }
         try:
             while True:
@@ -395,9 +434,10 @@ class ADDrone(threading.Thread):
                     print("3. List Drones")
                     print("4. Delete Drone")
                     print("5. Get Token")
-                    print("6. Exit")
+                    print("6. Take Over Drone")
+                    print("7. Exit")
                     choice = input("Select an option: ")
-                    if choice == "6":
+                    if choice == "7":
                         break
                     action = options.get(choice)
                     if action:
