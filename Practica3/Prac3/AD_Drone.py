@@ -16,7 +16,16 @@ class ADDrone(threading.Thread):
         super().__init__()
         self.engine_address = engine_address
         self.broker_address = broker_address
-        self.kafka_producer = KafkaProducer(bootstrap_servers=self.broker_address)
+        #self.kafka_producer = KafkaProducer(bootstrap_servers=self.broker_address)
+        self.kafka_producer = KafkaProducer(
+            bootstrap_servers=self.broker_address,
+            #value_serializer=lambda m: json.dumps(m).encode('utf-8'),
+            #security_protocol='SSL',
+            ssl_cafile='ssl/certificado_CA.crt',
+            ssl_certfile='ssl/certificado_registry.crt',
+            ssl_keyfile='ssl/clave_privada_registry.pem'
+        )
+
         self.registry_address = engine_registry_address  # Usamos el argumento proporcionado
         self.final_position = None
         self.current_position = (1, 1)
@@ -51,7 +60,11 @@ class ADDrone(threading.Thread):
             auto_offset_reset='latest',
             enable_auto_commit=True,
             group_id='drone-group-{}'.format(self.dron_id),
-            value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+            value_deserializer=lambda m: json.loads(m.decode('utf-8')),
+            #security_protocol='SSL',
+            ssl_cafile='ssl/certificado_CA.crt',
+            ssl_certfile='ssl/certificado_registry.crt',
+            ssl_keyfile='ssl/clave_privada_registry.pem'
         )
 
         for message in consumer:
@@ -116,11 +129,16 @@ class ADDrone(threading.Thread):
 
     def send_kafka_message(self, topic, message):
         try:
+            # Asegúrate de que 'message' sea un objeto que pueda ser serializado a JSON
+            # y no esté ya codificado como bytes
+            if isinstance(message, bytes):
+                message = message.decode('utf-8')
             self.kafka_producer.send(topic, value=json.dumps(message).encode('utf-8'))
             self.kafka_producer.flush()
             print(f"Mensaje Kafka enviado: {message}")
         except Exception as e:
             print(f"Error al enviar mensaje Kafka: {e}")
+
 
 
     def send_position_update(self):
@@ -129,7 +147,7 @@ class ADDrone(threading.Thread):
             'ID': self.dron_id,
             'Position': self.current_position
         }
-        self.kafka_producer.send('drone_position_updates', json.dumps(message).encode('utf-8'))
+        self.kafka_producer.send('drone_position_updates', value=json.dumps(message).encode('utf-8'))
         self.kafka_producer.flush()
         print(f"Nueva posición: {self.current_position}")
     
@@ -286,15 +304,20 @@ class ADDrone(threading.Thread):
             # Cargar el certificado de la autoridad certificadora
             context.load_verify_locations('ssl/certificado_registry.crt')
 
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as raw_socket:
+            #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as raw_socket:
                 # Envolver el socket en el contexto SSL
-                secure_socket = context.wrap_socket(raw_socket, server_hostname="registry")
+            #    secure_socket = context.wrap_socket(raw_socket, server_hostname="registry")
 
-                secure_socket.connect(self.engine_address)
+            #    secure_socket.connect(self.engine_address)
+            #    join_message = {'action': 'join', 'ID': self.dron_id, 'Alias': self.alias}
+            #    secure_socket.send(json.dumps(join_message).encode('utf-8'))
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as engine_socket:
+                engine_socket.connect(self.engine_address)
                 join_message = {'action': 'join', 'ID': self.dron_id, 'Alias': self.alias}
-                secure_socket.send(json.dumps(join_message).encode('utf-8'))
+                engine_socket.send(json.dumps(join_message).encode('utf-8'))
                 
-                response_data = secure_socket.recv(1024).decode()
+                response_data = engine_socket.recv(1024).decode()
+            #    response_data = secure_socket.recv(1024).decode()
                 if response_data:
                     response = json.loads(response_data)
                     if 'final_position' in response:

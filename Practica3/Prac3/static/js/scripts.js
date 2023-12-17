@@ -203,7 +203,7 @@ function updateDronePositions() {
     fetch('/get_drone_positions')
         .then(response => response.json())
         .then(data => {
-            for (let droneID in data) {
+            Object.entries(data).forEach(([droneID, position]) => {
                 let droneElement = document.getElementById(`drone-${droneID}`);
                 if (!droneElement) {
                     droneElement = document.createElement('div');
@@ -211,11 +211,32 @@ function updateDronePositions() {
                     droneElement.classList.add('drone');
                     document.getElementById('drone-map').appendChild(droneElement);
                 }
-                droneElement.style.left = `${data[droneID].x}px`;
-                droneElement.style.top = `${data[droneID].y}px`;
-            }
+                // Asegúrate de que las coordenadas 'x' y 'y' se traduzcan correctamente al mapa
+                droneElement.style.left = `${position.x * scaleFactor}px`;
+                droneElement.style.top = `${position.y * scaleFactor}px`;
+            });
         })
         .catch(error => console.error('Error al obtener posiciones de drones:', error));
 }
 
 
+function updateFinalPositions() {
+    fetch('/get_final_positions')
+        .then(response => response.json())
+        .then(data => {
+            Object.entries(data).forEach(([droneID, finalPosition]) => {
+                let finalPositionElement = document.getElementById(`cell-${finalPosition.x}-${finalPosition.y}`);
+                if (finalPositionElement) {
+                    finalPositionElement.style.backgroundColor = 'yellow';
+                }
+            });
+        })
+        .catch(error => console.error('Error al obtener posiciones finales:', error));
+}
+
+window.onload = function() {
+    createDroneMap();
+    updateDroneList();
+    updateDronePositions();
+    updateFinalPositions(); // Agregar esta línea
+};

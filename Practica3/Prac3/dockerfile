@@ -1,0 +1,25 @@
+# Utiliza la imagen oficial de Python 3.11.6 como base
+FROM python:3.11.6
+
+# Establece el directorio de trabajo dentro del contenedor
+WORKDIR /
+
+# Copia el archivo AD_Engine.py desde el directorio actual al directorio / en el contenedor
+COPY AD_Engine.py /AD_Engine.py
+
+# Crea una subcarpeta llamada 'ssl' en el directorio / en el contenedor
+RUN mkdir /ssl
+RUN mkdir /PRUEBAS
+
+# Copia los archivos de la subcarpeta 'ssl' desde tu directorio local al directorio /ssl en el contenedor
+COPY ssl/* /ssl/
+COPY PRUEBAS/* /PRUEBAS/
+
+# Instala las dependencias necesarias si las tienes
+RUN pip install --upgrade pip
+RUN pip install kafka-python
+RUN pip install pymongo
+RUN pip install flask
+
+# Define el comando predeterminado que se ejecutará cuando se inicie el contenedor
+CMD ["python", "AD_Engine.py", "--broker_address", "192.168.1.142:29092"]
