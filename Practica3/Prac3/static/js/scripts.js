@@ -16,6 +16,7 @@ function createDroneMap() {
 window.onload = function() {
     createDroneMap();
     updateDroneList();
+    updateDronePositions();
 };
 
 function getWeather(city) {
@@ -195,3 +196,26 @@ function updateDroneList() {
         })
         .catch(error => console.error('Error al listar drones:', error));
 }
+
+setInterval(updateDronePositions, 2000); // Actualiza cada 2 segundos
+
+function updateDronePositions() {
+    fetch('http://localhost:5005/get_drone_positions')
+        .then(response => response.json())
+        .then(data => {
+            for (let droneID in data) {
+                let droneElement = document.getElementById(`drone-${droneID}`);
+                if (!droneElement) {
+                    droneElement = document.createElement('div');
+                    droneElement.id = `drone-${droneID}`;
+                    droneElement.classList.add('drone');
+                    document.getElementById('drone-map').appendChild(droneElement);
+                }
+                droneElement.style.left = `${data[droneID].x}px`;
+                droneElement.style.top = `${data[droneID].y}px`;
+            }
+        })
+        .catch(error => console.error('Error al obtener posiciones de drones:', error));
+}
+
+

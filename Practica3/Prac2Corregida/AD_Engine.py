@@ -325,7 +325,15 @@ class ADEngine:
         if final_position and tuple(position) == final_position:
             print(f"Dron {dron_id} ha confirmado llegada a la posición final.")
             self.send_instruction_to_drone(dron_id, 'END')  # Enviar señal de que ha llegado a la posición final
-            #self.send_message_to_map_viewer(dron_id, position, state)
+
+        # Independientemente de si ha llegado a la posición final, enviar actualización
+        position_update_message = {
+            'ID': dron_id,
+            'Position': position,
+            'State': 'MOVING'
+        }
+        self.kafka_producer.send('drone_position_updates', json.dumps(position_update_message).encode('utf-8'))
+        self.kafka_producer.flush()
         
     def send_message_to_map_viewer(self, dron_id, position, state):
         message = {
