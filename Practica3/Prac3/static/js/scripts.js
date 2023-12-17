@@ -12,20 +12,11 @@ function createDroneMap() {
     }
 }
 
-function addDrone() {
-    const droneName = prompt("Ingrese el nombre del dron (debe ser un número):");
 
-    if (droneName !== null && !isNaN(droneName)) {
-        const droneList = document.getElementById('drone-list');
-        const newDrone = document.createElement('li');
-        newDrone.textContent = 'Dron ' + droneName;
-        droneList.appendChild(newDrone);
-    } else {
-        alert("Por favor, ingrese un número válido como nombre del dron.");
-    }
-}
-
-window.onload = createDroneMap;
+window.onload = function() {
+    createDroneMap();
+    updateDroneList();
+};
 
 function getWeather(city) {
     fetch('/weather/' + city)
@@ -37,4 +28,77 @@ function getWeather(city) {
             alert("Error al obtener el clima.");
         }
     });
+}
+
+function addDrone() {
+    const droneID = prompt("Ingrese el ID del dron (debe ser un número):");
+    const droneAlias = prompt("Ingrese el alias del dron:");
+
+    if (droneID && droneAlias) {
+        fetch('/registro', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ ID: droneID, Alias: droneAlias }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                alert("Dron registrado correctamente con ID: " + data.drone_id);
+                updateDroneList();
+            } else {
+                alert("Error al registrar el dron: " + data.error);
+            }
+        })
+        .catch((error) => {
+            console.error('Error:', error);
+            alert("Error en la conexión con el servidor.");
+        });
+    } else {
+        alert("Por favor, ingrese un ID y un alias válidos.");
+    }
+}
+
+function delDrone() {
+    const droneID = prompt("Ingrese el ID del dron a eliminar:");
+    if (droneID) {
+        deleteDrone(droneID);
+    } else {
+        alert("Por favor, ingrese un ID válido.");
+    }
+}
+
+function deleteDrone(droneId) {
+    fetch('/borrar_dron/' + droneId, {
+        method: 'DELETE',
+    })
+    .then(response => {
+        if (response.ok) {
+            alert("Dron eliminado correctamente.");
+            updateDroneList();
+        } else {
+            alert("Error al eliminar el dron.");
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert("Error en la conexión con el servidor.");
+    });
+}
+
+function updateDroneList() {
+    fetch('/listar_drones')
+        .then(response => response.json())
+        .then(drones => {
+            const listElement = document.getElementById('drone-list');
+            listElement.innerHTML = ''; // Limpia la lista actual
+
+            drones.forEach(drone => {
+                const listItem = document.createElement('li');
+                listItem.textContent = `ID: ${drone.id}, Alias: ${drone.alias}`;
+                listElement.appendChild(listItem);
+            });
+        })
+        .catch(error => console.error('Error al listar drones:', error));
 }
