@@ -1,17 +1,21 @@
 from flask import Flask, jsonify
+from flask_cors import CORS
 from kafka import KafkaConsumer
 import threading
 import json
 
 app = Flask(__name__)
+CORS(app)
+
+drone_positions = {}
 
 # Kafka Consumer que escucha en un tópico específico
 def kafka_listener():
     consumer = KafkaConsumer(
-        'drone_position_updates',
-        bootstrap_servers='localhost:29092',
-        value_deserializer=lambda m: json.loads(m.decode('utf-8'))
-    )
+    'drone_position_updates',
+    bootstrap_servers='localhost:29092',
+    value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+)
 
     for message in consumer:
         message_data = message.value
