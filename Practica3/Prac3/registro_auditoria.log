@@ -255,3 +255,80 @@ INFO:werkzeug:127.0.0.1 - - [17/Dec/2023 21:50:59] "GET /get_drone_positions HTT
 INFO:werkzeug:127.0.0.1 - - [17/Dec/2023 21:51:01] "GET /get_drone_positions HTTP/1.1" 200 -
 INFO:werkzeug:127.0.0.1 - - [17/Dec/2023 21:51:03] "GET /get_drone_positions HTTP/1.1" 200 -
 INFO:werkzeug:127.0.0.1 - - [17/Dec/2023 21:51:05] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:kafka.conn:<BrokerConnection node_id=bootstrap-0 host=localhost:29092 <connecting> [IPv6 ('::1', 29092, 0, 0)]>: connecting to localhost:29092 [('::1', 29092, 0, 0) IPv6]
+INFO:kafka.conn:Probing node bootstrap-0 broker version
+INFO:kafka.conn:<BrokerConnection node_id=bootstrap-0 host=localhost:29092 <connecting> [IPv6 ('::1', 29092, 0, 0)]>: Connection complete.
+INFO:werkzeug:[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on https://127.0.0.1:5000
+ * Running on https://192.168.1.142:5000
+INFO:werkzeug:[33mPress CTRL+C to quit[0m
+INFO:werkzeug: * Restarting with stat
+INFO:kafka.conn:Broker version identified as 2.5.0
+INFO:kafka.conn:Set configuration api_version=(2, 5, 0) to skip auto check_version requests on startup
+WARNING:kafka.coordinator.consumer:group_id is None: disabling auto-commit.
+INFO:kafka.consumer.subscription_state:Updating subscribed topics to: ('drone_position_updates',)
+INFO:kafka.consumer.subscription_state:Updated partition assignment: [TopicPartition(topic='drone_position_updates', partition=0)]
+INFO:kafka.conn:<BrokerConnection node_id=1 host=localhost:29092 <connecting> [IPv6 ('::1', 29092, 0, 0)]>: connecting to localhost:29092 [('::1', 29092, 0, 0) IPv6]
+INFO:kafka.conn:<BrokerConnection node_id=1 host=localhost:29092 <connecting> [IPv6 ('::1', 29092, 0, 0)]>: Connection complete.
+INFO:kafka.conn:<BrokerConnection node_id=bootstrap-0 host=localhost:29092 <connected> [IPv6 ('::1', 29092, 0, 0)]>: Closing connection. 
+INFO:kafka.conn:<BrokerConnection node_id=bootstrap-0 host=localhost:29092 <connecting> [IPv6 ('::1', 29092, 0, 0)]>: connecting to localhost:29092 [('::1', 29092, 0, 0) IPv6]
+INFO:kafka.conn:Probing node bootstrap-0 broker version
+INFO:kafka.conn:<BrokerConnection node_id=bootstrap-0 host=localhost:29092 <connecting> [IPv6 ('::1', 29092, 0, 0)]>: Connection complete.
+WARNING:werkzeug: * Debugger is active!
+INFO:werkzeug: * Debugger PIN: 306-585-276
+INFO:kafka.conn:Broker version identified as 2.5.0
+INFO:kafka.conn:Set configuration api_version=(2, 5, 0) to skip auto check_version requests on startup
+WARNING:kafka.coordinator.consumer:group_id is None: disabling auto-commit.
+INFO:kafka.consumer.subscription_state:Updating subscribed topics to: ('drone_position_updates',)
+INFO:kafka.consumer.subscription_state:Updated partition assignment: [TopicPartition(topic='drone_position_updates', partition=0)]
+INFO:kafka.conn:<BrokerConnection node_id=1 host=localhost:29092 <connecting> [IPv6 ('::1', 29092, 0, 0)]>: connecting to localhost:29092 [('::1', 29092, 0, 0) IPv6]
+INFO:kafka.conn:<BrokerConnection node_id=1 host=localhost:29092 <connecting> [IPv6 ('::1', 29092, 0, 0)]>: Connection complete.
+INFO:kafka.conn:<BrokerConnection node_id=bootstrap-0 host=localhost:29092 <connected> [IPv6 ('::1', 29092, 0, 0)]>: Closing connection. 
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:28] "GET / HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:28] "GET /static/css/style.css HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:28] "GET /static/js/scripts.js HTTP/1.1" 200 -
+ERROR:root:Error: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:28] "[35m[1mGET /favicon.ico HTTP/1.1[0m" 500 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:28] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:28] "GET /listar_drones HTTP/1.1" 200 -
+ERROR:root:Error: 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:28] "[35m[1mGET /get_final_positions HTTP/1.1[0m" 500 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:30] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:32] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:34] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:36] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:38] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:40] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:42] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:44] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:46] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:48] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:50] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:52] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:54] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:56] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:14:58] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:15:00] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:15:02] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:15:04] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:15:06] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:15:08] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:15:10] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:15:12] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:15:14] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:15:16] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:15:18] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:15:20] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:16:28] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:16:28] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:16:28] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:16:28] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:16:28] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:16:28] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:17:28] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:17:28] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:17:28] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:17:28] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:17:28] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:17:29] "GET /get_drone_positions HTTP/1.1" 200 -
