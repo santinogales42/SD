@@ -1,0 +1,38 @@
+Cifrado de Comunicaciones: Implementa métodos de cifrado para proteger las comunicaciones entre el Engine y los drones. Esto asegura que los datos transmitidos sean seguros y privados.
+
+Integración con Página Web: Modifica el código para que el mapa en la página web muestre la posición de los drones en tiempo real. Esto implica enviar datos desde el backend (posiblemente utilizando WebSockets o una API REST) al frontend para actualizar el mapa.
+
+Manejo de Drones: Implementa la lógica para controlar drones, registrarlos, actualizar sus posiciones, y manejar instrucciones como START y STOP.
+
+Visualización de Datos: Desarrolla una interfaz gráfica (en la página web o una aplicación independiente) que muestre información relevante sobre los drones y el espectáculo, como su posición, estado y posibles errores.
+
+
+
+
+
+MAS:
+Cifrado de Datos entre Engine y Drones
+
+    En el código del Engine (AD_Engine):
+        Implementa el cifrado SSL para la conexión entre el Engine y los Drones. Puedes usar el módulo ssl de Python para crear un contexto de servidor seguro y envolver las conexiones de socket con este contexto.
+        Modifica la función handle_drone_connection para utilizar conexiones seguras y manejar el intercambio de claves y certificados.
+
+    En el código del Drone (ADDrone):
+        Al establecer la conexión con el Engine, asegúrate de utilizar una conexión SSL para garantizar la seguridad de los datos transmitidos.
+        Implementa la lógica para validar el certificado del Engine y establecer una conexión cifrada.
+
+Implementación de un API Rest entre Dron y Engine
+
+    En el código del Engine (AD_Engine):
+        Implementa un endpoint de API Rest para la autenticación de los drones. Este endpoint puede ser utilizado para validar los drones antes de permitirles unirse al sistema.
+        Asegúrate de que la comunicación con la API Rest sea segura, implementando HTTPS.
+
+    En el código del Drone (ADDrone):
+        Modifica la lógica de registro para que, en lugar de utilizar sockets, el dron utilice una solicitud HTTP a la API Rest del Engine para registrarse.
+        Implementa la lógica para obtener y manejar tokens de acceso seguros.
+
+Implementación de Cifrado en el Canal con Drones
+
+    En la comunicación Kafka (parte del código de AD_Engine y ADDrone):
+        Asegura las comunicaciones Kafka implementando cifrado SSL/TLS. Kafka soporta SSL para la autenticación y el cifrado.
+        En las configuraciones de KafkaProducer y KafkaConsumer, incluye los parámetros necesarios para el cifrado SSL como security_protocol, ssl_cafile, ssl_certfile, y ssl_keyfile.
