@@ -37,8 +37,7 @@ class ADEngine:
         self.accept_thread.start()
         #Para conexiones seguras
         self.context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        self.context.load_cert_chain(certfile="ssl/service.crt", keyfile="ssl/service.key")
-    
+        self.context.load_cert_chain(certfile="ssl/certificado_registry.crt", keyfile="ssl/clave_privada_registry.pem")
     #def accept_connections(self):
     #    while True:
     #        client_socket, _ = self.server_socket.accept()
@@ -48,8 +47,13 @@ class ADEngine:
     def accept_connections(self):
         while True:
             client_socket, _ = self.server_socket.accept()
-            threading.Thread(target=self.handle_drone_connection, args=(client_socket,)).start()
-
+            try:
+                # Envolver la conexión del cliente con el contexto SSL
+                secure_socket = self.context.wrap_socket(client_socket, server_side=True)
+                threading.Thread(target=self.handle_drone_connection, args=(secure_socket,)).start()
+            except ssl.SSLError as e:
+                print(f"Error SSL: {e}")
+                
     # En la clase ADEngine
     def handle_drone_connection(self, client_socket):
         try:
