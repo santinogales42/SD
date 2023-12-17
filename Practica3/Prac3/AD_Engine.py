@@ -31,18 +31,18 @@ class ADEngine:
         self.server_socket.listen(15)
         self.kafka_producer = KafkaProducer(
             bootstrap_servers=[self.broker_address],
-            value_serializer=lambda v: json.dumps(v).encode('utf-8')
+            value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+            #security_protocol='SSL',
+            ssl_cafile='ssl/certificado_CA.crt',  # El certificado de la Autoridad Certificadora
+            ssl_certfile='ssl/certificado_registry.crt',  # Certificado de tu servidor
+            ssl_keyfile='ssl/clave_privada_registry.pem'  # Clave privada de tu servidor
         )
         self.accept_thread = threading.Thread(target=self.accept_connections)
         self.accept_thread.start()
         #Para conexiones seguras
         self.context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         self.context.load_cert_chain(certfile="ssl/certificado_registry.crt", keyfile="ssl/clave_privada_registry.pem")
-    #def accept_connections(self):
-    #    while True:
-    #        client_socket, _ = self.server_socket.accept()
-    #        secure_socket = self.context.wrap_socket(client_socket, server_side=True)
-    #        threading.Thread(target=self.handle_drone_connection, args=(secure_socket,)).start()
+
 
     def accept_connections(self):
         while True:
@@ -188,7 +188,11 @@ class ADEngine:
             auto_offset_reset='latest',
             enable_auto_commit=True,
             group_id='engine-group',
-            value_deserializer=lambda x: json.loads(x.decode('utf-8'))
+            value_deserializer=lambda x: json.loads(x.decode('utf-8')),
+            #security_protocol='SSL',
+            ssl_cafile='ssl/certificado_CA.crt',  # El certificado de la Autoridad Certificadora
+            ssl_certfile='ssl/certificado_registry.crt',  # Certificado de tu servidor
+            ssl_keyfile='ssl/clave_privada_registry.pem'  # Clave privada de tu servidor
         )
 
         for message in consumer:
@@ -196,6 +200,7 @@ class ADEngine:
                 dron_id = message.value['dron_id']
                 final_position = message.value['final_position']
                 self.handle_drone_position_reached(dron_id, final_position)
+
 
     def handle_drone_position_reached(self, dron_id, final_position):
         # Convertir la posición reportada a una tupla si es una lista

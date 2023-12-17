@@ -16,7 +16,7 @@ class ADDrone(threading.Thread):
         super().__init__()
         self.engine_address = engine_address
         self.broker_address = broker_address
-        self.kafka_producer = KafkaProducer(bootstrap_servers=self.broker_address)
+        #self.kafka_producer = KafkaProducer(bootstrap_servers=self.broker_address)
         self.registry_address = engine_registry_address  # Usamos el argumento proporcionado
         self.final_position = None
         self.current_position = (1, 1)

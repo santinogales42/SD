@@ -11,25 +11,6 @@ Visualización de Datos: Desarrolla una interfaz gráfica (en la página web o u
 
 
 MAS:
-Cifrado de Datos entre Engine y Drones
-
-    En el código del Engine (AD_Engine):
-        Implementa el cifrado SSL para la conexión entre el Engine y los Drones. Puedes usar el módulo ssl de Python para crear un contexto de servidor seguro y envolver las conexiones de socket con este contexto.
-        Modifica la función handle_drone_connection para utilizar conexiones seguras y manejar el intercambio de claves y certificados.
-
-    En el código del Drone (ADDrone):
-        Al establecer la conexión con el Engine, asegúrate de utilizar una conexión SSL para garantizar la seguridad de los datos transmitidos.
-        Implementa la lógica para validar el certificado del Engine y establecer una conexión cifrada.
-
-Implementación de un API Rest entre Dron y Engine
-
-    En el código del Engine (AD_Engine):
-        Implementa un endpoint de API Rest para la autenticación de los drones. Este endpoint puede ser utilizado para validar los drones antes de permitirles unirse al sistema.
-        Asegúrate de que la comunicación con la API Rest sea segura, implementando HTTPS.
-
-    En el código del Drone (ADDrone):
-        Modifica la lógica de registro para que, en lugar de utilizar sockets, el dron utilice una solicitud HTTP a la API Rest del Engine para registrarse.
-        Implementa la lógica para obtener y manejar tokens de acceso seguros.
 
 Implementación de Cifrado en el Canal con Drones
 
