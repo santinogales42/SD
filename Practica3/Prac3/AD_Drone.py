@@ -304,15 +304,20 @@ class ADDrone(threading.Thread):
             # Cargar el certificado de la autoridad certificadora
             context.load_verify_locations('ssl/certificado_registry.crt')
 
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as raw_socket:
+            #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as raw_socket:
                 # Envolver el socket en el contexto SSL
-                secure_socket = context.wrap_socket(raw_socket, server_hostname="registry")
+            #    secure_socket = context.wrap_socket(raw_socket, server_hostname="registry")
 
-                secure_socket.connect(self.engine_address)
+            #    secure_socket.connect(self.engine_address)
+            #    join_message = {'action': 'join', 'ID': self.dron_id, 'Alias': self.alias}
+            #    secure_socket.send(json.dumps(join_message).encode('utf-8'))
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as engine_socket:
+                engine_socket.connect(self.engine_address)
                 join_message = {'action': 'join', 'ID': self.dron_id, 'Alias': self.alias}
-                secure_socket.send(json.dumps(join_message).encode('utf-8'))
+                engine_socket.send(json.dumps(join_message).encode('utf-8'))
                 
-                response_data = secure_socket.recv(1024).decode()
+                response_data = engine_socket.recv(1024).decode()
+            #    response_data = secure_socket.recv(1024).decode()
                 if response_data:
                     response = json.loads(response_data)
                     if 'final_position' in response:

@@ -40,19 +40,23 @@ class ADEngine:
         self.accept_thread = threading.Thread(target=self.accept_connections)
         self.accept_thread.start()
         #Para conexiones seguras
-        self.context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        self.context.load_cert_chain(certfile="ssl/certificado_registry.crt", keyfile="ssl/clave_privada_registry.pem")
+        #self.context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        #self.context.load_cert_chain(certfile="ssl/certificado_registry.crt", keyfile="ssl/clave_privada_registry.pem")
 
-
+    #SANTI NO PUEDE
+    #def accept_connections(self):
+        #while True:
+            #client_socket, _ = self.server_socket.accept()
+            #try:
+                # Envolver la conexión del cliente con el contexto SSL
+            #    secure_socket = self.context.wrap_socket(client_socket, server_side=True)
+            #    threading.Thread(target=self.handle_drone_connection, args=(secure_socket,)).start()
+            #except ssl.SSLError as e:
+            #    print(f"Error SSL: {e}")
     def accept_connections(self):
         while True:
             client_socket, _ = self.server_socket.accept()
-            try:
-                # Envolver la conexión del cliente con el contexto SSL
-                secure_socket = self.context.wrap_socket(client_socket, server_side=True)
-                threading.Thread(target=self.handle_drone_connection, args=(secure_socket,)).start()
-            except ssl.SSLError as e:
-                print(f"Error SSL: {e}")
+            threading.Thread(target=self.handle_drone_connection, args=(client_socket,)).start()
                 
     # En la clase ADEngine
     def handle_drone_connection(self, client_socket):
@@ -282,8 +286,6 @@ class ADEngine:
         for dron_id in self.connected_drones:
             self.send_final_position(dron_id, self.final_positions[dron_id])
             self.send_instruction_to_drone(dron_id, 'START')
-
-# Resto del código...
 
 
     def check_drone_position(self, dron_id):
