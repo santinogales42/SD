@@ -1,7 +1,0 @@
-    Seguridad y Autenticación:
-    El código actual no implementa mecanismos de autenticación o seguridad. Para seguir las recomendaciones de los PDFs, deberías:
-        Implementar autenticación, por ejemplo, mediante tokens JWT (JSON Web Tokens) (no).
-        Asegurar las comunicaciones usando HTTPS, lo que requiere un certificado SSL. Puedes seguir las instrucciones del tutorial de securización con certificados para Flask.
-
-    Integración con Otros Componentes del Sistema:
-    Asegúrate de que tu API se integre correctamente con otros componentes del sistema, como el Kafka Producer/Consumer en tu AD_Registry y la base de datos MongoDB.

@@ -30,34 +30,128 @@ function getWeather(city) {
     });
 }
 
-function addDrone() {
-    const droneID = prompt("Ingrese el ID del dron (debe ser un número):");
-    const droneAlias = prompt("Ingrese el alias del dron:");
 
-    if (droneID && droneAlias) {
-        fetch('/registro', {
+function register_user() {
+    return new Promise((resolve, reject) => {
+        const username = prompt("Ingrese su nombre de usuario para el registro:");
+        const password = prompt("Ingrese su contraseña para el registro:");
+
+        fetch('http://localhost:5000/registro_usuario', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ ID: droneID, Alias: droneAlias }),
+            body: JSON.stringify({ username: username, password: password }),
         })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                alert("Dron registrado correctamente con ID: " + data.drone_id);
-                updateDroneList();
+        .then(response => {
+            if (response.ok) {
+                alert("Usuario registrado con éxito. Iniciando sesión...");
+                return request_jwt_token(username, password);
             } else {
-                alert("Error al registrar el dron: " + data.error);
+                return response.json().then(data => {
+                    throw new Error("Error al registrar usuario: " + data.msg);
+                });
             }
         })
-        .catch((error) => {
-            console.error('Error:', error);
-            alert("Error en la conexión con el servidor.");
+        .then(token => {
+            if (token) {
+                resolve(token);
+            } else {
+                throw new Error("No se pudo obtener un token JWT válido.");
+            }
+        })
+        .catch(error => {
+            alert(error.message);
+            reject(error);
         });
-    } else {
-        alert("Por favor, ingrese un ID y un alias válidos.");
-    }
+    });
+}
+
+function addDrone() {
+    get_jwt_token()
+    .then(token => {
+        const droneID = prompt("Ingrese el ID del dron (debe ser un número):");
+        const droneAlias = prompt("Ingrese el alias del dron:");
+
+        if (droneID && droneAlias) {
+            fetch('/registro', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token
+                },
+                body: JSON.stringify({ ID: droneID, Alias: droneAlias }),
+            })
+            .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert("Dron registrado correctamente con ID: " + data.drone_id);
+                        updateDroneList();
+                    } else {
+                        alert("Error al registrar el dron: " + data.error);
+                    }
+                })
+        } else {
+            alert("Por favor, ingrese un ID y un alias válidos.");
+        }
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+
+function get_jwt_token() {
+    return new Promise((resolve, reject) => {
+        const tiene_usuario = prompt("¿Ya tienes un usuario? (si/no)").toLowerCase();
+
+        function handleLogin() {
+            const username = prompt("Introduce tu nombre de usuario:");
+            const password = prompt("Introduce tu contraseña:");
+            return request_jwt_token(username, password);
+        }
+
+        if (tiene_usuario === "no") {
+            register_user()
+                .then(token => resolve(token))
+                .catch(error => {
+                    alert("Error durante el registro: " + error.message);
+                    reject(error);
+                });
+        } else {
+            handleLogin()
+                .then(token => resolve(token))
+                .catch(error => {
+                    alert("Error durante el inicio de sesión: " + error.message);
+                    reject(error);
+                });
+        }
+    });
+}
+
+
+
+
+function request_jwt_token() {
+    return new Promise((resolve, reject) => {
+        const username = prompt("Introduce tu nombre de usuario:");
+        const password = prompt("Introduce tu contraseña:");
+
+        fetch('http://localhost:5000/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ username: username, password: password }),
+        })
+        .then(response => {
+            if (response.ok) {
+                return response.json();
+            } else {
+                throw new Error("Error al obtener token JWT");
+            }
+        })
+        .then(data => resolve(data.access_token))
+        .catch(error => reject(error));
+    });
 }
 
 function delDrone() {
@@ -92,11 +186,10 @@ function updateDroneList() {
         .then(response => response.json())
         .then(drones => {
             const listElement = document.getElementById('drone-list');
-            listElement.innerHTML = ''; // Limpia la lista actual
-
+            listElement.innerHTML = '';
             drones.forEach(drone => {
                 const listItem = document.createElement('li');
-                listItem.textContent = `ID: ${drone.id}, Alias: ${drone.alias}`;
+                listItem.textContent = `ID: ${drone.ID}, Alias: ${drone.Alias}`;
                 listElement.appendChild(listItem);
             });
         })

@@ -1,0 +1,9 @@
+Cifrado de Comunicaciones: Implementa métodos de cifrado para proteger las comunicaciones entre el Engine y los drones. Esto asegura que los datos transmitidos sean seguros y privados.
+
+Integración con Página Web: Modifica el código para que el mapa en la página web muestre la posición de los drones en tiempo real. Esto implica enviar datos desde el backend (posiblemente utilizando WebSockets o una API REST) al frontend para actualizar el mapa.
+
+Manejo de Drones: Implementa la lógica para controlar drones, registrarlos, actualizar sus posiciones, y manejar instrucciones como START y STOP.
+
+Visualización de Datos: Desarrolla una interfaz gráfica (en la página web o una aplicación independiente) que muestre información relevante sobre los drones y el espectáculo, como su posición, estado y posibles errores.
+
+Pruebas y Depuración: Realiza pruebas exhaustivas para asegurarte de que todos los componentes funcionen correctamente y de manera integrada. Incluye la depuración de errores como el que mencionaste relacionado con Flask y Socket.IO.
