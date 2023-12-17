@@ -131,13 +131,13 @@ def create_app(mongo_address, kafka_address):
 
 
     ##### AUDITORIA #####
-    logging.basicConfig(filename='registro_auditoria.log', level=logging.INFO)
+    #logging.basicConfig(filename='registro_auditoria.log', level=logging.INFO)
 
-    @app.route('/evento', methods=['GET'])
-    @jwt_required()
-    def evento():
-        logging.info("Evento registrado")
-        return jsonify(msg="Evento registrado")
+    #@app.route('/evento', methods=['GET'])
+    #@jwt_required()
+    #def evento():
+    #    logging.info("Evento registrado")
+    #    return jsonify(msg="Evento registrado")
 
 
 
@@ -225,7 +225,7 @@ def create_app(mongo_address, kafka_address):
     threading.Thread(target=kafka_listener, daemon=True).start()
     context = ('ssl/certificado_registry.crt', 'ssl/clave_privada_registry.pem')
     #SSL
-    app.run(debug=True, ssl_context=context, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='registry', ssl_context=context, port=5000)
     #app.run(debug=False, host='0.0.0.0', port=5000)
 
 if __name__ == '__main__':
