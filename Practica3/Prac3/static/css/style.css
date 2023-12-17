@@ -74,6 +74,15 @@ nav a:hover {
     height: 700px;
 }
 
+.drone {
+    width: 10px;
+    height: 10px;
+    background-color: red;
+    position: absolute;
+    border-radius: 50%;
+}
+
+
 .drone-cell {
     border: 1px solid black;
     background-color: black;
