@@ -131,13 +131,13 @@ def create_app(mongo_address, kafka_address):
 
 
     ##### AUDITORIA #####
-    logging.basicConfig(filename='registro_auditoria.log', level=logging.INFO)
+    #logging.basicConfig(filename='registro_auditoria.log', level=logging.INFO)
 
-    @app.route('/evento', methods=['GET'])
-    @jwt_required()
-    def evento():
-        logging.info("Evento registrado")
-        return jsonify(msg="Evento registrado")
+    #@app.route('/evento', methods=['GET'])
+    #@jwt_required()
+    #def evento():
+    #    logging.info("Evento registrado")
+    #    return jsonify(msg="Evento registrado")
 
 
 
