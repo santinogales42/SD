@@ -9,37 +9,31 @@ import pymongo
 import sys
 import time
 import requests
+import ssl
 
 class ADDrone(threading.Thread):
-    def __init__(self, engine_address, broker_address):
+    def __init__(self, engine_address, broker_address, mongo_address, api_address, engine_registry_address):
         super().__init__()
         self.engine_address = engine_address
         self.broker_address = broker_address
         self.kafka_producer = KafkaProducer(bootstrap_servers=self.broker_address)
-        self.registry_address = ('localhost', 8081)
+        self.registry_address = engine_registry_address  # Usamos el argumento proporcionado
         self.final_position = None
         self.current_position = (1, 1)
         self.base_position = (1, 1)
         self.dron_id = None
         self.alias = None
         self.access_token = None
-        self.mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
+        self.mongo_client = pymongo.MongoClient(mongo_address)  # Usamos el argumento proporcionado
         self.db = self.mongo_client["dronedb"]
         
         self.registered_drones = {}
         self.in_show_mode = False
+
+
         
     def start(self):
         self.show_menu()
-        
-
-    def connect_to_engine(self):
-        engine_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        engine_socket.connect(self.engine_address)
-        engine_socket.send(json.dumps({'action': 'join', 'ID': self.dron_id}).encode())
-        response = json.loads(engine_socket.recv(1024).decode())
-        self.final_position = tuple(response['final_position'])
-        engine_socket.close()
         
         
     def handle_drone_registered_message(self, message):
@@ -279,24 +273,6 @@ class ADDrone(threading.Thread):
                 print(f"Error al eliminar dron de la base de datos: {e}")
 
 
-    def list_drones(self):
-        # Asegúrate de incluir el encabezado de autorización con el token JWT
-        headers = {'Authorization': f'Bearer {self.access_token}'}
-
-        try:
-            # Haz la solicitud a la API
-            response = requests.get('http://localhost:5000/listar_drones', headers=headers)
-
-            if response.status_code == 200:
-                drones = response.json()
-                for drone in drones:
-                    print(f"ID: {drone['ID']}, Alias: {drone['Alias']}")
-            else:
-                print(f"Error al listar drones: {response.text}")
-        except Exception as e:
-            print(f"Error: {e}")
-
-            
     def join_show(self):
         if not (self.dron_id and self.alias and self.access_token):
             print("Es necesario registrarse y obtener un token antes de unirse al show.")
@@ -304,14 +280,21 @@ class ADDrone(threading.Thread):
 
         headers = {'Authorization': f'Bearer {self.access_token}'}
         
-
         try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as engine_socket:
-                engine_socket.connect(self.engine_address)
+            # Crear un contexto SSL para el cliente
+            context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+            # Cargar el certificado de la autoridad certificadora
+            context.load_verify_locations('ssl/certificado_registry.crt')
+
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as raw_socket:
+                # Envolver el socket en el contexto SSL
+                secure_socket = context.wrap_socket(raw_socket, server_hostname="registry")
+
+                secure_socket.connect(self.engine_address)
                 join_message = {'action': 'join', 'ID': self.dron_id, 'Alias': self.alias}
-                engine_socket.send(json.dumps(join_message).encode('utf-8'))
+                secure_socket.send(json.dumps(join_message).encode('utf-8'))
                 
-                response_data = engine_socket.recv(1024).decode()
+                response_data = secure_socket.recv(1024).decode()
                 if response_data:
                     response = json.loads(response_data)
                     if 'final_position' in response:
@@ -328,6 +311,8 @@ class ADDrone(threading.Thread):
                         print(f"Drone {self.dron_id} failed to join the show. Server response: {response}")
                 else:
                     print(f"Drone {self.dron_id} failed to join the show. No response from server.")
+        except ssl.SSLError as e:
+            print(f"Error SSL: {e}")
         except json.JSONDecodeError:
             print("Failed to decode the server response. Ensure the server sends a valid JSON.")
         except ConnectionError as e:
@@ -420,10 +405,9 @@ class ADDrone(threading.Thread):
         options = {
             "1": self.input_drone_data,
             "2": self.join_show,
-            "3": self.list_drones,
-            "4": self.delete_drones,
-            "5": self.get_jwt_token,
-            "6": self.take_over_drone  # Agregar la nueva opción aquí
+            "3": self.delete_drones,
+            "4": self.get_jwt_token,
+            "5": self.take_over_drone  # Agregar la nueva opción aquí
         }
         try:
             while True:
@@ -431,13 +415,12 @@ class ADDrone(threading.Thread):
                     print("\nDrone Menu:")
                     print("1. Enter Drone Data")
                     print("2. Join Show")
-                    print("3. List Drones")
-                    print("4. Delete Drone")
-                    print("5. Get Token")
-                    print("6. Take Over Drone")
-                    print("7. Exit")
+                    print("3. Delete Drone")
+                    print("4. Get Token")
+                    print("5. Take Over Drone")
+                    print("6. Exit")
                     choice = input("Select an option: ")
-                    if choice == "7":
+                    if choice == "6":
                         break
                     action = options.get(choice)
                     if action:
@@ -456,12 +439,21 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='ADDrone start-up arguments')
     parser.add_argument('--engine_ip', type=str, default='127.0.0.1', help='IP address of the ADEngine')
     parser.add_argument('--engine_port', type=int, default=8080, help='Port number of the ADEngine')
+    parser.add_argument('--engine_registry_address', type=str, default='localhost:8081', help='Address of the ADEngine Registry')
     parser.add_argument('--broker_address', type=str, default='localhost:29092', help='Address of the Kafka broker')
+    parser.add_argument('--mongo_address', type=str, default='localhost:27017', help='Address of the MongoDB server')
+    parser.add_argument('--api_address', type=str, default='http://localhost:5000', help='Address of the API server')
     args = parser.parse_args()
-
-
+    #python tu_script.py --mongo_address mi_servidor_mongodb:27017 --api_address http://mi_servidor_api:5000 --engine_registry_address mi_servidor_engine_registry:8081
+    
     drones = []
-    dron = ADDrone((args.engine_ip, args.engine_port), args.broker_address)
+    dron = ADDrone(
+        (args.engine_ip, args.engine_port),
+        args.broker_address,
+        args.mongo_address,
+        args.api_address,
+        args.engine_registry_address
+    )
     drones.append(dron)
 
     # Inicia cada dron como un hilo separado

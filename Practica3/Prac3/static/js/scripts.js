@@ -37,7 +37,7 @@ function register_user() {
         const username = prompt("Ingrese su nombre de usuario para el registro:");
         const password = prompt("Ingrese su contraseña para el registro:");
 
-        fetch('http://localhost:5000/registro_usuario', {
+        fetch('/registro_usuario', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -136,7 +136,7 @@ function request_jwt_token() {
         const username = prompt("Introduce tu nombre de usuario:");
         const password = prompt("Introduce tu contraseña:");
 
-        fetch('http://localhost:5000/login', {
+        fetch('/login', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -200,7 +200,7 @@ function updateDroneList() {
 setInterval(updateDronePositions, 2000); // Actualiza cada 2 segundos
 
 function updateDronePositions() {
-    fetch('http://localhost:5005/get_drone_positions')
+    fetch('/get_drone_positions')
         .then(response => response.json())
         .then(data => {
             for (let droneID in data) {
