@@ -25,7 +25,7 @@ class ADDrone(threading.Thread):
             ssl_certfile='ssl/certificado_registry.crt',
             ssl_keyfile='ssl/clave_privada_registry.pem'
         )
-
+        self.api_address = api_address
         self.registry_address = engine_registry_address  # Usamos el argumento proporcionado
         self.final_position = None
         self.current_position = (1, 1)
