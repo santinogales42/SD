@@ -332,3 +332,22 @@ INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:17:28] "GET /get_drone_positions
 INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:17:28] "GET /get_drone_positions HTTP/1.1" 200 -
 INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:17:28] "GET /get_drone_positions HTTP/1.1" 200 -
 INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:17:29] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:kafka.conn:<BrokerConnection node_id=bootstrap-0 host=localhost:29092 <connecting> [IPv6 ('::1', 29092, 0, 0)]>: connecting to localhost:29092 [('::1', 29092, 0, 0) IPv6]
+INFO:kafka.conn:Probing node bootstrap-0 broker version
+INFO:kafka.conn:<BrokerConnection node_id=bootstrap-0 host=localhost:29092 <connecting> [IPv6 ('::1', 29092, 0, 0)]>: Connection complete.
+WARNING:werkzeug: * Debugger is active!
+INFO:werkzeug: * Debugger PIN: 306-585-276
+INFO:kafka.conn:Broker version identified as 2.5.0
+INFO:kafka.conn:Set configuration api_version=(2, 5, 0) to skip auto check_version requests on startup
+WARNING:kafka.coordinator.consumer:group_id is None: disabling auto-commit.
+INFO:kafka.consumer.subscription_state:Updating subscribed topics to: ('drone_position_updates',)
+INFO:kafka.consumer.subscription_state:Updated partition assignment: [TopicPartition(topic='drone_position_updates', partition=0)]
+INFO:kafka.conn:<BrokerConnection node_id=1 host=localhost:29092 <connecting> [IPv6 ('::1', 29092, 0, 0)]>: connecting to localhost:29092 [('::1', 29092, 0, 0) IPv6]
+INFO:kafka.conn:<BrokerConnection node_id=1 host=localhost:29092 <connecting> [IPv6 ('::1', 29092, 0, 0)]>: Connection complete.
+INFO:kafka.conn:<BrokerConnection node_id=bootstrap-0 host=localhost:29092 <connected> [IPv6 ('::1', 29092, 0, 0)]>: Closing connection. 
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:25:46] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:25:48] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:25:50] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:25:52] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:25:54] "GET /get_drone_positions HTTP/1.1" 200 -
+INFO:werkzeug:192.168.1.142 - - [17/Dec/2023 22:25:56] "GET /get_drone_positions HTTP/1.1" 200 -
