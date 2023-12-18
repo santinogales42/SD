@@ -132,7 +132,7 @@ if __name__ == "__main__":
     parser.add_argument('--db_port', type=int, default=27017, help='MongoDB port')
     parser.add_argument('--db_name', type=str, default='dronedb', help='MongoDB database name')
     parser.add_argument('--broker_address', type=str, default='localhost:29092', help='Kafka broker address')
-    parser.add_argument('--api_address', type=str, default='http://localhost:5000', help='API address')
+    parser.add_argument('--api_address', type=str, default='https://localhost:5000', help='API address')
     args = parser.parse_args()
 
     # Inicializa y comienza la instancia de ADRegistry con los argumentos

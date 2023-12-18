@@ -10,6 +10,8 @@ import sys
 import time
 import requests
 import ssl
+import warnings
+from urllib3.exceptions import InsecureRequestWarning
 
 class ADDrone(threading.Thread):
     def __init__(self, engine_address, broker_address, mongo_address, api_address, engine_registry_address):
@@ -38,6 +40,8 @@ class ADDrone(threading.Thread):
         
         self.registered_drones = {}
         self.in_show_mode = False
+        
+        warnings.filterwarnings('ignore', category=InsecureRequestWarning)
 
 
         
@@ -232,7 +236,7 @@ class ADDrone(threading.Thread):
         data = {'ID': str(self.dron_id), 'Alias': self.alias}
         headers = {'Authorization': f'Bearer {self.access_token}'}
         api_address = args.api_address  # args.api_address es el argumento que recibes
-        response = requests.post(f'{api_address}/registro', json=data, headers=headers)
+        response = requests.post(f'{api_address}/registro', json=data, headers=headers, verify=False)
         #response = requests.post('http://localhost:5000/registro', json=data, headers=headers)
         if self.id_exists(self.dron_id):
             print("ID de dron ya existe. Introduce un ID diferente.")
@@ -284,7 +288,7 @@ class ADDrone(threading.Thread):
         # Primero intenta eliminar el dron a través de la API
         headers = {'Authorization': f'Bearer {self.access_token}'}
         api_address = args.api_address  # args.api_address es el argumento que recibes
-        response = requests.delete(f'{api_address}/borrar_dron/{self.dron_id}', headers=headers)
+        response = requests.delete(f'{api_address}/borrar_dron/{self.dron_id}', headers=headers, verify=False)
         #response = requests.delete(f'http://localhost:5000/borrar_dron/{self.dron_id}', headers=headers)
         
         if response.status_code == 200:
@@ -370,7 +374,7 @@ class ADDrone(threading.Thread):
                 print("Nombre de usuario y contraseña son obligatorios.")
                 continue
             api_address = args.api_address  # args.api_address es el argumento que recibes
-            response = requests.post(f'{api_address}/registro_usuario', json={'username': username, 'password': password})
+            response = requests.post(f'{api_address}/registro_usuario', json={'username': username, 'password': password}, verify=False)
             #response = requests.post('http://localhost:5000/registro_usuario', json={'username': username, 'password': password})
 
             if response.status_code == 201:
@@ -401,7 +405,7 @@ class ADDrone(threading.Thread):
     def request_jwt_token(self, username, password):
         # Solicitar el token JWT a la API
         api_address = args.api_address  # args.api_address es el argumento que recibes
-        response = requests.post(f'{api_address}/login', json={'username': username, 'password': password})
+        response = requests.post(f'{api_address}/login', json={'username': username, 'password': password}, verify=False)
         #response = requests.post('http://localhost:5000/login', json={'username': username, 'password': password})
         if response.status_code == 200:
             return response.json().get('access_token')
@@ -486,7 +490,7 @@ if __name__ == "__main__":
     parser.add_argument('--engine_registry_address', type=str, default='localhost:8081', help='Address of the ADEngine Registry')
     parser.add_argument('--broker_address', type=str, default='localhost:29092', help='Address of the Kafka broker')
     parser.add_argument('--mongo_address', type=str, default='localhost:27017', help='Address of the MongoDB server')
-    parser.add_argument('--api_address', type=str, default='http://localhost:5000', help='Address of the API server')
+    parser.add_argument('--api_address', type=str, default='https://localhost:5000', help='Address of the API server')
     args = parser.parse_args()
     #python tu_script.py --mongo_address mi_servidor_mongodb:27017 --api_address http://mi_servidor_api:5000 --engine_registry_address mi_servidor_engine_registry:8081
     

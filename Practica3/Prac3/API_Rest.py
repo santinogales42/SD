@@ -53,7 +53,7 @@ def create_app(mongo_address, kafka_address):
     file_handler.setLevel(logging.INFO)
 
     # Formato del logger con la ip
-    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(ip)s - %(message)s')
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     file_handler.setFormatter(formatter)
 
     # Añade el manejador al logger
