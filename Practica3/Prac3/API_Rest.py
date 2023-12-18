@@ -16,8 +16,7 @@ import argparse
 
 app = Flask(__name__)
 CORS(app)
-logging.basicConfig(level=logging.INFO)
-#logging.basicConfig(filename='registro_auditoria.log', level=logging.INFO)
+#logging.basicConfig(level=logging.INFO)
 
 def create_app(mongo_address, kafka_address):
     try:
@@ -44,6 +43,22 @@ def create_app(mongo_address, kafka_address):
     drone_positions = {}
 
     BASE_URL = "http://api.openweathermap.org/data/2.5/weather"
+    
+
+    # Configura el logger de auditoría
+    auditoria_logger = logging.getLogger('auditoria')
+    auditoria_logger.setLevel(logging.INFO)
+    # Crea un manejador de archivo
+    file_handler = logging.FileHandler('registro_auditoria.log')
+    file_handler.setLevel(logging.INFO)
+
+    # Formato del logger con la ip
+    formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(ip)s - %(message)s')
+    file_handler.setFormatter(formatter)
+
+    # Añade el manejador al logger
+    auditoria_logger.addHandler(file_handler)
+
 
 
 
@@ -87,7 +102,7 @@ def create_app(mongo_address, kafka_address):
             # Guardar en un archivo JSON
             with open('ciudad.json', 'w') as json_file:
                 json.dump(custom_data, json_file, indent=4)
-            
+            auditoria_logger.info('Evento específico en /weather/<city>')
             return jsonify(custom_data)
         else:
             return jsonify({'error': 'No se pudo obtener el clima'}), 404
@@ -157,6 +172,7 @@ def create_app(mongo_address, kafka_address):
             return jsonify({"msg": "El usuario ya existe"}), 409
 
         db.users.insert_one({"username": username, "password_hash": password_hash})
+        auditoria_logger.info('Evento específico en /registro_usuario')
         return jsonify({"msg": "Usuario registrado exitosamente"}), 201
 
     
@@ -172,6 +188,7 @@ def create_app(mongo_address, kafka_address):
 
         if user and check_password_hash(user['password_hash'], password):
             access_token = create_access_token(identity=username, expires_delta=timedelta(seconds=20))
+            auditoria_logger.info('Evento específico en /login')
             return jsonify(access_token=access_token)
         return jsonify({"msg": "Credenciales incorrectas"}), 401
 
@@ -220,6 +237,8 @@ def create_app(mongo_address, kafka_address):
     
     @app.errorhandler(Exception)
     def handle_all_errors(e):
+        if request.path in ['/weather', '/registro_usuario', '/login', '/registro', '/borrar_dron']:
+            logging.error(f'Error en {request.path}: {e}')
         if hasattr(e, 'code') and e.code == 200:
             return e
         log_error(e)  # Función personalizada para registrar errores
@@ -297,30 +316,10 @@ def create_app(mongo_address, kafka_address):
                 result = db.drones.delete_one({'ID': int(drone_id)})
                 if result.deleted_count == 0:
                     return error_response('Dron no encontrado', 404)
+                auditoria_logger.info('Evento específico en /borrar_dron/<drone_id>')
                 return jsonify({'message': 'Dron eliminado correctamente'}), 200
         except errors.PyMongoError as e:
             return jsonify({'error': str(e)}), 500
-        
-
-    @app.route('/unir_drones_show', methods=['POST'])
-    @jwt_required()
-    def unir_drones_show():
-        data = request.get_json()
-        drone_ids = data['drone_ids']
-
-        if not drone_ids:
-            return jsonify({'error': 'No se proporcionaron IDs de drones'}), 400
-
-        for dron_id in drone_ids:
-            drone = db.drones.find_one({"ID": dron_id})
-            if drone:
-                # Actualiza el estado del dron en la base de datos
-                db.drones.update_one({"ID": dron_id}, {"$set": {"estado": "en_show"}})
-                # Enviar mensaje a Kafka
-                kafka_producer.send('drone_messages_topic', json.dumps({"type": "join_show", "dron_id": dron_id}))
-
-        return jsonify({'message': 'Drones unidos al show exitosamente'}), 200
-
 
     
     

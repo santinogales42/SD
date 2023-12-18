@@ -281,40 +281,6 @@ window.onload = function() {
     loadErrors();
 };
 
-function confirmJoinShow() {
-    // Obtener los IDs de los drones seleccionados
-    const selectedDrones = [];
-    document.querySelectorAll('.drone-checkbox:checked').forEach(checkbox => {
-        selectedDrones.push(checkbox.value);
-    });
-
-    if (selectedDrones.length === 0) {
-        alert('Por favor, selecciona al menos un dron.');
-        return;
-    }
-
-    // Obtener el token JWT
-    get_jwt_token().then(token => {
-        // Realizar la petición para unir los drones al show
-        fetch('/unir_drones_show', {
-            method: 'POST',
-            headers: {
-                'Authorization': 'Bearer ' + token,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ drone_ids: selectedDrones })
-        })
-        .then(response => {
-            if (response.ok) {
-                alert('Drones unidos al show exitosamente.');
-            } else {
-                alert('Error al unir drones al show.');
-            }
-        })
-        .catch(error => console.error('Error:', error));
-    });
-}
-
 function loadErrors() {
     fetch('/get_errors')
         .then(response => response.json())
