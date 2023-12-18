@@ -6,9 +6,10 @@ from pymongo import MongoClient
 from kafka import KafkaProducer, KafkaConsumer
 from os import getenv
 from uuid import uuid4
+import argparse
 
 class ADRegistry:
-    def __init__(self, listen_port, db_host, db_port, db_name, broker_address):
+    def __init__(self, listen_port, db_host, db_port, db_name, broker_address, api_address):
         self.listen_port = listen_port
         self.db_host = db_host
         self.db_port = db_port
@@ -17,6 +18,7 @@ class ADRegistry:
         self.client = MongoClient(self.db_host, self.db_port)
         self.db = self.client[self.db_name]
         self.broker_address = broker_address
+        self.api_address = api_address
 
 
 #####SOCKET#####
@@ -91,7 +93,7 @@ class ADRegistry:
             
     # Función para registrar un dron en la base de datos
     def register_drone_via_api(self, drone_id, alias):
-        url = 'http://localhost:5000/registro'  # Ajusta la URL según sea necesario
+        url = f"{self.api_address}/registro"  # Utiliza la URL pasada como argumento
         data = {'ID': drone_id, 'Alias': alias}
         response = requests.post(url, json=data)
         if response.status_code == 200:
@@ -118,11 +120,24 @@ class ADRegistry:
 
 
 if __name__ == "__main__":
-    listen_port = int(getenv('LISTEN_PORT', 8081))
-    db_host = getenv('DB_HOST', 'localhost')
-    db_port = int(getenv('DB_PORT', 27017))
-    db_name = getenv('DB_NAME', 'dronedb')
-    broker_address = getenv('BROKER_ADDRESS', 'localhost:29092')
+    #listen_port = int(getenv('LISTEN_PORT', 8081))
+    #db_host = getenv('DB_HOST', 'localhost')
+    #db_port = int(getenv('DB_PORT', 27017))
+    #db_name = getenv('DB_NAME', 'dronedb')
+    #broker_address = getenv('BROKER_ADDRESS', 'localhost:29092')
+    
+    parser = argparse.ArgumentParser(description="ADRegistry Configuration")
+    parser.add_argument('--listen_port', type=int, default=8081, help='Listen port for ADRegistry')
+    parser.add_argument('--db_host', type=str, default='localhost', help='MongoDB host')
+    parser.add_argument('--db_port', type=int, default=27017, help='MongoDB port')
+    parser.add_argument('--db_name', type=str, default='dronedb', help='MongoDB database name')
+    parser.add_argument('--broker_address', type=str, default='localhost:29092', help='Kafka broker address')
+    parser.add_argument('--api_address', type=str, default='http://localhost:5000', help='API address')
+    args = parser.parse_args()
 
-    registry = ADRegistry(listen_port, db_host, db_port, db_name, broker_address)
+    # Inicializa y comienza la instancia de ADRegistry con los argumentos
+    registry = ADRegistry(args.listen_port, args.db_host, args.db_port, args.db_name, args.broker_address, args.api_address)
     registry.start()
+
+    #registry = ADRegistry(listen_port, db_host, db_port, db_name, broker_address)
+    #registry.start()

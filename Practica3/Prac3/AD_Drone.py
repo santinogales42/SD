@@ -169,7 +169,9 @@ class ADDrone(threading.Thread):
                     dron_id = int(user_input)
 
                     if 1 <= dron_id <= 99:
-                        mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
+                        mongo_address = args.mongo_address  # args.mongo_address es el argumento que recibes
+                        mongo_client = pymongo.MongoClient(mongo_address)
+                        #mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
                         db = mongo_client["dronedb"]
                         drones_collection = db["drones"]
 
@@ -229,7 +231,9 @@ class ADDrone(threading.Thread):
     def register_via_api(self):
         data = {'ID': str(self.dron_id), 'Alias': self.alias}
         headers = {'Authorization': f'Bearer {self.access_token}'}
-        response = requests.post('http://localhost:5000/registro', json=data, headers=headers)
+        api_address = args.api_address  # args.api_address es el argumento que recibes
+        response = requests.post(f'{api_address}/registro', json=data, headers=headers)
+        #response = requests.post('http://localhost:5000/registro', json=data, headers=headers)
         if self.id_exists(self.dron_id):
             print("ID de dron ya existe. Introduce un ID diferente.")
             return
@@ -253,7 +257,9 @@ class ADDrone(threading.Thread):
     
     def request_final_position_from_db(self):
         # Conectar a la base de datos de MongoDB
-        mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
+        mongo_address = args.mongo_address  # args.mongo_address es el argumento que recibes
+        mongo_client = pymongo.MongoClient(mongo_address)
+        #mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
         db = mongo_client["dronedb"]
         drones_collection = db["drones_fp"]
 
@@ -277,7 +283,9 @@ class ADDrone(threading.Thread):
 
         # Primero intenta eliminar el dron a través de la API
         headers = {'Authorization': f'Bearer {self.access_token}'}
-        response = requests.delete(f'http://localhost:5000/borrar_dron/{self.dron_id}', headers=headers)
+        api_address = args.api_address  # args.api_address es el argumento que recibes
+        response = requests.delete(f'{api_address}/borrar_dron/{self.dron_id}', headers=headers)
+        #response = requests.delete(f'http://localhost:5000/borrar_dron/{self.dron_id}', headers=headers)
         
         if response.status_code == 200:
             print("Dron eliminado exitosamente.")
@@ -285,7 +293,9 @@ class ADDrone(threading.Thread):
             print(f"Error al eliminar dron en la API: {response.text}")
 
             # Si la API falla, intenta eliminarlo de la base de datos local
-            mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
+            mongo_address = args.mongo_address  # args.mongo_address es el argumento que recibes
+            mongo_client = pymongo.MongoClient(mongo_address)
+            #mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
             db = mongo_client["dronedb"]
             drones_collection = db["drones"]
 
@@ -359,8 +369,9 @@ class ADDrone(threading.Thread):
             if not username or not password:
                 print("Nombre de usuario y contraseña son obligatorios.")
                 continue
-
-            response = requests.post('http://localhost:5000/registro_usuario', json={'username': username, 'password': password})
+            api_address = args.api_address  # args.api_address es el argumento que recibes
+            response = requests.post(f'{api_address}/registro_usuario', json={'username': username, 'password': password})
+            #response = requests.post('http://localhost:5000/registro_usuario', json={'username': username, 'password': password})
 
             if response.status_code == 201:
                 print("Usuario registrado exitosamente.")
@@ -389,7 +400,9 @@ class ADDrone(threading.Thread):
 
     def request_jwt_token(self, username, password):
         # Solicitar el token JWT a la API
-        response = requests.post('http://localhost:5000/login', json={'username': username, 'password': password})
+        api_address = args.api_address  # args.api_address es el argumento que recibes
+        response = requests.post(f'{api_address}/login', json={'username': username, 'password': password})
+        #response = requests.post('http://localhost:5000/login', json={'username': username, 'password': password})
         if response.status_code == 200:
             return response.json().get('access_token')
         else:
