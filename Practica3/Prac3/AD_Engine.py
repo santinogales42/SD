@@ -11,14 +11,11 @@ from flask import Flask
 
 
 class ADEngine:
-    def __init__(self, listen_port, max_drones, broker_address, database_address, weather_address):
+    def __init__(self, listen_port, max_drones, broker_address, database_address):
         self.listen_port = listen_port
         self.max_drones = max_drones
         self.broker_address = broker_address
         self.database_address = database_address
-        self.weather_address = weather_address
-        weather_ip, weather_port_str = weather_address.split(':')
-        self.weather_address = (weather_ip, int(weather_port_str))
         self.client = pymongo.MongoClient(self.database_address)
         self.db = self.client["dronedb"]
         self.state_lock = threading.Lock()
@@ -117,6 +114,32 @@ class ADEngine:
             self.drones_state[dron_id] = {'instruction': instruction, 'reached': False}
 
 
+    def check_weather_warnings(self):
+        while True:
+            with open('ciudad.json', 'r') as file:
+                weather_data = json.load(file)
+                city_name = weather_data['name']
+                temp_kelvin = weather_data['main']['temp']
+                temp_celsius = temp_kelvin - 273.15  # Convert Kelvin to Celsius
+                print(f"Temperatura actual en {city_name}: {temp_celsius}°C")
+                if temp_celsius < 0:
+                    self.send_warning_to_drones(city_name, temp_celsius)
+            
+            time.sleep(10)  # Check every hour, adjust as needed
+
+    def send_warning_to_drones(self, city_name, temp_celsius):
+        warning_message = {
+            'type': 'weather_warning',
+            'city': city_name,
+            'temp_celsius': temp_celsius,
+            'message': 'Temperature is below freezing. Return to base positions.'
+        }
+        self.kafka_producer.send('drone_warnings_topic', warning_message)
+        self.kafka_producer.flush()
+        print(f"Weather warning sent for {city_name}: {temp_celsius}°C")
+
+
+
     def send_final_position(self, dron_id, final_position):
         message = {
             'type': 'final_position',
@@ -137,13 +160,16 @@ class ADEngine:
     def start(self):
         print(f"AD_Engine en funcionamiento. Escuchando en el puerto {self.listen_port}...")
         
+        
         self.kafka_consumer_thread = threading.Thread(target=self.start_kafka_consumer)
         self.kafka_consumer_thread.start()
-        
+        self.weather_warning_thread = threading.Thread(target=self.check_weather_warnings)
+        self.weather_warning_thread.start()
         
         run_map_viewer()
         try:
             while True:
+                
                 client_socket, addr = self.server_socket.accept()
                 print(f"Nueva conexión desde {addr}")
                 drone_connection_thread = threading.Thread(target=self.handle_drone_connection, args=(client_socket,))
@@ -350,7 +376,6 @@ if __name__ == "__main__":
     parser.add_argument('--listen_port', type=int, default=8080, help='Port to listen on for drone connections')
     parser.add_argument('--max_drones', type=int, default=20, help='Maximum number of drones to support')
     parser.add_argument('--broker_address', default="127.0.0.1:29092", help='Address of the Kafka broker')
-    parser.add_argument('--weather_address', default="127.0.0.1:8082", help='Address of the weather service')
     parser.add_argument('--database_address', default="mongodb://localhost:27017/", help='MongoDB URI for the drones database')
     parser.add_argument('--json', default="PRUEBAS/AwD_figuras_Correccion.json", help='Path to the JSON file with figures configuration')
 
@@ -362,7 +387,6 @@ if __name__ == "__main__":
         listen_port=args.listen_port,
         max_drones=args.max_drones,  # Asegúrate de manejar este argumento en tu clase ADEngine
         broker_address=args.broker_address,
-        weather_address=args.weather_address,
         database_address=args.database_address
     )
 

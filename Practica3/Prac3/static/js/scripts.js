@@ -21,15 +21,19 @@ window.onload = function() {
 
 function getWeather(city) {
     fetch('/weather/' + city)
-    .then(response => response.json())
-    .then(data => {
-        if(data.temperature) {
-            alert("La temperatura en " + city + " es: " + data.temperature + "°C");
-        } else {
-            alert("Error al obtener el clima.");
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Respuesta del servidor no exitosa.');
         }
-    });
+        return response.json();
+    })
+    .then(data => {
+
+        alert("La temperatura en " + city + " es: " + data.temp + "°C");
+
+    })
 }
+
 
 
 function register_user() {

@@ -40,20 +40,19 @@ def create_app(mongo_address, kafka_address):
 
 
 
+    # Esta función obtiene los datos del clima para una ciudad
     def get_weather(city_name):
         params = {
             'q': city_name,
             'appid': WEATHER_API_KEY,
-            'units': 'metric'
         }
         response = requests.get(BASE_URL, params=params)
         if response.status_code == 200:
-            data = response.json()
-            temperature = data['main']['temp']
-            return temperature
+            return response.json()  # Retorna el JSON de la respuesta
         else:
             return None
-
+            
+            
     @app.route('/')
     def index():
         return render_template('index.html')
@@ -61,11 +60,32 @@ def create_app(mongo_address, kafka_address):
 
     @app.route('/weather/<city>', methods=['GET'])
     def weather(city):
-        temperature = get_weather(city)
-        if temperature is not None:
-            return jsonify({'city': city, 'temperature': temperature})
+        data = get_weather(city)
+        if data is not None:
+            custom_data = {
+                'coord': data['coord'],
+                'weather': data['weather'],
+                'base': data['base'],
+                'main': data['main'],
+                'visibility': data['visibility'],
+                'wind': data['wind'],
+                'clouds': data['clouds'],
+                'dt': data['dt'],
+                'sys': data['sys'],
+                'timezone': data['timezone'],
+                'id': data['id'],
+                'name': data['name'],
+                'cod': data['cod']
+            }
+            # Guardar en un archivo JSON
+            with open('ciudad.json', 'w') as json_file:
+                json.dump(custom_data, json_file, indent=4)
+            
+            return jsonify(custom_data)
         else:
             return jsonify({'error': 'No se pudo obtener el clima'}), 404
+
+
 
 
     def error_response(message, status_code):
