@@ -278,6 +278,7 @@ window.onload = function() {
     updateDroneList();
     updateDronePositions();
     updateFinalPositions(); // Agregar esta línea
+    loadErrors();
 };
 
 function confirmJoinShow() {
@@ -314,5 +315,16 @@ function confirmJoinShow() {
     });
 }
 
-
-
+function loadErrors() {
+    fetch('/get_errors')
+        .then(response => response.json())
+        .then(errors => {
+            const errorList = document.getElementById('error-list');
+            errorList.innerHTML = '';
+            errors.forEach(error => {
+                const listItem = document.createElement('li');
+                listItem.textContent = error;
+                errorList.appendChild(listItem);
+            });
+        });
+}

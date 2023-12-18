@@ -22,7 +22,7 @@
         <ul id="dropdown-menu">
             <li><a href="/mapa">MAPA</a></li>
             <li><a href="/registro">REGISTRO</a></li>
-            <li><a href="/errores">ERRORES</a></li>
+            <li><a href="/errores" onclick="cargarErrores()">ERRORES</a></li>
         </ul>
     </nav>
 
@@ -46,6 +46,14 @@
         <button id="add-drone-btn" onclick="addDrone()">Añadir</button>
         <button id="del-drone-btn" onclick="delDrone()">Borrar</button>
     </div>
+
+    <div id="error-container" class="error-container">
+        <h2>Errores Registrados</h2>
+        <ul id="error-list"></ul>
+    </div>
+    
+    
+    
 
     <script src="../static/js/scripts.js"></script>
 </body>

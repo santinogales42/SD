@@ -197,3 +197,31 @@ nav a:hover {
     background-color: #fca738;
 }
 
+.error-container {
+    background-color: black; /* Fondo negro para el contenedor */
+    color: #fca738; /* Texto en color naranja */
+    padding: 10px;
+    margin: 20px 400px; /* Ajuste para alinear con otros elementos */
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* Sombra para destacar */
+}
+
+.error-container h2 {
+    margin-top: 0;
+    color: #fca738; /* Título en color naranja */
+}
+
+#error-list {
+    max-height: 300px; /* Altura máxima con desplazamiento vertical */
+    overflow-y: auto;
+    list-style-type: none; /* Sin viñetas */
+    padding: 0;
+}
+
+#error-list p {
+    background-color: #333; /* Fondo oscuro para cada error */
+    margin-bottom: 5px;
+    padding: 5px;
+    border-radius: 3px;
+}
+

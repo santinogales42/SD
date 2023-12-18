@@ -197,6 +197,34 @@ def create_app(mongo_address, kafka_address):
     def error_response(e):
         logging.error(f'Error: {e}')
         return jsonify(error=str(e)), 500
+    
+    
+    @app.route('/get_errors', methods=['GET'])
+    def get_errors():
+        with open('error_log.txt', 'r') as file:
+            errors = file.readlines()
+        return jsonify(errors)
+
+    
+    
+    @app.route('/errores', methods=['GET'])
+    def obtener_errores():
+        # Aquí el código para obtener los errores de la base de datos o archivo de registro
+        errores = []  # Supongamos que esta es la lista de errores
+        return jsonify(errores)
+    
+    def log_error(error):
+        with open('error_log.txt', 'a') as file:
+            file.write(f'{error}\n')
+
+    
+    @app.errorhandler(Exception)
+    def handle_all_errors(e):
+        if hasattr(e, 'code') and e.code == 200:
+            return e
+        log_error(e)  # Función personalizada para registrar errores
+        return jsonify({'error': 'Ocurrió un error'}), getattr(e, 'code', 500)
+
 
 
 
@@ -300,8 +328,8 @@ def create_app(mongo_address, kafka_address):
     threading.Thread(target=kafka_listener, daemon=True).start()
     context = ('ssl/certificado_registry.crt', 'ssl/clave_privada_registry.pem')
     #SSL
-    #app.run(debug=True, host='registry', ssl_context=context, port=5000)
-    app.run(debug=False, host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', ssl_context=context, port=5000)
+    #app.run(debug=False, host='0.0.0.0', port=5000)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='API Rest para drones')
