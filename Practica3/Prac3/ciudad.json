@@ -1,43 +1,50 @@
 {
     "coord": {
-        "lon": -0.4815,
-        "lat": 38.3452
+        "lon": -75.4557,
+        "lat": 43.2128
     },
     "weather": [
         {
-            "id": 801,
-            "main": "Clouds",
-            "description": "few clouds",
-            "icon": "02d"
+            "id": 502,
+            "main": "Rain",
+            "description": "heavy intensity rain",
+            "icon": "10n"
+        },
+        {
+            "id": 701,
+            "main": "Mist",
+            "description": "mist",
+            "icon": "50n"
         }
     ],
     "base": "stations",
     "main": {
-        "temp": 283.97,
-        "feels_like": 282.94,
-        "temp_min": 281.89,
-        "temp_max": 285.6,
-        "pressure": 1035,
-        "humidity": 70
+        "temp": 282.21,
+        "feels_like": 280.74,
+        "temp_min": 281.44,
+        "temp_max": 283.2,
+        "pressure": 990,
+        "humidity": 96
     },
-    "visibility": 10000,
+    "visibility": 4828,
     "wind": {
-        "speed": 4.12,
-        "deg": 290
+        "speed": 2.68,
+        "deg": 0,
+        "gust": 5.36
     },
     "clouds": {
-        "all": 20
+        "all": 100
     },
-    "dt": 1702890002,
+    "dt": 1702897048,
     "sys": {
         "type": 1,
-        "id": 6391,
-        "country": "ES",
-        "sunrise": 1702883607,
-        "sunset": 1702917796
+        "id": 5681,
+        "country": "US",
+        "sunrise": 1702902529,
+        "sunset": 1702934873
     },
-    "timezone": 3600,
-    "id": 2521978,
-    "name": "Alicante",
+    "timezone": -18000,
+    "id": 5134295,
+    "name": "Rome",
     "cod": 200
 }

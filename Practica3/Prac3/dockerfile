@@ -22,4 +22,6 @@ RUN pip install pymongo
 RUN pip install flask
 
 # Define el comando predeterminado que se ejecutará cuando se inicie el contenedor
-CMD ["python", "AD_Engine.py", "--broker_address", "192.168.1.142:29092"]
+CMD ["python", "AD_Engine.py", "--broker_address", "172.20.10.6:29092"]
+#docker build -t mi-imagen-python .\n
+#docker run -it --rm mi-imagen-python\n
