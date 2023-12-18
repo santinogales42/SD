@@ -21,15 +21,19 @@ window.onload = function() {
 
 function getWeather(city) {
     fetch('/weather/' + city)
-    .then(response => response.json())
-    .then(data => {
-        if(data.temperature) {
-            alert("La temperatura en " + city + " es: " + data.temperature + "°C");
-        } else {
-            alert("Error al obtener el clima.");
+    .then(response => {
+        if (!response.ok) {
+            throw new Error('Respuesta del servidor no exitosa.');
         }
-    });
+        return response.json();
+    })
+    .then(data => {
+
+        alert("La temperatura en " + city + " es: " + data.temp + "°C");
+
+    })
 }
+
 
 
 function register_user() {
@@ -197,25 +201,55 @@ function updateDroneList() {
         .catch(error => console.error('Error al listar drones:', error));
 }
 
-setInterval(updateDronePositions, 2000); // Actualiza cada 2 segundos
+setInterval(function() {
+    updateDronePositions();
+    updateMapWithTableData();
+}, 500); // Actualiza cada 2 segundos
+
+function updateMapWithTableData() {
+    // Obtén las posiciones de la tabla
+    const tableRows = document.querySelectorAll('#drone-positions-table tr');
+    const occupiedPositions = new Set();
+
+    for (let i = 1; i < tableRows.length; i++) {
+        const cells = tableRows[i].cells;
+        const posX = parseInt(cells[1].textContent, 10);
+        const posY = parseInt(cells[2].textContent, 10);
+        occupiedPositions.add(`${posX},${posY}`);
+    }
+
+    // Borra el mapa actual y crea uno nuevo
+    const mapContainer = document.getElementById('drone-map');
+    mapContainer.innerHTML = '';
+
+    for (let y = 0; y < 20; y++) {
+        for (let x = 0; x < 20; x++) {
+            const cell = document.createElement('div');
+            cell.classList.add(occupiedPositions.has(`${x},${y}`) ? 'occupied-cell' : 'drone-cell');
+            mapContainer.appendChild(cell);
+        }
+    }
+}
 
 function updateDronePositions() {
     fetch('/get_drone_positions')
         .then(response => response.json())
         .then(data => {
+            let tableContent = '<h3>Posiciones de Drones</h3>';
+            tableContent += '<table><tr><th>ID</th><th>Posición X</th><th>Posición Y</th></tr>';
             for (let droneID in data) {
-                let droneElement = document.getElementById(`drone-${droneID}`);
-                if (!droneElement) {
-                    droneElement = document.createElement('div');
-                    droneElement.id = `drone-${droneID}`;
-                    droneElement.classList.add('drone');
-                    document.getElementById('drone-map').appendChild(droneElement);
-                }
-                droneElement.style.left = `${data[droneID].x}px`;
-                droneElement.style.top = `${data[droneID].y}px`;
+                tableContent += `<tr><td>${droneID}</td><td>${data[droneID][0]}</td><td>${data[droneID][1]}</td></tr>`;
             }
+            tableContent += '</table>';
+            document.getElementById('drone-positions-table').innerHTML = tableContent;
         })
         .catch(error => console.error('Error al obtener posiciones de drones:', error));
 }
 
 
+window.onload = function() {
+    createDroneMap();
+    updateDroneList();
+    updateDronePositions();
+    updateFinalPositions(); // Agregar esta línea
+};

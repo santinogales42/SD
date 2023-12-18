@@ -11,14 +11,11 @@ from flask import Flask
 
 
 class ADEngine:
-    def __init__(self, listen_port, max_drones, broker_address, database_address, weather_address):
+    def __init__(self, listen_port, max_drones, broker_address, database_address):
         self.listen_port = listen_port
         self.max_drones = max_drones
         self.broker_address = broker_address
         self.database_address = database_address
-        self.weather_address = weather_address
-        weather_ip, weather_port_str = weather_address.split(':')
-        self.weather_address = (weather_ip, int(weather_port_str))
         self.client = pymongo.MongoClient(self.database_address)
         self.db = self.client["dronedb"]
         self.state_lock = threading.Lock()
@@ -31,28 +28,32 @@ class ADEngine:
         self.server_socket.listen(15)
         self.kafka_producer = KafkaProducer(
             bootstrap_servers=[self.broker_address],
-            value_serializer=lambda v: json.dumps(v).encode('utf-8')
+            value_serializer=lambda m: json.dumps(m).encode('utf-8'),
+            #security_protocol='SSL',
+            ssl_cafile='ssl/certificado_CA.crt',  # El certificado de la Autoridad Certificadora
+            ssl_certfile='ssl/certificado_registry.crt',  # Certificado de tu servidor
+            ssl_keyfile='ssl/clave_privada_registry.pem'  # Clave privada de tu servidor
         )
         self.accept_thread = threading.Thread(target=self.accept_connections)
         self.accept_thread.start()
         #Para conexiones seguras
-        self.context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
-        self.context.load_cert_chain(certfile="ssl/certificado_registry.crt", keyfile="ssl/clave_privada_registry.pem")
-    #def accept_connections(self):
-    #    while True:
-    #        client_socket, _ = self.server_socket.accept()
-    #        secure_socket = self.context.wrap_socket(client_socket, server_side=True)
-    #        threading.Thread(target=self.handle_drone_connection, args=(secure_socket,)).start()
+        #self.context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+        #self.context.load_cert_chain(certfile="ssl/certificado_registry.crt", keyfile="ssl/clave_privada_registry.pem")
 
+    #SANTI NO PUEDE
+    #def accept_connections(self):
+        #while True:
+            #client_socket, _ = self.server_socket.accept()
+            #try:
+                # Envolver la conexión del cliente con el contexto SSL
+            #    secure_socket = self.context.wrap_socket(client_socket, server_side=True)
+            #    threading.Thread(target=self.handle_drone_connection, args=(secure_socket,)).start()
+            #except ssl.SSLError as e:
+            #    print(f"Error SSL: {e}")
     def accept_connections(self):
         while True:
             client_socket, _ = self.server_socket.accept()
-            try:
-                # Envolver la conexión del cliente con el contexto SSL
-                secure_socket = self.context.wrap_socket(client_socket, server_side=True)
-                threading.Thread(target=self.handle_drone_connection, args=(secure_socket,)).start()
-            except ssl.SSLError as e:
-                print(f"Error SSL: {e}")
+            threading.Thread(target=self.handle_drone_connection, args=(client_socket,)).start()
                 
     # En la clase ADEngine
     def handle_drone_connection(self, client_socket):
@@ -113,6 +114,32 @@ class ADEngine:
             self.drones_state[dron_id] = {'instruction': instruction, 'reached': False}
 
 
+    def check_weather_warnings(self):
+        while True:
+            with open('ciudad.json', 'r') as file:
+                weather_data = json.load(file)
+                city_name = weather_data['name']
+                temp_kelvin = weather_data['main']['temp']
+                temp_celsius = temp_kelvin - 273.15  # Convert Kelvin to Celsius
+                print(f"Temperatura actual en {city_name}: {temp_celsius}°C")
+                if temp_celsius < 0:
+                    self.send_warning_to_drones(city_name, temp_celsius)
+            
+            time.sleep(10)  # Check every hour, adjust as needed
+
+    def send_warning_to_drones(self, city_name, temp_celsius):
+        warning_message = {
+            'type': 'weather_warning',
+            'city': city_name,
+            'temp_celsius': temp_celsius,
+            'message': 'Temperature is below freezing. Return to base positions.'
+        }
+        self.kafka_producer.send('drone_warnings_topic', warning_message)
+        self.kafka_producer.flush()
+        print(f"Weather warning sent for {city_name}: {temp_celsius}°C")
+
+
+
     def send_final_position(self, dron_id, final_position):
         message = {
             'type': 'final_position',
@@ -133,13 +160,16 @@ class ADEngine:
     def start(self):
         print(f"AD_Engine en funcionamiento. Escuchando en el puerto {self.listen_port}...")
         
+        
         self.kafka_consumer_thread = threading.Thread(target=self.start_kafka_consumer)
         self.kafka_consumer_thread.start()
-        
+        self.weather_warning_thread = threading.Thread(target=self.check_weather_warnings)
+        self.weather_warning_thread.start()
         
         run_map_viewer()
         try:
             while True:
+                
                 client_socket, addr = self.server_socket.accept()
                 print(f"Nueva conexión desde {addr}")
                 drone_connection_thread = threading.Thread(target=self.handle_drone_connection, args=(client_socket,))
@@ -188,7 +218,11 @@ class ADEngine:
             auto_offset_reset='latest',
             enable_auto_commit=True,
             group_id='engine-group',
-            value_deserializer=lambda x: json.loads(x.decode('utf-8'))
+            value_deserializer=lambda x: json.loads(x.decode('utf-8')),
+            #security_protocol='SSL',
+            ssl_cafile='ssl/certificado_CA.crt',  # El certificado de la Autoridad Certificadora
+            ssl_certfile='ssl/certificado_registry.crt',  # Certificado de tu servidor
+            ssl_keyfile='ssl/clave_privada_registry.pem'  # Clave privada de tu servidor
         )
 
         for message in consumer:
@@ -196,6 +230,7 @@ class ADEngine:
                 dron_id = message.value['dron_id']
                 final_position = message.value['final_position']
                 self.handle_drone_position_reached(dron_id, final_position)
+
 
     def handle_drone_position_reached(self, dron_id, final_position):
         # Convertir la posición reportada a una tupla si es una lista
@@ -278,8 +313,6 @@ class ADEngine:
             self.send_final_position(dron_id, self.final_positions[dron_id])
             self.send_instruction_to_drone(dron_id, 'START')
 
-# Resto del código...
-
 
     def check_drone_position(self, dron_id):
         current_position = self.get_current_position(dron_id)
@@ -343,7 +376,6 @@ if __name__ == "__main__":
     parser.add_argument('--listen_port', type=int, default=8080, help='Port to listen on for drone connections')
     parser.add_argument('--max_drones', type=int, default=20, help='Maximum number of drones to support')
     parser.add_argument('--broker_address', default="127.0.0.1:29092", help='Address of the Kafka broker')
-    parser.add_argument('--weather_address', default="127.0.0.1:8082", help='Address of the weather service')
     parser.add_argument('--database_address', default="mongodb://localhost:27017/", help='MongoDB URI for the drones database')
     parser.add_argument('--json', default="PRUEBAS/AwD_figuras_Correccion.json", help='Path to the JSON file with figures configuration')
 
@@ -355,7 +387,6 @@ if __name__ == "__main__":
         listen_port=args.listen_port,
         max_drones=args.max_drones,  # Asegúrate de manejar este argumento en tu clase ADEngine
         broker_address=args.broker_address,
-        weather_address=args.weather_address,
         database_address=args.database_address
     )
 

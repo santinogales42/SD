@@ -1,0 +1,43 @@
+{
+    "coord": {
+        "lon": -0.4815,
+        "lat": 38.3452
+    },
+    "weather": [
+        {
+            "id": 800,
+            "main": "Clear",
+            "description": "clear sky",
+            "icon": "01n"
+        }
+    ],
+    "base": "stations",
+    "main": {
+        "temp": 281.64,
+        "feels_like": 280.13,
+        "temp_min": 279.11,
+        "temp_max": 283.37,
+        "pressure": 1035,
+        "humidity": 69
+    },
+    "visibility": 10000,
+    "wind": {
+        "speed": 2.57,
+        "deg": 310
+    },
+    "clouds": {
+        "all": 0
+    },
+    "dt": 1702861179,
+    "sys": {
+        "type": 1,
+        "id": 6391,
+        "country": "ES",
+        "sunrise": 1702883607,
+        "sunset": 1702917796
+    },
+    "timezone": 3600,
+    "id": 2521978,
+    "name": "Alicante",
+    "cod": 200
+}
