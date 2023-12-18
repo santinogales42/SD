@@ -106,7 +106,7 @@ def create_app(mongo_address, kafka_address):
     def kafka_listener():
         consumer = KafkaConsumer(
         'drone_position_updates',
-        bootstrap_servers='localhost:29092',
+        bootstrap_servers=kafka_address,
         value_deserializer=lambda m: json.loads(m.decode('utf-8'))
         )
 
@@ -124,7 +124,7 @@ def create_app(mongo_address, kafka_address):
     def kafka_final_positions_listener():
         consumer = KafkaConsumer(
             'drone_final_position',  # Asegúrate de usar el tópico correcto
-            bootstrap_servers='localhost:29092',
+            bootstrap_servers=kafka_address,
             value_deserializer=lambda m: json.loads(m.decode('utf-8'))
         )
 
