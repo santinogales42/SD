@@ -111,6 +111,26 @@ def create_app(mongo_address, kafka_address):
             drone_positions[dron_id] = position
             print(f"Actualización recibida: Drone ID {dron_id}, Posición {position}")
 
+    final_drone_positions = {}
+
+    def kafka_final_positions_listener():
+        consumer = KafkaConsumer(
+            'drone_final_position',  # Asegúrate de usar el tópico correcto
+            bootstrap_servers='localhost:29092',
+            value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+        )
+
+        for message in consumer:
+            dron_id = message.value['dron_id']
+            final_position = message.value['final_position']
+            final_drone_positions[dron_id] = final_position
+
+    threading.Thread(target=kafka_final_positions_listener, daemon=True).start()
+
+    @app.route('/get_final_drone_positions', methods=['GET'])
+    def get_final_drone_positions():
+        return jsonify(final_drone_positions)
+
     @app.route('/get_drone_positions')
     def get_drone_positions():
         return jsonify(drone_positions)
@@ -130,6 +150,10 @@ def create_app(mongo_address, kafka_address):
 
         db.users.insert_one({"username": username, "password_hash": password_hash})
         return jsonify({"msg": "Usuario registrado exitosamente"}), 201
+
+    
+
+
 
 
     @app.route('/login', methods=['POST'])

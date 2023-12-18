@@ -207,7 +207,6 @@ setInterval(function() {
 }, 500); // Actualiza cada 2 segundos
 
 function updateMapWithTableData() {
-    // Obtén las posiciones de la tabla
     const tableRows = document.querySelectorAll('#drone-positions-table tr');
     const occupiedPositions = new Set();
 
@@ -218,18 +217,25 @@ function updateMapWithTableData() {
         occupiedPositions.add(`${posX},${posY}`);
     }
 
-    // Borra el mapa actual y crea uno nuevo
     const mapContainer = document.getElementById('drone-map');
     mapContainer.innerHTML = '';
 
     for (let y = 0; y < 20; y++) {
         for (let x = 0; x < 20; x++) {
             const cell = document.createElement('div');
-            cell.classList.add(occupiedPositions.has(`${x},${y}`) ? 'occupied-cell' : 'drone-cell');
+            const positionKey = `${x},${y}`;
+            if (finalDronePositions[positionKey]) {
+                cell.classList.add('final-cell');
+            } else if (occupiedPositions.has(positionKey)) {
+                cell.classList.add('occupied-cell');
+            } else {
+                cell.classList.add('drone-cell');
+            }
             mapContainer.appendChild(cell);
         }
     }
 }
+
 
 function updateDronePositions() {
     fetch('/get_drone_positions')
@@ -246,6 +252,21 @@ function updateDronePositions() {
         .catch(error => console.error('Error al obtener posiciones de drones:', error));
 }
 
+let finalDronePositions = {};
+
+function updateFinalDronePositions() {
+    fetch('/get_final_drone_positions') // Ruta de tu API para obtener posiciones finales
+        .then(response => response.json())
+        .then(data => {
+            finalDronePositions = data;
+            console.log('Posiciones Finales de Drones:', finalDronePositions);
+        })
+        .catch(error => console.error('Error al obtener posiciones finales de drones:', error));
+}
+
+
+// Llamar a la función para actualizar las posiciones finales
+updateFinalDronePositions();
 
 window.onload = function() {
     createDroneMap();

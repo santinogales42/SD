@@ -68,7 +68,7 @@ nav a:hover {
     grid-template-columns: repeat(20, 1fr);
     grid-template-rows: repeat(20, 1fr);
     gap: 2px;
-    margin-left: 300px;
+    margin-left: 400px;
     margin-top: 50px;
     width: 700px;
     height: 700px;
@@ -85,7 +85,8 @@ nav a:hover {
 #drone-positions-table {
     width: 250px;
     float: left;
-    margin-right: 10px;
+    margin-left: 20px;
+    margin-top: 50px;
     background-color: black;
     color: #fca738;
     padding: 10px;
@@ -100,6 +101,10 @@ nav a:hover {
 .occupied-cell{
     border: 1px solid black;
     background-color: red;
+}
+.final-cell{
+    border: 1px solid black;
+    background-color: green;
 }
 /* Estilos para la sección de la lista de drones */
 #drone-list-section {
