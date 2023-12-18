@@ -11,7 +11,7 @@ import requests
 import logging
 from api_w import WEATHER_API_KEY
 import threading
-from kafka import KafkaConsumer
+from kafka import KafkaConsumer, KafkaProducer
 import json
 import argparse
 
@@ -29,6 +29,10 @@ def create_app(mongo_address, kafka_address):
         'drone_position_updates',
         bootstrap_servers=kafka_address,
         value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+    )
+    kafka_producer = KafkaProducer(
+        bootstrap_servers=kafka_address,
+        value_serializer=lambda m: json.dumps(m).encode('utf-8')
     )
 
     app.config["JWT_SECRET_KEY"] = "tu_clave_secreta"  # Cambia esto por una clave segura
@@ -265,6 +269,30 @@ def create_app(mongo_address, kafka_address):
                 return jsonify({'message': 'Dron eliminado correctamente'}), 200
         except errors.PyMongoError as e:
             return jsonify({'error': str(e)}), 500
+        
+
+    @app.route('/unir_drones_show', methods=['POST'])
+    @jwt_required()
+    def unir_drones_show():
+        data = request.get_json()
+        drone_ids = data['drone_ids']
+
+        if not drone_ids:
+            return jsonify({'error': 'No se proporcionaron IDs de drones'}), 400
+
+        for dron_id in drone_ids:
+            drone = db.drones.find_one({"ID": dron_id})
+            if drone:
+                # Actualiza el estado del dron en la base de datos
+                db.drones.update_one({"ID": dron_id}, {"$set": {"estado": "en_show"}})
+                # Enviar mensaje a Kafka
+                kafka_producer.send('drone_messages_topic', json.dumps({"type": "join_show", "dron_id": dron_id}))
+
+        return jsonify({'message': 'Drones unidos al show exitosamente'}), 200
+
+
+    
+    
 
     threading.Thread(target=kafka_listener, daemon=True).start()
     context = ('ssl/certificado_registry.crt', 'ssl/clave_privada_registry.pem')

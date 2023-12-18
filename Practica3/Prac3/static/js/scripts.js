@@ -194,9 +194,14 @@ function updateDroneList() {
             listElement.innerHTML = '';
             drones.forEach(drone => {
                 const listItem = document.createElement('li');
-                listItem.textContent = `ID: ${drone.ID}, Alias: ${drone.Alias}`;
+                listItem.innerHTML = `<input type="checkbox" class="drone-checkbox" id="drone${drone.ID}" value="${drone.ID}"> <label for="drone${drone.ID}">ID: ${drone.ID}, Alias: ${drone.Alias}</label>`;
                 listElement.appendChild(listItem);
             });
+
+            const joinButton = document.createElement('button');
+            joinButton.innerText = 'Unir al Show';
+            joinButton.onclick = confirmJoinShow;
+            listElement.appendChild(joinButton);
         })
         .catch(error => console.error('Error al listar drones:', error));
 }
@@ -274,3 +279,40 @@ window.onload = function() {
     updateDronePositions();
     updateFinalPositions(); // Agregar esta línea
 };
+
+function confirmJoinShow() {
+    // Obtener los IDs de los drones seleccionados
+    const selectedDrones = [];
+    document.querySelectorAll('.drone-checkbox:checked').forEach(checkbox => {
+        selectedDrones.push(checkbox.value);
+    });
+
+    if (selectedDrones.length === 0) {
+        alert('Por favor, selecciona al menos un dron.');
+        return;
+    }
+
+    // Obtener el token JWT
+    get_jwt_token().then(token => {
+        // Realizar la petición para unir los drones al show
+        fetch('/unir_drones_show', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ drone_ids: selectedDrones })
+        })
+        .then(response => {
+            if (response.ok) {
+                alert('Drones unidos al show exitosamente.');
+            } else {
+                alert('Error al unir drones al show.');
+            }
+        })
+        .catch(error => console.error('Error:', error));
+    });
+}
+
+
+

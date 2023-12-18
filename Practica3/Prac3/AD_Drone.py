@@ -79,6 +79,9 @@ class ADDrone(threading.Thread):
 
     def handle_instruction_message(self, message):
         instruction = message.value.get('instruction')
+        if instruction == 'join_show':
+            self.in_show_mode = True
+            print(f"ADDrone: Uniendo al show con ID {self.dron_id}...")
         if instruction == 'START':
             if self.in_show_mode:
                 self.in_show_mode = True
