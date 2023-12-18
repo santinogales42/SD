@@ -72,22 +72,25 @@ class ADDrone(threading.Thread):
                 self.handle_drone_registered_message(message)
             if message.topic == 'drone_messages_topic':
                 self.handle_instruction_message(message)
-            elif message.topic == 'drone_final_position':
+            if message.topic == 'drone_final_position':
                 self.handle_final_position_message(message)
+                
+        
 
     def handle_instruction_message(self, message):
         instruction = message.value.get('instruction')
         if instruction == 'START':
-            if self.final_position != self.current_position:
-                print("ADDrone: Instrucción START recibida, moviéndose hacia la posición final...")
+            if self.in_show_mode:
+                self.in_show_mode = True
+                print("ADDrone: Instrucción START recibida, iniciando movimiento hacia posición final...")
                 self.move_to_final_position()
             else:
-                print("ADDrone: Ya en posición final, ignorando instrucción START.")
+                print("ADDrone: Ya en modo show, ignorando instrucción START.")
         elif instruction == 'STOP':
             print("ADDrone: Instrucción STOP recibida, deteniendo y regresando a la base...")
-            self.current_position = self.base_position
+            self.final_position = self.base_position
             self.in_show_mode = False
-            self.send_position_update()
+            self.move_to_final_position()
 
     def handle_final_position_message(self, message):
         if message.value.get('dron_id') == self.dron_id:
@@ -98,17 +101,19 @@ class ADDrone(threading.Thread):
 
 
     def move_to_final_position(self):
-        while self.current_position != self.final_position:
+        if not self.in_show_mode:
+            return
+        while self.current_position != self.final_position and self.in_show_mode:
             self.calculate_movement()
             self.send_position_update()
             time.sleep(1)
-
-        self.send_kafka_message('drone_position_reached', {
-            'type': 'position_reached',
-            'dron_id': self.dron_id,
-            'final_position': self.final_position
-        })
-        print(f"ADDrone: Posición final alcanzada: {self.final_position}")
+        if self.current_position == self.final_position:
+            self.send_kafka_message('drone_position_reached', {
+                'type': 'position_reached',
+                'dron_id': self.dron_id,
+                'final_position': self.final_position
+            })
+            print(f"ADDrone: Posición {('final' if self.in_show_mode else 'base')} alcanzada: {self.current_position}")
 
 
     def calculate_movement(self):

@@ -36,6 +36,7 @@ class ADEngine:
         )
         self.accept_thread = threading.Thread(target=self.accept_connections)
         self.accept_thread.start()
+        self.last_weather_check = {"city_name": None, "temp_celsius": None}
         #Para conexiones seguras
         #self.context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         #self.context.load_cert_chain(certfile="ssl/certificado_registry.crt", keyfile="ssl/clave_privada_registry.pem")
@@ -120,23 +121,31 @@ class ADEngine:
                 weather_data = json.load(file)
                 city_name = weather_data['name']
                 temp_kelvin = weather_data['main']['temp']
-                temp_celsius = temp_kelvin - 273.15  # Convert Kelvin to Celsius
-                print(f"Temperatura actual en {city_name}: {temp_celsius}°C")
-                if temp_celsius < 0:
-                    self.send_warning_to_drones(city_name, temp_celsius)
-            
-            time.sleep(10)  # Check every hour, adjust as needed
+                temp_celsius = temp_kelvin - 273.15
+
+                # Comprobar si la temperatura ha cambiado
+                if city_name != self.last_weather_check['city_name'] or temp_celsius != self.last_weather_check['temp_celsius']:
+                    print(f"Temperatura actual en {city_name}: {temp_celsius}°C")
+                    if temp_celsius < 0:
+                        self.send_warning_to_drones(city_name, temp_celsius)
+
+                    # Actualizar la última comprobación de clima
+                    self.last_weather_check['city_name'] = city_name
+                    self.last_weather_check['temp_celsius'] = temp_celsius
+
+            time.sleep(10)  # Check every 10 seconds (ajustar según sea necesario)
 
     def send_warning_to_drones(self, city_name, temp_celsius):
         warning_message = {
-            'type': 'weather_warning',
-            'city': city_name,
-            'temp_celsius': temp_celsius,
-            'message': 'Temperature is below freezing. Return to base positions.'
+            'type': 'instruction',
+            'dron_id': 'all',  # O especificar un ID si solo se dirige a un dron específico
+            'instruction': 'STOP',
+            'reason': f"Advertencia de clima frío en {city_name}: {temp_celsius}°C"
         }
-        self.kafka_producer.send('drone_warnings_topic', warning_message)
+        self.kafka_producer.send('drone_messages_topic', warning_message)
         self.kafka_producer.flush()
-        print(f"Weather warning sent for {city_name}: {temp_celsius}°C")
+        print(f"Enviada advertencia de clima frío para todos los drones.")
+
 
 
 
