@@ -192,7 +192,7 @@ function updateDroneList() {
         .then(drones => {
             const listElement = document.getElementById('drone-list');
             listElement.innerHTML = '';
-            drones.forEach(drone => {
+            /*drones.forEach(drone => {
                 const listItem = document.createElement('li');
                 listItem.innerHTML = `<input type="checkbox" class="drone-checkbox" id="drone${drone.ID}" value="${drone.ID}"> <label for="drone${drone.ID}">ID: ${drone.ID}, Alias: ${drone.Alias}</label>`;
                 listElement.appendChild(listItem);
@@ -201,7 +201,7 @@ function updateDroneList() {
             const joinButton = document.createElement('button');
             joinButton.innerText = 'Unir al Show';
             joinButton.onclick = confirmJoinShow;
-            listElement.appendChild(joinButton);
+            listElement.appendChild(joinButton);*/
         })
         .catch(error => console.error('Error al listar drones:', error));
 }
