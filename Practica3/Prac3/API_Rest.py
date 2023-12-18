@@ -3,7 +3,6 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required
 from pymongo import MongoClient, errors
 from bson import ObjectId
 from datetime import timedelta
-from cryptography.fernet import Fernet
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_cors import CORS
 import os
@@ -17,26 +16,30 @@ import argparse
 
 app = Flask(__name__)
 CORS(app)
-
+logging.basicConfig(level=logging.INFO)
+#logging.basicConfig(filename='registro_auditoria.log', level=logging.INFO)
 
 def create_app(mongo_address, kafka_address):
-    # Configura la conexión a MongoDB
-    client = MongoClient(mongo_address)
+    try:
+        client = MongoClient(mongo_address, serverSelectionTimeoutMS=5000)
+        client.server_info()  # Test MongoDB connection
+    except Exception as e:
+        logging.error(f"Error al conectar a MongoDB: {e}")
+        # Implementar lógica de reintento o manejo de fallo aquí
+
+    try:
+        kafka_producer = KafkaProducer(
+            bootstrap_servers=kafka_address,
+            value_serializer=lambda m: json.dumps(m).encode('utf-8')
+        )
+        # Test Kafka connection here
+    except Exception as e:
+        logging.error(f"Error al conectar a Kafka: {e}")
+        # Implementar lógica de reintento o manejo de fallo aquí
+
     db = client.dronedb
-
-    # Configura la conexión a Kafka
-    consumer = KafkaConsumer(
-        'drone_position_updates',
-        bootstrap_servers=kafka_address,
-        value_deserializer=lambda m: json.loads(m.decode('utf-8'))
-    )
-    kafka_producer = KafkaProducer(
-        bootstrap_servers=kafka_address,
-        value_serializer=lambda m: json.dumps(m).encode('utf-8')
-    )
-
-    app.config["JWT_SECRET_KEY"] = "tu_clave_secreta"  # Cambia esto por una clave segura
     jwt = JWTManager(app)
+    app.config["JWT_SECRET_KEY"] = "tu_clave_secreta"
 
     drone_positions = {}
 
@@ -92,9 +95,10 @@ def create_app(mongo_address, kafka_address):
 
 
 
-    def error_response(message, status_code):
-        return jsonify({'error': message}), status_code
-
+    @app.errorhandler(Exception)
+    def error_response(e):
+        logging.error(f'Error no capturado: {e}', exc_info=True)
+        return jsonify(error=str(e)), 500
 
 
 
@@ -179,13 +183,12 @@ def create_app(mongo_address, kafka_address):
 
 
     ##### AUDITORIA #####
-    #logging.basicConfig(filename='registro_auditoria.log', level=logging.INFO)
 
-    #@app.route('/evento', methods=['GET'])
-    #@jwt_required()
-    #def evento():
-    #    logging.info("Evento registrado")
-    #    return jsonify(msg="Evento registrado")
+    @app.route('/evento', methods=['GET'])
+    @jwt_required()
+    def evento():
+        logging.info("Evento registrado")
+        return jsonify(msg="Evento registrado")
 
 
 
