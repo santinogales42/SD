@@ -247,10 +247,8 @@ class ADDrone(threading.Thread):
             print(f"Error al registrar via API: {response.text}")
 
     def choose_registration_method(self):
-        method = input("Elige el método de registro (1: Socket, 2: API): ")
-        if method == "1":
-            self.register_drone()
-        elif method == "2":
+        method = input("Elige el método de registro  2: API): ")
+        if method == "2":
             self.register_via_api()
         else:
             print("Método de registro no válido.")
@@ -322,9 +320,9 @@ class ADDrone(threading.Thread):
         
         try:
             # Crear un contexto SSL para el cliente
-            context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+            #context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
             # Cargar el certificado de la autoridad certificadora
-            context.load_verify_locations('ssl/certificado_registry.crt')
+            #context.load_verify_locations('ssl/certificado_registry.crt')
 
             #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as raw_socket:
                 # Envolver el socket en el contexto SSL
