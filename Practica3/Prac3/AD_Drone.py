@@ -12,16 +12,18 @@ import requests
 import ssl
 import warnings
 from urllib3.exceptions import InsecureRequestWarning
+import logging
 
 class ADDrone(threading.Thread):
     def __init__(self, engine_address, broker_address, mongo_address, api_address, engine_registry_address):
         super().__init__()
         self.engine_address = engine_address
         self.broker_address = broker_address
+        #logging.basicConfig(level=logging.DEBUG)
         #self.kafka_producer = KafkaProducer(bootstrap_servers=self.broker_address)
         self.kafka_producer = KafkaProducer(
             bootstrap_servers=self.broker_address,
-            #value_serializer=lambda m: json.dumps(m).encode('utf-8'),
+            value_serializer=lambda m: json.dumps(m).encode('utf-8'),
             #security_protocol='SSL',
             ssl_cafile='ssl/certificado_CA.crt',
             ssl_certfile='ssl/certificado_registry.crt',
@@ -320,10 +322,12 @@ class ADDrone(threading.Thread):
         
         try:
             # Crear un contexto SSL para el cliente
-            #context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+            context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
             # Cargar el certificado de la autoridad certificadora
-            #context.load_verify_locations('ssl/certificado_registry.crt')
-
+            context.load_verify_locations('ssl/certificado_CA.crt')
+            context.load_cert_chain(certfile='ssl/certificado_registry.crt', keyfile='ssl/clave_privada_registry.pem')
+            #with socket.create_connection((host, port)) as sock:
+            #    with context.wrap_socket(sock, server_hostname=host) as secure_sock:
             #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as raw_socket:
                 # Envolver el socket en el contexto SSL
             #    secure_socket = context.wrap_socket(raw_socket, server_hostname="registry")

@@ -24,7 +24,8 @@ class ADEngine:
         self.current_positions = {}
         self.connected_drones = set()
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.bind(("127.0.0.1", self.listen_port))
+        # Para conectarse desde cualquier IP de la misma red
+        self.server_socket.bind(("0.0.0.0", self.listen_port))
         self.server_socket.listen(15)
         self.kafka_producer = KafkaProducer(
             bootstrap_servers=[self.broker_address],

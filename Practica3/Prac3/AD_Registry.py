@@ -47,7 +47,7 @@ class ADRegistry:
 
     def start(self):
         server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.bind(("127.0.0.1", self.listen_port))
+        server_socket.bind(("0.0.0.0", self.listen_port))
         server_socket.listen(15)
         print(f"AD_Registry en funcionamiento. Escuchando en el puerto {self.listen_port}...")
         
