@@ -1,14 +1,17 @@
-Para guardar mensajes cifrados en MongoDB y observarlos posteriormente, primero necesitas cifrar los mensajes antes de enviarlos a Kafka. Puedes hacer esto utilizando una biblioteca de cifrado en Python, como cryptography o PyCrypto. Una vez cifrado el mensaje, lo envías a través de Kafka como de costumbre.
+    Generación de Certificados .pem: Usa una herramienta como OpenSSL para generar un par de claves (pública y privada) para cada dron. Guarda estas claves en archivos .pem.
 
-En el consumidor de Kafka, después de recibir el mensaje, lo guardas directamente en MongoDB sin descifrarlo. De esta manera, el mensaje almacenado en la base de datos permanece cifrado.
+    Distribución de Certificados: Asigna y distribuye de forma segura estos archivos a cada dron. Cada dron debe tener su propio archivo .pem.
 
-Cuando necesites observar estos mensajes, puedes recuperarlos de MongoDB y descifrarlos utilizando la misma clave y algoritmo de cifrado que usaste para cifrarlos inicialmente.
+    Modificación del Código en AD_Registry:
+        Implementa la lógica para cifrar los mensajes usando la clave pública del dron destinatario.
+        Asegúrate de que AD_Registry tenga acceso a la clave pública de cada dron.
 
-Aquí tienes un ejemplo muy básico de cómo podría ser este proceso:
+    Modificación del Código en AD_Drone:
+        Implementa la lógica para descifrar los mensajes recibidos usando la clave privada almacenada en su archivo .pem.
+        Asegúrate de que cada dron cargue su archivo .pem de manera segura al iniciar.
 
-    Cifra el mensaje antes de enviarlo a Kafka.
-    Envia el mensaje cifrado a través de Kafka.
-    El consumidor de Kafka recibe el mensaje cifrado y lo almacena en MongoDB.
-    Para leer y entender el mensaje, recupéralo de MongoDB y descífralo utilizando la misma clave.
+    Prueba de Comunicación: Realiza pruebas para verificar que los mensajes se cifran y descifran correctamente entre AD_Registry y los drones.
 
-Ten en cuenta que la gestión de claves de cifrado es un aspecto crítico de la seguridad. Asegúrate de manejar y almacenar las claves de forma segura.
+    Seguridad y Manejo de Errores: Implementa medidas de seguridad para proteger las claves y manejar errores de cifrado/descifrado.
+
+Este proceso garantizará que la comunicación entre el registro y los drones sea segura y que solo los drones destinatarios puedan descifrar los mensajes recibidos.

@@ -7,6 +7,10 @@ from kafka import KafkaProducer, KafkaConsumer
 from os import getenv
 from uuid import uuid4
 import argparse
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.backends import default_backend
 from cryptography.fernet import Fernet
 import base64
 
@@ -21,22 +25,61 @@ class ADRegistry:
         self.db = self.client[self.db_name]
         self.broker_address = broker_address
         self.api_address = api_address
-        #Leer de clave.key el valor de la clave para descifrar
-        key = Fernet.generate_key()
-        with open("clave.key", "wb") as key_file:
-            key_file.write(key)
-        #leer la clave de cifrado del archivo
-        with open("clave.key", "rb") as key_file:
-            key = key_file.read()
-        self.cipher_suite = Fernet(key)
+        self.private_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048
+        )
+        self.public_key = self.private_key.public_key()
 
 
 #####SOCKET#####
+
+    def extract_drone_id_and_data(self, request_data):
+        try:
+            drone_id, encrypted_data = request_data
+            return drone_id, encrypted_data
+        except ValueError as e:
+            print(f"Error al extraer datos: {e}")
+            return None, None
+
+    def load_drone_keys(self, drone_id):
+        try:
+            private_key_file = f"private_key_{drone_id}.pem"
+            with open(private_key_file, "rb") as key_file:
+                private_key = serialization.load_pem_private_key(
+                    key_file.read(),
+                    password=None,
+                    backend=default_backend()
+                )
+            return private_key
+        except FileNotFoundError:
+            print(f"No se encontró el archivo de clave privada: {private_key_file}")
+            return None
+        except Exception as e:
+            print(f"Error al cargar clave privada: {e}")
+            return None
+
     def handle_client(self, client_socket, addr):
         try:
             request_data = client_socket.recv(1024)
-            decoded_data = base64.b64decode(request_data)
-            decrypted_data = self.cipher_suite.decrypt(decoded_data)
+
+            drone_id, encrypted_data = self.extract_drone_id_and_data(request_data)
+            if drone_id is None or encrypted_data is None:
+                raise ValueError("Datos de solicitud inválidos")
+            private_key = self.load_drone_keys(drone_id)
+            if private_key is None:
+                raise ValueError(f"No se pudo cargar la clave privada para el dron {drone_id}")
+
+            # Descifrar los datos
+            decrypted_data = private_key.decrypt(
+                request_data,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
+                    label=None
+                )
+            )
+
             request_json = json.loads(decrypted_data.decode('utf-8'))
             
             if 'ID' in request_json and 'Alias' in request_json:
@@ -83,8 +126,8 @@ class ADRegistry:
     def register_drone(self, drone_id, alias):
         producer = KafkaProducer(
             bootstrap_servers=self.broker_address,
-            key_serializer=str.encode,  # Asegúrate de que las claves se serializan a bytes
-            value_serializer=lambda m: json.dumps(m).encode('utf-8')  # Serializador para los valores
+            key_serializer=str.encode,
+            value_serializer=lambda m: json.dumps(m).encode('utf-8')
         )
 
         initial_position = [1,1]
@@ -94,20 +137,32 @@ class ADRegistry:
             'Alias': alias,
             'InitialPosition': initial_position
         }
-        print(f"Mensaje a enviar: {drone_data_message}")
-        #Cifrar el mensaje antes de enviar
-        encrypted_message = self.cipher_suite.encrypt(json.dumps(drone_data_message).encode('utf-8'))
-        print("Mensaje cifrado")
-        # Enviar el mensaje al tópico de Kafka 'drone_registered' con la clave del dron como clave 
-        producer.send('drone_registered', key=str(drone_id), value=encrypted_message)
-        print("Mensaje enviado al tópico de Kafka")
-        producer.flush()  # Asegúrate de que el mensaje se envía antes de continuar
-        print("Productor cerrado")
-        producer.close()  # Cierra el productor después de enviar el mensaje
-        print("Productor cerrado")
-        self.db.drones.insert_one({"drone_id": drone_id, "encrypted_data": encrypted_message})
-        print("Mensaje almacenado en MongoDB")
+
+        # Cifrar el mensaje con la clave pública
+        encrypted_message = self.public_key.encrypt(
+            json.dumps(drone_data_message).encode(),
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
+            )
+        )
+        encoded_message = base64.b64encode(encrypted_message).decode('utf-8')
+        # Enviar el mensaje al tópico de Kafka con la clave siendo el ID del dron
+        producer.send('drone_messages_topic', key=str(drone_id), value=encoded_message)
+        producer.flush()
+        producer.close()
+
+        # Almacenar el mensaje cifrado en MongoDB
+        self.db.drones.insert_one(drone_data_message)
+        kafka_message_document = {
+            'OriginalMessage': drone_data_message,
+            'EncryptedMessage': encoded_message
+        }
+        self.db.MensajesKafka.insert_one(kafka_message_document)
+        
         return drone_data_message
+        
 
             
     # Función para registrar un dron en la base de datos
@@ -132,15 +187,24 @@ class ADRegistry:
         for message in consumer:
             encrypted_data = message.value  # Datos cifrados
 
-            # Descifrar el mensaje
-            decrypted_data = self.cipher_suite.decrypt(encrypted_data)
-            drone_data = json.loads(decrypted_data.decode('utf-8'))
+            try:
+                decrypted_data = self.private_key.decrypt(
+                    base64.b64decode(encrypted_data),
+                    padding.OAEP(
+                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                        algorithm=hashes.SHA256(),
+                        label=None
+                    )
+                )
+                drone_data = json.loads(decrypted_data.decode('utf-8')) 
 
-            if drone_data['type'] == 'register':
-                # Procesar la información del dron registrado
-                print(f"Dron registrado: {drone_data['ID']} con alias {drone_data['Alias']}")
-                # Almacenar el mensaje descifrado en MongoDB
-                self.db.drones.insert_one(drone_data)
+                if drone_data['type'] == 'register':
+                    # Procesar la información del dron registrado
+                    print(f"Dron registrado: {drone_data['ID']} con alias {drone_data['Alias']}")
+                    # Almacenar el mensaje descifrado en MongoDB
+                    self.db.drones.insert_one(drone_data)
+            except Exception as e:
+                print(f"Error al descifrar mensaje: {e}")
 
 
 if __name__ == "__main__":

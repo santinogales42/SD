@@ -13,8 +13,14 @@ import ssl
 import warnings
 from urllib3.exceptions import InsecureRequestWarning
 import logging
-from cryptography.fernet import Fernet
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives import hashes
 import base64
+
 
 class ADDrone(threading.Thread):
     def __init__(self, engine_address, broker_address, mongo_address, api_address, engine_registry_address):
@@ -45,12 +51,8 @@ class ADDrone(threading.Thread):
         self.registered_drones = {}
         self.in_show_mode = False
         
-        #guardar la clave de cifrado en un archivo
-        #como solo se genera una vez, no es necesario volver a generarla
-        file = open('clave.key', 'rb')
-        key = file.read()
-        file.close()
-        self.cipher_suite = Fernet(key)
+        self.public_key = None
+        self.private_key = None
         
         warnings.filterwarnings('ignore', category=InsecureRequestWarning)
 
@@ -58,6 +60,26 @@ class ADDrone(threading.Thread):
     def start(self):
         self.show_menu()
         
+        
+    def generate_keys(self):
+        if self.dron_id is None:
+            raise ValueError("Drone ID is not set. Can't generate keys.")
+        
+        # Generar y guardar las claves
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
+        public_key = private_key.public_key()
+        self.private_key = private_key
+        self.public_key = public_key
+
+        private_key_file = f"private_key_{self.dron_id}.pem"
+        public_key_file = f"public_key_{self.dron_id}.pem"
+
+        with open(private_key_file, 'wb') as f:
+            f.write(private_key.private_bytes(encoding=serialization.Encoding.PEM, format=serialization.PrivateFormat.TraditionalOpenSSL, encryption_algorithm=serialization.NoEncryption()))
+
+        with open(public_key_file, 'wb') as f:
+            f.write(public_key.public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo))
+
         
     def handle_drone_registered_message(self, message):
         if message.value.get('ID') == self.dron_id:
@@ -151,12 +173,23 @@ class ADDrone(threading.Thread):
 
     def send_kafka_message(self, topic, message):
         try:
-            # Si el mensaje no es un objeto bytes, convertirlo
-            if not isinstance(message, bytes):
-                message = json.dumps(message).encode('utf-8')
-            self.kafka_producer.send(topic, value=message)
+            # Cifrar el mensaje antes de enviarlo
+            encrypted_data = self.public_key.encrypt(
+                json.dumps(message).encode(),
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
+                    label=None
+                )
+            )
+
+            # Codificar los datos cifrados en base64
+            encoded_message = base64.b64encode(encrypted_data).decode('utf-8')
+
+            # Enviar el mensaje cifrado y codificado a Kafka
+            self.kafka_producer.send(topic, value=encoded_message)
             self.kafka_producer.flush()
-            print(f"Mensaje Kafka enviado: {message}")
+            print("Mensaje Kafka enviado (cifrado y codificado):", encoded_message)
         except Exception as e:
             print(f"Error al enviar mensaje Kafka: {e}")
 
@@ -196,6 +229,7 @@ class ADDrone(threading.Thread):
                         else:
                             self.dron_id = dron_id
                             self.alias = alias
+                            self.generate_keys()
                             self.choose_registration_method()
                             break  
                     else:
@@ -215,15 +249,34 @@ class ADDrone(threading.Thread):
             host, port = self.registry_address.split(':')
             registry_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             registry_socket.connect((host, int(port)))
-            
-            dron_data = {'ID': self.dron_id, 'Alias': self.alias}
-            encrypted_message = self.cipher_suite.encrypt(json.dumps(dron_data).encode('utf-8'))
-            encoded_message = base64.b64encode(encrypted_message)
+            public_key_file = f"public_key_{self.dron_id}.pem"
+        
+            # Carga la clave pública del archivo
+            with open(public_key_file, "rb") as key_file:
+                public_key = serialization.load_pem_public_key(
+                    key_file.read(),
+                    backend=default_backend()
+                )
 
-            registry_socket.send(encoded_message)
+            dron_data = {'ID': self.dron_id, 'Alias': self.alias}
+            # Cifra los datos con la clave pública
+            encrypted_data = public_key.encrypt(
+                json.dumps(dron_data).encode(),
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
+                    label=None
+                )
+            )
+
+            #Envía los datos cifrados
+            data_to_send = {'ID': self.dron_id, 'Data': encrypted_data}
+            registry_socket.sendall(json.dumps(data_to_send).encode())
+            
+            registry_socket.send(encrypted_data)
             response = registry_socket.recv(1024).decode()
             response_json = json.loads(response)
-            
+
             registry_socket.close()
             
             if self.id_exists(self.dron_id):
@@ -241,8 +294,7 @@ class ADDrone(threading.Thread):
                     'InitialPosition': self.current_position
                 }
                 #Cifrar y enviar el mensaje a Kafka
-                encrypted_message = self.cipher_suite.encrypt(json.dumps(full_message).encode('utf-8'))
-                self.send_kafka_message('drone_registered', encrypted_message)
+                self.send_kafka_message('drone_messages_topic', full_message)
             else:
                 print(f"Error en el registro: {response_json['message']}")
         except ConnectionRefusedError:
