@@ -52,10 +52,7 @@ class ADDrone(threading.Thread):
         file.close()
         self.cipher_suite = Fernet(key)
         
-        
-        
         warnings.filterwarnings('ignore', category=InsecureRequestWarning)
-
 
         
     def start(self):
@@ -270,15 +267,11 @@ class ADDrone(threading.Thread):
             print(f"Error al registrar via API: {response.text}")
 
     def choose_registration_method(self):
-        method = input("Elige el método de registro 2: API): ")
+        method = input("Elige el método de registro (1 - Registro directo, 2 - Registro via API): ")
         if method == "1":
             self.register_drone()
         if method == "2":
             self.register_via_api()
-        else:
-            print("Método de registro no válido.")
-    
-    
     
     
     
@@ -470,10 +463,7 @@ class ADDrone(threading.Thread):
             print(f"Error al listar drones: {e}")
             return []
 
-    
-    
-    
-            
+               
     def show_menu(self):
         options = {
             "1": self.input_drone_data,

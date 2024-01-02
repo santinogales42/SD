@@ -38,10 +38,8 @@ class ADRegistry:
             decoded_data = base64.b64decode(request_data)
             decrypted_data = self.cipher_suite.decrypt(decoded_data)
             request_json = json.loads(decrypted_data.decode('utf-8'))
-            print(f"Datos en JSON: {request_json}")
             
             if 'ID' in request_json and 'Alias' in request_json:
-                print(f"Registrando dron {request_json['ID']} con alias {request_json['Alias']}...")
                 drone_id = request_json['ID']
                 alias = request_json['Alias']
 
@@ -88,7 +86,6 @@ class ADRegistry:
             key_serializer=str.encode,  # Asegúrate de que las claves se serializan a bytes
             value_serializer=lambda m: json.dumps(m).encode('utf-8')  # Serializador para los valores
         )
-        print(f"Vamos a registrar el dron {drone_id} con alias {alias}")
 
         initial_position = [1,1]
         drone_data_message = {
@@ -100,9 +97,9 @@ class ADRegistry:
         print(f"Mensaje a enviar: {drone_data_message}")
         #Cifrar el mensaje antes de enviar
         encrypted_message = self.cipher_suite.encrypt(json.dumps(drone_data_message).encode('utf-8'))
-        print(f"Mensaje cifrado: {encrypted_message}")
-        # Enviar el mensaje al tópico de Kafka con la clave siendo el ID del dron
-        producer.send('drone_messages_topic', key=str(drone_id), value=encrypted_message)
+        print("Mensaje cifrado")
+        # Enviar el mensaje al tópico de Kafka 'drone_registered' con la clave del dron como clave 
+        producer.send('drone_registered', key=str(drone_id), value=encrypted_message)
         print("Mensaje enviado al tópico de Kafka")
         producer.flush()  # Asegúrate de que el mensaje se envía antes de continuar
         print("Productor cerrado")
