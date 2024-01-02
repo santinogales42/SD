@@ -13,6 +13,8 @@ import ssl
 import warnings
 from urllib3.exceptions import InsecureRequestWarning
 import logging
+from cryptography.fernet import Fernet
+import base64
 
 class ADDrone(threading.Thread):
     def __init__(self, engine_address, broker_address, mongo_address, api_address, engine_registry_address):
@@ -42,6 +44,15 @@ class ADDrone(threading.Thread):
         
         self.registered_drones = {}
         self.in_show_mode = False
+        
+        #guardar la clave de cifrado en un archivo
+        #como solo se genera una vez, no es necesario volver a generarla
+        file = open('clave.key', 'rb')
+        key = file.read()
+        file.close()
+        self.cipher_suite = Fernet(key)
+        
+        
         
         warnings.filterwarnings('ignore', category=InsecureRequestWarning)
 
@@ -143,15 +154,15 @@ class ADDrone(threading.Thread):
 
     def send_kafka_message(self, topic, message):
         try:
-            # Asegúrate de que 'message' sea un objeto que pueda ser serializado a JSON
-            # y no esté ya codificado como bytes
-            if isinstance(message, bytes):
-                message = message.decode('utf-8')
-            self.kafka_producer.send(topic, value=json.dumps(message).encode('utf-8'))
+            # Si el mensaje no es un objeto bytes, convertirlo
+            if not isinstance(message, bytes):
+                message = json.dumps(message).encode('utf-8')
+            self.kafka_producer.send(topic, value=message)
             self.kafka_producer.flush()
             print(f"Mensaje Kafka enviado: {message}")
         except Exception as e:
             print(f"Error al enviar mensaje Kafka: {e}")
+
 
 
 
@@ -204,13 +215,20 @@ class ADDrone(threading.Thread):
 
     def register_drone(self):
         try:
+            host, port = self.registry_address.split(':')
             registry_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            registry_socket.connect(self.registry_address)
+            registry_socket.connect((host, int(port)))
+            
             dron_data = {'ID': self.dron_id, 'Alias': self.alias}
-            registry_socket.send(json.dumps(dron_data).encode())
+            encrypted_message = self.cipher_suite.encrypt(json.dumps(dron_data).encode('utf-8'))
+            encoded_message = base64.b64encode(encrypted_message)
+
+            registry_socket.send(encoded_message)
             response = registry_socket.recv(1024).decode()
-            response_json = json.loads(response)  # Convertir la respuesta a JSON
+            response_json = json.loads(response)
+            
             registry_socket.close()
+            
             if self.id_exists(self.dron_id):
                 print("ID de dron ya existe. Introduce un ID diferente.")
                 return
@@ -219,12 +237,15 @@ class ADDrone(threading.Thread):
                 self.registered_drones[self.dron_id] = self.access_token
                 print(f"Registro exitoso. Token de acceso: {self.access_token}")
                 
-                self.send_kafka_message('drone_registered', {
+                full_message = {
                     'type': 'register',
                     'ID': self.dron_id,
                     'Alias': self.alias,
                     'InitialPosition': self.current_position
-                })
+                }
+                #Cifrar y enviar el mensaje a Kafka
+                encrypted_message = self.cipher_suite.encrypt(json.dumps(full_message).encode('utf-8'))
+                self.send_kafka_message('drone_registered', encrypted_message)
             else:
                 print(f"Error en el registro: {response_json['message']}")
         except ConnectionRefusedError:
@@ -249,7 +270,9 @@ class ADDrone(threading.Thread):
             print(f"Error al registrar via API: {response.text}")
 
     def choose_registration_method(self):
-        method = input("Elige el método de registro  2: API): ")
+        method = input("Elige el método de registro 2: API): ")
+        if method == "1":
+            self.register_drone()
         if method == "2":
             self.register_via_api()
         else:

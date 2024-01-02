@@ -1,0 +1,14 @@
+Para guardar mensajes cifrados en MongoDB y observarlos posteriormente, primero necesitas cifrar los mensajes antes de enviarlos a Kafka. Puedes hacer esto utilizando una biblioteca de cifrado en Python, como cryptography o PyCrypto. Una vez cifrado el mensaje, lo envías a través de Kafka como de costumbre.
+
+En el consumidor de Kafka, después de recibir el mensaje, lo guardas directamente en MongoDB sin descifrarlo. De esta manera, el mensaje almacenado en la base de datos permanece cifrado.
+
+Cuando necesites observar estos mensajes, puedes recuperarlos de MongoDB y descifrarlos utilizando la misma clave y algoritmo de cifrado que usaste para cifrarlos inicialmente.
+
+Aquí tienes un ejemplo muy básico de cómo podría ser este proceso:
+
+    Cifra el mensaje antes de enviarlo a Kafka.
+    Envia el mensaje cifrado a través de Kafka.
+    El consumidor de Kafka recibe el mensaje cifrado y lo almacena en MongoDB.
+    Para leer y entender el mensaje, recupéralo de MongoDB y descífralo utilizando la misma clave.
+
+Ten en cuenta que la gestión de claves de cifrado es un aspecto crítico de la seguridad. Asegúrate de manejar y almacenar las claves de forma segura.

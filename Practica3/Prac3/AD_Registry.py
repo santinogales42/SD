@@ -7,6 +7,8 @@ from kafka import KafkaProducer, KafkaConsumer
 from os import getenv
 from uuid import uuid4
 import argparse
+from cryptography.fernet import Fernet
+import base64
 
 class ADRegistry:
     def __init__(self, listen_port, db_host, db_port, db_name, broker_address, api_address):
@@ -19,19 +21,32 @@ class ADRegistry:
         self.db = self.client[self.db_name]
         self.broker_address = broker_address
         self.api_address = api_address
+        #Leer de clave.key el valor de la clave para descifrar
+        key = Fernet.generate_key()
+        with open("clave.key", "wb") as key_file:
+            key_file.write(key)
+        #leer la clave de cifrado del archivo
+        with open("clave.key", "rb") as key_file:
+            key = key_file.read()
+        self.cipher_suite = Fernet(key)
 
 
 #####SOCKET#####
     def handle_client(self, client_socket, addr):
         try:
-            request_data = client_socket.recv(1024).decode()
-            request_json = json.loads(request_data)
+            request_data = client_socket.recv(1024)
+            decoded_data = base64.b64decode(request_data)
+            decrypted_data = self.cipher_suite.decrypt(decoded_data)
+            request_json = json.loads(decrypted_data.decode('utf-8'))
+            print(f"Datos en JSON: {request_json}")
             
             if 'ID' in request_json and 'Alias' in request_json:
+                print(f"Registrando dron {request_json['ID']} con alias {request_json['Alias']}...")
                 drone_id = request_json['ID']
                 alias = request_json['Alias']
 
                 drone_data = self.register_drone(drone_id, alias)
+                print(f"Registro exitoso del dron {drone_id} con alias {alias}")
                 response = {'status': 'success', 'message': 'Registro exitoso'}
                 
             else:
@@ -51,7 +66,6 @@ class ADRegistry:
         server_socket.listen(15)
         print(f"AD_Registry en funcionamiento. Escuchando en el puerto {self.listen_port}...")
         
-
         try:
             while True:
                 client_socket, addr = server_socket.accept()
@@ -74,6 +88,7 @@ class ADRegistry:
             key_serializer=str.encode,  # Asegúrate de que las claves se serializan a bytes
             value_serializer=lambda m: json.dumps(m).encode('utf-8')  # Serializador para los valores
         )
+        print(f"Vamos a registrar el dron {drone_id} con alias {alias}")
 
         initial_position = [1,1]
         drone_data_message = {
@@ -82,12 +97,19 @@ class ADRegistry:
             'Alias': alias,
             'InitialPosition': initial_position
         }
-        
+        print(f"Mensaje a enviar: {drone_data_message}")
+        #Cifrar el mensaje antes de enviar
+        encrypted_message = self.cipher_suite.encrypt(json.dumps(drone_data_message).encode('utf-8'))
+        print(f"Mensaje cifrado: {encrypted_message}")
         # Enviar el mensaje al tópico de Kafka con la clave siendo el ID del dron
-        producer.send('drone_messages_topic', key=str(drone_id), value=drone_data_message)
+        producer.send('drone_messages_topic', key=str(drone_id), value=encrypted_message)
+        print("Mensaje enviado al tópico de Kafka")
         producer.flush()  # Asegúrate de que el mensaje se envía antes de continuar
+        print("Productor cerrado")
         producer.close()  # Cierra el productor después de enviar el mensaje
-        self.db.drones.insert_one(drone_data_message)
+        print("Productor cerrado")
+        self.db.drones.insert_one({"drone_id": drone_id, "encrypted_data": encrypted_message})
+        print("Mensaje almacenado en MongoDB")
         return drone_data_message
 
             
@@ -100,23 +122,28 @@ class ADRegistry:
             return response.json()
         else:
             return {'status': 'error', 'message': 'Error en la solicitud API'}
+        
     
     def consume_drone_registered_messages(self):
         consumer = KafkaConsumer(
             'drone_registered',
             bootstrap_servers=self.broker_address,
             auto_offset_reset='earliest',
-            group_id='drone-management-group'  # Un grupo de consumidores para este tópico
+            group_id='drone-management-group'
         )
 
         for message in consumer:
-            # Decodificar el mensaje de bytes a dict
-            drone_data = json.loads(message.value.decode('utf-8'))
+            encrypted_data = message.value  # Datos cifrados
+
+            # Descifrar el mensaje
+            decrypted_data = self.cipher_suite.decrypt(encrypted_data)
+            drone_data = json.loads(decrypted_data.decode('utf-8'))
 
             if drone_data['type'] == 'register':
                 # Procesar la información del dron registrado
                 print(f"Dron registrado: {drone_data['ID']} con alias {drone_data['Alias']}")
-                # Aquí podrías, por ejemplo, agregar el dron a una lista de drones activos, actualizar una base de datos, etc.
+                # Almacenar el mensaje descifrado en MongoDB
+                self.db.drones.insert_one(drone_data)
 
 
 if __name__ == "__main__":
