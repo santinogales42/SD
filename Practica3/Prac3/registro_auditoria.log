@@ -96,3 +96,14 @@
 2024-01-02 18:18:04,879 - INFO - Evento específico en /login
 2024-01-02 18:19:06,120 - INFO - Evento específico en /login
 2024-01-02 18:19:36,403 - INFO - Evento específico en /login
+2024-01-02 19:40:41,370 - INFO - Evento específico en /registro_usuario
+2024-01-02 19:40:42,677 - INFO - Evento específico en /login
+2024-01-02 19:43:25,061 - INFO - Evento específico en /login
+2024-01-02 19:45:41,188 - INFO - Evento específico en /login
+2024-01-02 19:46:53,718 - INFO - Evento específico en /login
+2024-01-02 19:49:21,251 - INFO - Evento específico en /login
+2024-01-02 19:49:22,972 - INFO - Evento específico en /borrar_dron/<drone_id>
+2024-01-02 19:49:24,111 - INFO - Evento específico en /borrar_dron/<drone_id>
+2024-01-02 19:52:19,405 - INFO - Evento específico en /login
+2024-01-02 19:53:36,237 - INFO - Evento específico en /borrar_dron/<drone_id>
+2024-01-02 19:53:39,761 - INFO - Evento específico en /login

@@ -170,12 +170,16 @@ class ADDrone(threading.Thread):
             next_y -= 1
 
         self.current_position = (next_x, next_y)
+        
 
     def send_kafka_message(self, topic, message):
         try:
-            # Cifrar el mensaje antes de enviarlo
+            # Convertir el mensaje original a JSON
+            original_message_json = json.dumps(message)
+
+            # Cifrar el mensaje
             encrypted_data = self.public_key.encrypt(
-                json.dumps(message).encode(),
+                original_message_json.encode(),
                 padding.OAEP(
                     mgf=padding.MGF1(algorithm=hashes.SHA256()),
                     algorithm=hashes.SHA256(),
@@ -183,15 +187,25 @@ class ADDrone(threading.Thread):
                 )
             )
 
-            # Codificar los datos cifrados en base64
+            # Codificar en base64
             encoded_message = base64.b64encode(encrypted_data).decode('utf-8')
 
-            # Enviar el mensaje cifrado y codificado a Kafka
+            # Enviar a Kafka
             self.kafka_producer.send(topic, value=encoded_message)
             self.kafka_producer.flush()
             print("Mensaje Kafka enviado (cifrado y codificado):", encoded_message)
+
+            # Almacenar en MongoDB
+            kafka_message_document = {
+                'Clase': 'ADDrone',
+                'OriginalMessage': message,
+                'EncryptedMessage': encoded_message
+            }
+            self.db.MensajesKafka.insert_one(kafka_message_document)
+
         except Exception as e:
             print(f"Error al enviar mensaje Kafka: {e}")
+
 
 
 
@@ -249,8 +263,9 @@ class ADDrone(threading.Thread):
             host, port = self.registry_address.split(':')
             registry_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             registry_socket.connect((host, int(port)))
+
             public_key_file = f"public_key_{self.dron_id}.pem"
-        
+
             # Carga la clave pública del archivo
             with open(public_key_file, "rb") as key_file:
                 public_key = serialization.load_pem_public_key(
@@ -258,8 +273,10 @@ class ADDrone(threading.Thread):
                     backend=default_backend()
                 )
 
+            # Datos del dron
             dron_data = {'ID': self.dron_id, 'Alias': self.alias}
-            # Cifra los datos con la clave pública
+
+            # Cifrar los datos
             encrypted_data = public_key.encrypt(
                 json.dumps(dron_data).encode(),
                 padding.OAEP(
@@ -269,11 +286,13 @@ class ADDrone(threading.Thread):
                 )
             )
 
-            #Envía los datos cifrados
-            data_to_send = {'ID': self.dron_id, 'Data': encrypted_data}
-            registry_socket.sendall(json.dumps(data_to_send).encode())
+            # Preparar datos para enviar
+            data_to_send = json.dumps({'ID': self.dron_id, 'Data': base64.b64encode(encrypted_data).decode()}).encode()
+
+            # Enviar datos cifrados
+            registry_socket.sendall(data_to_send)
             
-            registry_socket.send(encrypted_data)
+            # Recibir y procesar respuesta
             response = registry_socket.recv(1024).decode()
             response_json = json.loads(response)
 

@@ -61,18 +61,22 @@ class ADRegistry:
 
     def handle_client(self, client_socket, addr):
         try:
-            request_data = client_socket.recv(1024)
+            # Recibir los datos del socket
+            request_data = client_socket.recv(1024).decode()
 
-            drone_id, encrypted_data = self.extract_drone_id_and_data(request_data)
-            if drone_id is None or encrypted_data is None:
-                raise ValueError("Datos de solicitud inválidos")
+            # Convertir los datos JSON a un diccionario de Python
+            data_dict = json.loads(request_data)
+            drone_id = data_dict['ID']
+            encrypted_data = base64.b64decode(data_dict['Data'])
+
+            # Cargar la clave privada para el dron específico
             private_key = self.load_drone_keys(drone_id)
             if private_key is None:
                 raise ValueError(f"No se pudo cargar la clave privada para el dron {drone_id}")
 
             # Descifrar los datos
             decrypted_data = private_key.decrypt(
-                request_data,
+                encrypted_data,
                 padding.OAEP(
                     mgf=padding.MGF1(algorithm=hashes.SHA256()),
                     algorithm=hashes.SHA256(),
@@ -156,6 +160,7 @@ class ADRegistry:
         # Almacenar el mensaje cifrado en MongoDB
         self.db.drones.insert_one(drone_data_message)
         kafka_message_document = {
+            'Clase': 'ADRegistry',
             'OriginalMessage': drone_data_message,
             'EncryptedMessage': encoded_message
         }
