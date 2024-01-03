@@ -34,14 +34,6 @@ class ADRegistry:
 
 #####SOCKET#####
 
-    def extract_drone_id_and_data(self, request_data):
-        try:
-            drone_id, encrypted_data = request_data
-            return drone_id, encrypted_data
-        except ValueError as e:
-            print(f"Error al extraer datos: {e}")
-            return None, None
-
     def load_drone_keys(self, drone_id):
         try:
             private_key_file = f"private_key_{drone_id}.pem"
@@ -61,20 +53,20 @@ class ADRegistry:
 
     def handle_client(self, client_socket, addr):
         try:
-            # Recibir los datos del socket
+            #Recibir los datos del socket
             request_data = client_socket.recv(1024).decode()
 
-            # Convertir los datos JSON a un diccionario de Python
+            #Convertir los datos JSON a un diccionario de Python
             data_dict = json.loads(request_data)
             drone_id = data_dict['ID']
             encrypted_data = base64.b64decode(data_dict['Data'])
 
-            # Cargar la clave privada para el dron específico
+            #Cargar la clave privada para el dron específico
             private_key = self.load_drone_keys(drone_id)
             if private_key is None:
                 raise ValueError(f"No se pudo cargar la clave privada para el dron {drone_id}")
 
-            # Descifrar los datos
+            #Descifrar los datos
             decrypted_data = private_key.decrypt(
                 encrypted_data,
                 padding.OAEP(
@@ -83,7 +75,7 @@ class ADRegistry:
                     label=None
                 )
             )
-
+            #Convertir los datos descifrados a un diccionario de Python
             request_json = json.loads(decrypted_data.decode('utf-8'))
             
             if 'ID' in request_json and 'Alias' in request_json:
@@ -142,7 +134,7 @@ class ADRegistry:
             'InitialPosition': initial_position
         }
 
-        # Cifrar el mensaje con la clave pública
+        #Cifrar el mensaje con la clave pública
         encrypted_message = self.public_key.encrypt(
             json.dumps(drone_data_message).encode(),
             padding.OAEP(
@@ -161,6 +153,7 @@ class ADRegistry:
         self.db.drones.insert_one(drone_data_message)
         kafka_message_document = {
             'Clase': 'ADRegistry',
+            'type': 'register',
             'OriginalMessage': drone_data_message,
             'EncryptedMessage': encoded_message
         }
@@ -190,9 +183,10 @@ class ADRegistry:
         )
 
         for message in consumer:
-            encrypted_data = message.value  # Datos cifrados
+            encrypted_data = message.value  #Datos cifrados
 
             try:
+                #Descifrar los datos
                 decrypted_data = self.private_key.decrypt(
                     base64.b64decode(encrypted_data),
                     padding.OAEP(
@@ -228,7 +222,6 @@ if __name__ == "__main__":
     parser.add_argument('--api_address', type=str, default='https://localhost:5000', help='API address')
     args = parser.parse_args()
 
-    # Inicializa y comienza la instancia de ADRegistry con los argumentos
     registry = ADRegistry(args.listen_port, args.db_host, args.db_port, args.db_name, args.broker_address, args.api_address)
     registry.start()
 

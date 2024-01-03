@@ -6,9 +6,12 @@ import logging
 import threading
 import argparse
 import time
-from MapViewer import run_map_viewer
 from flask import Flask
-
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.backends import default_backend
+import base64
 
 class ADEngine:
     def __init__(self, listen_port, max_drones, broker_address, database_address):
@@ -38,6 +41,11 @@ class ADEngine:
         self.accept_thread = threading.Thread(target=self.accept_connections)
         self.accept_thread.start()
         self.last_weather_check = {"city_name": None, "temp_celsius": None}
+        self.private_key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048
+        )
+        self.public_key = self.private_key.public_key()
         #Para conexiones seguras
         #self.context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         #self.context.load_cert_chain(certfile="ssl/certificado_registry.crt", keyfile="ssl/clave_privada_registry.pem")
@@ -61,39 +69,107 @@ class ADEngine:
     def handle_drone_connection(self, client_socket):
         try:
             data = client_socket.recv(1024).decode('utf-8')
-            message = json.loads(data)
-            
-            if message.get('action') == 'join':
-                dron_id = message['ID']
-                
-                if dron_id in self.final_positions:
-                    # Se verifica si el dron es necesario para la figura actual
-                    self.connected_drones.add(dron_id)
-                    remaining_drones = self.required_drones - len(self.connected_drones)
-                    print(f"Drone ID {dron_id} has joined. {remaining_drones} drones are still required.")
-                    
-                    # Enviar la posición final al dron si es necesario
-                    final_position = self.final_positions[dron_id]
-                    response_message = {
-                        'status': 'success',
-                        'final_position': final_position
-                    }
+            data_dict = json.loads(data)
 
-                    # Verifica si es el momento de iniciar el show
-                    self.check_all_drones_connected()
+            # Suponiendo que se recibe ID y datos cifrados
+            drone_id = data_dict['ID']
+            encrypted_data = base64.b64decode(data_dict['Data'])
+
+            # Cargar clave privada y descifrar datos
+            private_key = self.load_drone_keys(drone_id)
+            if private_key is None:
+                raise ValueError(f"No se pudo cargar la clave privada para el dron {drone_id}")
+
+            decrypted_data = private_key.decrypt(
+                encrypted_data,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
+                    label=None
+                )
+            )
+
+            # Procesar datos descifrados
+            request_json = json.loads(decrypted_data.decode('utf-8'))
+
+            if request_json.get('action') == 'join':
+                if drone_id in self.final_positions:
+                    self.connected_drones.add(drone_id)
+                    remaining_drones = self.required_drones - len(self.connected_drones)
+                    print(f"Drone ID {drone_id} has joined. {remaining_drones} drones are still required.")
+                    final_position = self.final_positions[drone_id]
+                    response = {'status': 'success', 'final_position': final_position}
                 else:
-                    # El dron no es necesario para la figura actual
-                    print(f"Drone ID {dron_id} has joined but is not needed for the current figure.")
-                    response_message = {'status': 'not_required'}
-                
-                client_socket.send(json.dumps(response_message).encode('utf-8'))
+                    print(f"Drone ID {drone_id} has joined but is not needed for the current figure.")
+                    response = {'status': 'not_required'}
             else:
-                print(f"Received unknown action from drone: {message.get('action')}")
-        
+                print(f"Received unknown action from drone: {request_json.get('action')}")
+                response = {'status': 'error', 'message': 'Unknown action'}
+
+            client_socket.send(json.dumps(response).encode('utf-8'))
+
         except Exception as e:
-            print(f"An error occurred while handling drone connection: {e}")
+            print(f"Error al manejar la conexión del dron: {e}")
         finally:
             client_socket.close()
+
+            
+
+    def load_drone_keys(self, drone_id):
+        try:
+            private_key_file = f"private_key_{drone_id}.pem"
+            with open(private_key_file, "rb") as key_file:
+                private_key = serialization.load_pem_private_key(
+                    key_file.read(),
+                    password=None,
+                    backend=default_backend()
+                )
+            return private_key
+        except FileNotFoundError:
+            print(f"No se encontró el archivo de clave privada: {private_key_file}")
+            return None
+        except Exception as e:
+            print(f"Error al cargar clave privada: {e}")
+            return None
+            
+            
+    def send_encrypted_kafka_message(self, topic, message):
+        try:
+            # Convertir el mensaje original a JSON
+            original_message_json = json.dumps(message)
+
+            # Cifrar el mensaje
+            encrypted_data = self.public_key.encrypt(
+                original_message_json.encode(),
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
+                    label=None
+                )
+            )
+
+            # Codificar en base64
+            encoded_message = base64.b64encode(encrypted_data).decode('utf-8')
+
+            # Enviar a Kafka
+            self.kafka_producer.send(topic, value=encoded_message)
+            self.kafka_producer.flush()
+            print("Mensaje Kafka enviado (cifrado y codificado):", encoded_message)
+
+            # Almacenar en MongoDB
+            kafka_message_document = {
+                'Clase': 'ADEngine',
+                'Topic': topic,
+                'OriginalMessage': message,
+                'EncryptedMessage': encoded_message
+            }
+            self.db.MensajesKafka.insert_one(kafka_message_document)
+
+        except Exception as e:
+            print(f"Error al enviar mensaje Kafka: {e}")
+        
+            
+    
 
     def check_all_drones_connected(self):
         if len(self.connected_drones) == self.required_drones:
@@ -156,7 +232,8 @@ class ADEngine:
             'dron_id': dron_id,
             'final_position': final_position
         }
-        self.kafka_producer.send('drone_final_position', value=message)
+        self.send_encrypted_kafka_message('drone_final_position', message)
+        #self.kafka_producer.send('drone_final_position', value=message)
         self.kafka_producer.flush()
 
     def procesar_datos_json(self, ruta_archivo_json):
@@ -176,7 +253,6 @@ class ADEngine:
         self.weather_warning_thread = threading.Thread(target=self.check_weather_warnings)
         self.weather_warning_thread.start()
         
-        run_map_viewer()
         try:
             while True:
                 
@@ -364,20 +440,7 @@ class ADEngine:
             self.send_instruction_to_drone(dron_id, 'END')  # Enviar señal de que ha llegado a la posición final
             #self.send_message_to_map_viewer(dron_id, position, state)
         
-    def send_message_to_map_viewer(self, dron_id, position, state):
-        message = {
-            'ID': dron_id,
-            'Position': position,
-            'State': state
-        }
-        # Elige el tópico correcto basado en el estado del dron
-        topic = 'final_positions_topic' if state == 'FINAL' else 'drone_position_updates'
-        try:
-            self.kafka_producer.send(topic, value=message)
-            self.kafka_producer.flush()
-        except Exception as e:
-            print(f"Error al enviar mensaje al MapViewer: {e}")
-
+        
 if __name__ == "__main__":
     # Crear el analizador de argumentos
     parser = argparse.ArgumentParser(description='AD_Engine start-up arguments')

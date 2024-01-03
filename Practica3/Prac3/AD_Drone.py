@@ -16,10 +16,11 @@ import logging
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
 import base64
+import atexit, os
+
 
 
 class ADDrone(threading.Thread):
@@ -54,6 +55,8 @@ class ADDrone(threading.Thread):
         self.public_key = None
         self.private_key = None
         
+        atexit.register(self.cleanup)
+        
         warnings.filterwarnings('ignore', category=InsecureRequestWarning)
 
         
@@ -80,6 +83,19 @@ class ADDrone(threading.Thread):
         with open(public_key_file, 'wb') as f:
             f.write(public_key.public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo))
 
+
+    def cleanup(self):
+        if self.dron_id is not None:
+            private_key_file = f"private_key_{self.dron_id}.pem"
+            public_key_file = f"public_key_{self.dron_id}.pem"
+            try:
+                os.remove(private_key_file)
+                os.remove(public_key_file)
+                print("Archivos de clave eliminados.")
+            except Exception as e:
+                print(f"Error al eliminar archivos de clave: {e}")
+
+
         
     def handle_drone_registered_message(self, message):
         if message.value.get('ID') == self.dron_id:
@@ -96,7 +112,7 @@ class ADDrone(threading.Thread):
             auto_offset_reset='latest',
             enable_auto_commit=True,
             group_id='drone-group-{}'.format(self.dron_id),
-            value_deserializer=lambda m: json.loads(m.decode('utf-8')),
+            value_deserializer=lambda x: json.loads(x.decode('utf-8')),
             #security_protocol='SSL',
             ssl_cafile='ssl/certificado_CA.crt',
             ssl_certfile='ssl/certificado_registry.crt',
@@ -177,7 +193,7 @@ class ADDrone(threading.Thread):
             # Convertir el mensaje original a JSON
             original_message_json = json.dumps(message)
 
-            # Cifrar el mensaje
+            #Cifrar el mensaje
             encrypted_data = self.public_key.encrypt(
                 original_message_json.encode(),
                 padding.OAEP(
@@ -187,17 +203,18 @@ class ADDrone(threading.Thread):
                 )
             )
 
-            # Codificar en base64
+            #Codificar en base64
             encoded_message = base64.b64encode(encrypted_data).decode('utf-8')
 
-            # Enviar a Kafka
+            #Enviar a Kafka
             self.kafka_producer.send(topic, value=encoded_message)
             self.kafka_producer.flush()
             print("Mensaje Kafka enviado (cifrado y codificado):", encoded_message)
 
-            # Almacenar en MongoDB
+            #Almacenar en MongoDB
             kafka_message_document = {
                 'Clase': 'ADDrone',
+                'Topic': topic,
                 'OriginalMessage': message,
                 'EncryptedMessage': encoded_message
             }
@@ -205,9 +222,6 @@ class ADDrone(threading.Thread):
 
         except Exception as e:
             print(f"Error al enviar mensaje Kafka: {e}")
-
-
-
 
 
     def send_position_update(self):
