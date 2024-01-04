@@ -88,8 +88,14 @@ class ADEngine:
                     label=None
                 )
             )
+            self.db.MensajesKafka.insert_one({
+                'DroneID': drone_id,
+                'Type': 'Incoming',
+                'EncryptedMessage': data_dict['Data'],
+                'DecryptedMessage': decrypted_data.decode('utf-8')
+            })
 
-            # Procesar datos descifrados
+            #Procesar datos descifrados
             request_json = json.loads(decrypted_data.decode('utf-8'))
 
             if request_json.get('action') == 'join':
@@ -116,18 +122,24 @@ class ADEngine:
             
 
     def load_drone_keys(self, drone_id):
-        try:
-            private_key_file = f"private_key_{drone_id}.pem"
-            with open(private_key_file, "rb") as key_file:
-                private_key = serialization.load_pem_private_key(
-                    key_file.read(),
-                    password=None,
-                    backend=default_backend()
-                )
+        try:            
+            #obtener la clave privada del dron
+            key_document = self.db.Claves.find_one({'ID': drone_id})
+            
+            #Comprobar si se encontró el documento
+            if key_document is None:
+                print(f"No se encontró la clave para el dron ID {drone_id}")
+                return None
+            
+            #Cargar la clave privada desde el documento
+            private_key_data = key_document['PrivateKey']
+            private_key = serialization.load_pem_private_key(
+                private_key_data,
+                password=None,
+                backend=default_backend()
+            )
             return private_key
-        except FileNotFoundError:
-            print(f"No se encontró el archivo de clave privada: {private_key_file}")
-            return None
+
         except Exception as e:
             print(f"Error al cargar clave privada: {e}")
             return None

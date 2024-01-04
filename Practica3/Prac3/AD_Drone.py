@@ -82,6 +82,18 @@ class ADDrone(threading.Thread):
 
         with open(public_key_file, 'wb') as f:
             f.write(public_key.public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo))
+        
+        #Almacenar las claves en MongoDB
+        key_document = {
+            'ID': self.dron_id,
+            'PrivateKey': private_key.private_bytes(encoding=serialization.Encoding.PEM, format=serialization.PrivateFormat.TraditionalOpenSSL, encryption_algorithm=serialization.NoEncryption()),
+            'PublicKey': public_key.public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo)
+        }
+        self.db.Claves.update_one(
+            {'ID': self.dron_id}, 
+            {'$set': key_document}, 
+            upsert=True
+        )
 
 
     def cleanup(self):
@@ -438,8 +450,31 @@ class ADDrone(threading.Thread):
             #    secure_socket.send(json.dumps(join_message).encode('utf-8'))
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as engine_socket:
                 engine_socket.connect(self.engine_address)
+
+                # Preparar el mensaje para enviar
                 join_message = {'action': 'join', 'ID': self.dron_id, 'Alias': self.alias}
-                engine_socket.send(json.dumps(join_message).encode('utf-8'))
+                encoded_message = json.dumps(join_message).encode()
+
+                # Cifrar el mensaje
+                encrypted_message = self.public_key.encrypt(
+                    encoded_message,
+                    padding.OAEP(
+                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                        algorithm=hashes.SHA256(),
+                        label=None
+                    )
+                )
+
+                # Preparar el mensaje final con ID y datos cifrados
+                final_message = json.dumps({'ID': self.dron_id, 'Data': base64.b64encode(encrypted_message).decode()}).encode()
+                self.db.MensajesKafka.insert_one({
+                    'DroneID': self.dron_id,
+                    'MessageType': 'join',
+                    'OriginalMessage': join_message,
+                    'EncryptedMessage': base64.b64encode(encrypted_message).decode()
+                })
+                # Enviar el mensaje cifrado
+                engine_socket.sendall(final_message)
                 
                 response_data = engine_socket.recv(1024).decode()
             #    response_data = secure_socket.recv(1024).decode()
@@ -569,6 +604,11 @@ class ADDrone(threading.Thread):
                     print("6. Exit")
                     choice = input("Select an option: ")
                     if choice == "6":
+                        try:
+                            self.db.Claves.delete_one({'ID': self.dron_id})
+                            print(f"Database entries for drone ID {self.dron_id} deleted.")
+                        except Exception as e:
+                            print(f"Error deleting database entries: {e}")
                         break
                     action = options.get(choice)
                     if action:
