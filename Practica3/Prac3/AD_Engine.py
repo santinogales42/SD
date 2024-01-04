@@ -13,6 +13,9 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
 import base64
 
+#logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
+
+
 class ADEngine:
     def __init__(self, listen_port, max_drones, broker_address, database_address):
         self.listen_port = listen_port
@@ -118,7 +121,6 @@ class ADEngine:
             print(f"Error al manejar la conexión del dron: {e}")
         finally:
             client_socket.close()
-
             
 
     def load_drone_keys(self, drone_id):

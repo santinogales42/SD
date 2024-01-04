@@ -58,6 +58,8 @@ class ADDrone(threading.Thread):
         atexit.register(self.cleanup)
         
         warnings.filterwarnings('ignore', category=InsecureRequestWarning)
+        #logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
+
 
         
     def start(self):
@@ -132,32 +134,84 @@ class ADDrone(threading.Thread):
         )
 
         for message in consumer:
+            decrypted_message = self.decrypt_message(message.value)
+            if decrypted_message is None:
+                continue
+
             if message.topic == 'drones_registered':
-                self.handle_drone_registered_message(message)
-            if message.topic == 'drone_messages_topic':
-                self.handle_instruction_message(message)
-            if message.topic == 'drone_final_position':
-                self.handle_final_position_message(message)
+                self.handle_drone_registered_message(decrypted_message)  # asumiendo que decrypted_message es un dict
+            elif message.topic == 'drone_messages_topic':
+                self.handle_instruction_message(decrypted_message)  # asumiendo que decrypted_message es un dict
+            elif message.topic == 'drone_final_position':
+                self.handle_final_position_message(decrypted_message)  # asumiendo que decrypted_message es un dict
                 
+                
+    
+    
+    
+    def decrypt_message(self, encrypted_message):
+        try:
+            # Decodificar el mensaje de Base64
+            encrypted_data = base64.b64decode(encrypted_message)
+        except base64.binascii.Error as e:
+            logging.error(f"Error en la decodificación Base64: {e}")
+            return None
+
+        try:
+            # Desencriptar el mensaje
+            decrypted_data = self.private_key.decrypt(
+                encrypted_data,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
+                    label=None
+                )
+            )
+        except ValueError as e:
+            logging.error(f"Error en la desencriptación RSA: {e}")
+            return None
+
+        try:
+            # Convertir datos desencriptados a cadena
+            decrypted_message = decrypted_data.decode()
+            # Convertir cadena a objeto JSON
+            message_json = json.loads(decrypted_message)
+            # Aquí puedes agregar validación adicional del formato de mensaje_json
+            if not isinstance(message_json, dict):
+                logging.error("Mensaje desencriptado no tiene el formato esperado")
+                return None
+            return message_json
+        except json.JSONDecodeError as e:
+            logging.error(f"Error al decodificar JSON: {e}")
+            return None
+
         
 
     def handle_instruction_message(self, message):
-        instruction = message.value.get('instruction')
-        if instruction == 'join_show':
-            self.in_show_mode = True
-            print(f"ADDrone: Uniendo al show con ID {self.dron_id}...")
-        if instruction == 'START':
-            if self.in_show_mode:
+        try:
+
+            instruction = message.get('instruction')
+            
+            if instruction == 'join_show':
                 self.in_show_mode = True
-                print("ADDrone: Instrucción START recibida, iniciando movimiento hacia posición final...")
+                print(f"ADDrone: Uniendo al show con ID {self.dron_id}...")
+            if instruction == 'START':
+                if self.in_show_mode:
+                    self.in_show_mode = True
+                    print("ADDrone: Instrucción START recibida, iniciando movimiento hacia posición final...")
+                    self.move_to_final_position()
+                else:
+                    print("ADDrone: Ya en modo show, ignorando instrucción START.")
+            elif instruction == 'STOP':
+                print("ADDrone: Instrucción STOP recibida, deteniendo y regresando a la base...")
+                self.final_position = self.base_position
+                self.in_show_mode = False
                 self.move_to_final_position()
-            else:
-                print("ADDrone: Ya en modo show, ignorando instrucción START.")
-        elif instruction == 'STOP':
-            print("ADDrone: Instrucción STOP recibida, deteniendo y regresando a la base...")
-            self.final_position = self.base_position
-            self.in_show_mode = False
-            self.move_to_final_position()
+        
+        except json.JSONDecodeError:
+            print(f"Received non-JSON message: {message.value}")
+        
+            
 
     def handle_final_position_message(self, message):
         if message.value.get('dron_id') == self.dron_id:
@@ -330,7 +384,7 @@ class ADDrone(threading.Thread):
             if response_json.get('status') == 'success':
                 self.access_token = response_json.get('token', '')
                 self.registered_drones[self.dron_id] = self.access_token
-                print(f"Registro exitoso. Token de acceso: {self.access_token}")
+                print(f"Registro exitoso del dron {self.dron_id}.")
                 
                 full_message = {
                     'type': 'register',
@@ -477,7 +531,7 @@ class ADDrone(threading.Thread):
                 engine_socket.sendall(final_message)
                 
                 response_data = engine_socket.recv(1024).decode()
-            #    response_data = secure_socket.recv(1024).decode()
+                #response_data = secure_socket.recv(1024).decode()
                 if response_data:
                     response = json.loads(response_data)
                     if 'final_position' in response:
