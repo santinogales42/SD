@@ -124,23 +124,22 @@ class ADEngine:
             
 
     def load_drone_keys(self, drone_id):
-        try:            
-            #obtener la clave privada del dron
-            key_document = self.db.Claves.find_one({'ID': drone_id})
+        try:      
             
-            #Comprobar si se encontró el documento
-            if key_document is None:
-                print(f"No se encontró la clave para el dron ID {drone_id}")
-                return None
-            
-            #Cargar la clave privada desde el documento
-            private_key_data = key_document['PrivateKey']
-            private_key = serialization.load_pem_private_key(
-                private_key_data,
-                password=None,
-                backend=default_backend()
+            # Suponiendo que recuperas la clave pública así:
+            # Suponiendo que recuperas la clave pública así:
+            public_key_data = self.db.Claves.find_one({'ID': drone_id})['PublicKey']
+            public_key = serialization.load_pem_public_key(public_key_data, backend=default_backend())
+
+            # Convertir a bytes y luego a Base64
+            public_key_bytes = public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
             )
-            return private_key
+            public_key_b64 = base64.b64encode(public_key_bytes).decode('utf-8')
+            print("Public Key (Base64):", public_key_b64)
+            
+            return public_key
 
         except Exception as e:
             print(f"Error al cargar clave privada: {e}")
@@ -164,6 +163,7 @@ class ADEngine:
 
             # Codificar en base64
             encoded_message = base64.b64encode(encrypted_data).decode('utf-8')
+            print("Datos cifrados (Base64):", encoded_message)
 
             # Enviar a Kafka
             self.kafka_producer.send(topic, value=encoded_message)
@@ -181,17 +181,7 @@ class ADEngine:
 
         except Exception as e:
             print(f"Error al enviar mensaje Kafka: {e}")
-        
             
-    
-
-    def check_all_drones_connected(self):
-        if len(self.connected_drones) == self.required_drones:
-            print("Todos los drones necesarios para la figura actual están conectados.")
-            for dron_id in self.connected_drones:
-                self.send_final_position(dron_id, self.final_positions[dron_id])
-                self.send_instruction_to_drone(dron_id, 'START')
-            print("Instrucciones START y posiciones finales enviadas a todos los drones.")
 
     def send_instruction_to_drone(self, dron_id, instruction):
         message = {
@@ -199,7 +189,8 @@ class ADEngine:
             'dron_id': dron_id,
             'instruction': instruction
         }
-        self.kafka_producer.send('drone_messages_topic', message)
+        self.send_encrypted_kafka_message('drone_messages_topic', message)
+        #self.kafka_producer.send('drone_messages_topic', message)
         self.kafka_producer.flush()
         print(f"Instrucción {instruction} enviada al dron {dron_id}")
         with self.state_lock:  # Asegurar el acceso al diccionario de estados
@@ -279,17 +270,6 @@ class ADEngine:
         finally:
             self.close()
 
-            
-    def respond_to_final_position_request(self, dron_id):
-        final_position = self.get_final_position(dron_id)
-        if final_position:
-            message = {
-                'type': 'final_position',
-                'dron_id': dron_id,
-                'final_position': final_position
-            }
-            self.kafka_producer.send('drone_final_position', message)
-            self.kafka_producer.flush()
 
 
     def end_show(self):
@@ -297,9 +277,7 @@ class ADEngine:
         # Finalmente, limpia o reinicia variables si es necesario.
         self.connected_drones.clear()
         self.final_positions.clear()
-        if self.map_viewer_process:
-            self.map_viewer_process.terminate()
-            print("Mapa visual finalizado.")
+
 
     def close(self):
         self.stop_event.set()
@@ -343,25 +321,14 @@ class ADEngine:
         if self.check_all_drones_in_position():
             self.load_next_figure()
                 
-    #Cambiado
     def check_all_drones_in_position(self):
-        all_in_position = True
-        for dron_id, state in self.drones_state.items():
-            if not state['reached']:
-                all_in_position = False
-                break
-        if all_in_position:
-            logging.info("Todos los drones han alcanzado sus posiciones finales.")
-        return all_in_position          
-    
-
-    def check_all_drones_connected(self):
-        if len(self.connected_drones) == self.required_drones:
-            print("Todos los drones están conectados para la figura actual.")
-            for dron_id in self.connected_drones:
-                # Enviar la nueva posición final y luego la instrucción de START
-                self.send_final_position(dron_id, self.final_positions[dron_id])
-                self.send_instruction_to_drone(dron_id, 'START')
+        with self.state_lock:
+            for dron_id, state in self.drones_state.items():
+                if not state['reached']:
+                    print(f"Dron {dron_id} aún no ha alcanzado su posición final.")
+                    return False
+        print("Todos los drones han alcanzado su posición final.")
+        return True       
 
 
     def load_next_figure(self):
@@ -400,18 +367,14 @@ class ADEngine:
                 self.drones_state[dron_id] = {'instruction': 'PENDING', 'reached': False}
 
         self.send_positions_and_start_commands()
-        final_positions_message = {
-            'type': 'final_positions_update',
-            'final_positions': [(dron['ID'], tuple(map(int, dron['POS'].split(','))))
-                                for dron in figura_actual['Drones']]
-        }
-        self.kafka_producer.send('final_positions_topic', final_positions_message)        
-        self.kafka_producer.flush()
+        
 
     def send_positions_and_start_commands(self):
         for dron_id in self.connected_drones:
             self.send_final_position(dron_id, self.final_positions[dron_id])
-            self.send_instruction_to_drone(dron_id, 'START')
+            #cuaqndo esten todos conectado la instruccion
+            if self.check_all_drones_in_position():
+                self.send_instruction_to_drone(dron_id, 'START')
 
 
     def check_drone_position(self, dron_id):
