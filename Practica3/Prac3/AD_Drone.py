@@ -19,7 +19,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
 import base64
-import atexit, os
+import json
 
 
 
@@ -54,9 +54,7 @@ class ADDrone(threading.Thread):
         
         self.public_key = None
         self.private_key = None
-        
-        atexit.register(self.cleanup)
-        
+                
         warnings.filterwarnings('ignore', category=InsecureRequestWarning)
         #logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
 
@@ -67,47 +65,31 @@ class ADDrone(threading.Thread):
         
         
     def generate_keys(self):
-        if self.dron_id is None:
-            raise ValueError("Drone ID is not set. Can't generate keys.")
-        
-        # Generar y guardar las claves
-        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
-        public_key = private_key.public_key()
-        self.private_key = private_key
-        self.public_key = public_key
+        try:
+            
+            if self.dron_id is None:
+                raise ValueError("Drone ID is not set. Can't generate keys.")
+            
+            # Generar y guardar las claves
+            private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
+            public_key = private_key.public_key()
+            self.private_key = private_key
+            self.public_key = public_key
 
-        private_key_file = f"private_key_{self.dron_id}.pem"
-        public_key_file = f"public_key_{self.dron_id}.pem"
-
-        with open(private_key_file, 'wb') as f:
-            f.write(private_key.private_bytes(encoding=serialization.Encoding.PEM, format=serialization.PrivateFormat.TraditionalOpenSSL, encryption_algorithm=serialization.NoEncryption()))
-
-        with open(public_key_file, 'wb') as f:
-            f.write(public_key.public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo))
-        
-        #Almacenar las claves en MongoDB
-        key_document = {
-            'ID': self.dron_id,
-            'PrivateKey': private_key.private_bytes(encoding=serialization.Encoding.PEM, format=serialization.PrivateFormat.TraditionalOpenSSL, encryption_algorithm=serialization.NoEncryption()),
-            'PublicKey': public_key.public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo)
-        }
-        self.db.Claves.update_one(
-            {'ID': self.dron_id}, 
-            {'$set': key_document}, 
-            upsert=True
-        )
-
-
-    def cleanup(self):
-        if self.dron_id is not None:
-            private_key_file = f"private_key_{self.dron_id}.pem"
-            public_key_file = f"public_key_{self.dron_id}.pem"
-            try:
-                os.remove(private_key_file)
-                os.remove(public_key_file)
-                print("Archivos de clave eliminados.")
-            except Exception as e:
-                print(f"Error al eliminar archivos de clave: {e}")
+            #Almacenar las claves en MongoDB
+            key_document = {
+                'ID': self.dron_id,
+                'PrivateKey': private_key.private_bytes(encoding=serialization.Encoding.PEM, format=serialization.PrivateFormat.TraditionalOpenSSL, encryption_algorithm=serialization.NoEncryption()),
+                'PublicKey': public_key.public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo)
+            }
+            self.db.Claves.update_one(
+                {'ID': self.dron_id}, 
+                {'$set': key_document}, 
+                upsert=True
+            )
+        except Exception as e:
+            print(f"Error al generar claves: {e}")
+            return None
 
 
         
@@ -144,21 +126,12 @@ class ADDrone(threading.Thread):
                 self.handle_instruction_message(decrypted_message)  # asumiendo que decrypted_message es un dict
             elif message.topic == 'drone_final_position':
                 self.handle_final_position_message(decrypted_message)  # asumiendo que decrypted_message es un dict
-                
-                
-    
     
     
     def decrypt_message(self, encrypted_message):
         try:
             # Decodificar el mensaje de Base64
             encrypted_data = base64.b64decode(encrypted_message)
-        except base64.binascii.Error as e:
-            logging.error(f"Error en la decodificación Base64: {e}")
-            return None
-
-        try:
-            # Desencriptar el mensaje
             decrypted_data = self.private_key.decrypt(
                 encrypted_data,
                 padding.OAEP(
@@ -167,11 +140,6 @@ class ADDrone(threading.Thread):
                     label=None
                 )
             )
-        except ValueError as e:
-            logging.error(f"Error en la desencriptación RSA: {e}")
-            return None
-
-        try:
             # Convertir datos desencriptados a cadena
             decrypted_message = decrypted_data.decode()
             # Convertir cadena a objeto JSON
@@ -180,11 +148,13 @@ class ADDrone(threading.Thread):
             if not isinstance(message_json, dict):
                 logging.error("Mensaje desencriptado no tiene el formato esperado")
                 return None
+            print("Datos recibidos de Kafka:", message_json)
             return message_json
-        except json.JSONDecodeError as e:
-            logging.error(f"Error al decodificar JSON: {e}")
+        except Exception as e:
+            print(f"Error al desencriptar mensaje: {e}")
             return None
-
+        
+        
         
 
     def handle_instruction_message(self, message):
@@ -344,20 +314,11 @@ class ADDrone(threading.Thread):
             registry_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             registry_socket.connect((host, int(port)))
 
-            public_key_file = f"public_key_{self.dron_id}.pem"
-
-            # Carga la clave pública del archivo
-            with open(public_key_file, "rb") as key_file:
-                public_key = serialization.load_pem_public_key(
-                    key_file.read(),
-                    backend=default_backend()
-                )
-
             # Datos del dron
             dron_data = {'ID': self.dron_id, 'Alias': self.alias}
 
             # Cifrar los datos
-            encrypted_data = public_key.encrypt(
+            encrypted_data = self.public_key.encrypt(
                 json.dumps(dron_data).encode(),
                 padding.OAEP(
                     mgf=padding.MGF1(algorithm=hashes.SHA256()),
