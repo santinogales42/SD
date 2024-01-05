@@ -100,10 +100,14 @@ class ADEngine:
 
             #Procesar datos descifrados
             request_json = json.loads(decrypted_data.decode('utf-8'))
+            print(f"Datos recibidos del dron {drone_id}: {request_json}")
 
             if request_json.get('action') == 'join':
                 if drone_id in self.final_positions:
                     self.connected_drones.add(drone_id)
+                    if self.are_all_drones_connected():
+                        print("Todos los drones necesarios están conectados. Preparando para iniciar el espectáculo.")
+                        self.send_positions_and_start_commands()
                     remaining_drones = self.required_drones - len(self.connected_drones)
                     print(f"Drone ID {drone_id} has joined. {remaining_drones} drones are still required.")
                     final_position = self.final_positions[drone_id]
@@ -114,32 +118,34 @@ class ADEngine:
             else:
                 print(f"Received unknown action from drone: {request_json.get('action')}")
                 response = {'status': 'error', 'message': 'Unknown action'}
-
+            
+            print(f"Sending response to drone {drone_id}: {response}")
             client_socket.send(json.dumps(response).encode('utf-8'))
 
         except Exception as e:
             print(f"Error al manejar la conexión del dron: {e}")
         finally:
             client_socket.close()
-            
-
+        
     def load_drone_keys(self, drone_id):
-        try:      
+        #Cargar la clave privada del dron desde MongoDB
+        try:            
+            #obtener la clave privada del dron
+            key_document = self.db.Claves.find_one({'ID': drone_id})
             
-            # Suponiendo que recuperas la clave pública así:
-            # Suponiendo que recuperas la clave pública así:
-            public_key_data = self.db.Claves.find_one({'ID': drone_id})['PublicKey']
-            public_key = serialization.load_pem_public_key(public_key_data, backend=default_backend())
-
-            # Convertir a bytes y luego a Base64
-            public_key_bytes = public_key.public_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PublicFormat.SubjectPublicKeyInfo
+            #Comprobar si se encontró el documento
+            if key_document is None:
+                print(f"No se encontró la clave para el dron ID {drone_id}")
+                return None
+            
+            #Cargar la clave privada desde el documento
+            private_key_data = key_document['PrivateKey']
+            private_key = serialization.load_pem_private_key(
+                private_key_data,
+                password=None,
+                backend=default_backend()
             )
-            public_key_b64 = base64.b64encode(public_key_bytes).decode('utf-8')
-            print("Public Key (Base64):", public_key_b64)
-            
-            return public_key
+            return private_key
 
         except Exception as e:
             print(f"Error al cargar clave privada: {e}")
@@ -150,10 +156,11 @@ class ADEngine:
         try:
             # Convertir el mensaje original a JSON
             original_message_json = json.dumps(message)
+            print("Mensaje original:", original_message_json)
 
             # Cifrar el mensaje
             encrypted_data = self.public_key.encrypt(
-                original_message_json.encode(),
+                original_message_json.encode('utf-8'),
                 padding.OAEP(
                     mgf=padding.MGF1(algorithm=hashes.SHA256()),
                     algorithm=hashes.SHA256(),
@@ -161,14 +168,22 @@ class ADEngine:
                 )
             )
 
+            # Verificar que los datos cifrados no son None
+            if encrypted_data is None:
+                raise ValueError("Los datos cifrados son None")
+
             # Codificar en base64
             encoded_message = base64.b64encode(encrypted_data).decode('utf-8')
-            print("Datos cifrados (Base64):", encoded_message)
+
+            # Verificar que el mensaje codificado no es None
+            if encoded_message is None:
+                raise ValueError("El mensaje codificado es None")
 
             # Enviar a Kafka
             self.kafka_producer.send(topic, value=encoded_message)
             self.kafka_producer.flush()
             print("Mensaje Kafka enviado (cifrado y codificado):", encoded_message)
+
 
             # Almacenar en MongoDB
             kafka_message_document = {
@@ -178,9 +193,10 @@ class ADEngine:
                 'EncryptedMessage': encoded_message
             }
             self.db.MensajesKafka.insert_one(kafka_message_document)
-
         except Exception as e:
             print(f"Error al enviar mensaje Kafka: {e}")
+
+            
             
 
     def send_instruction_to_drone(self, dron_id, instruction):
@@ -195,6 +211,10 @@ class ADEngine:
         print(f"Instrucción {instruction} enviada al dron {dron_id}")
         with self.state_lock:  # Asegurar el acceso al diccionario de estados
             self.drones_state[dron_id] = {'instruction': instruction, 'reached': False}
+            
+    def are_all_drones_connected(self):
+        return len(self.connected_drones) >= self.required_drones
+
 
 
     def check_weather_warnings(self):
@@ -251,7 +271,6 @@ class ADEngine:
 
     def start(self):
         print(f"AD_Engine en funcionamiento. Escuchando en el puerto {self.listen_port}...")
-        
         
         self.kafka_consumer_thread = threading.Thread(target=self.start_kafka_consumer)
         self.kafka_consumer_thread.start()
@@ -365,16 +384,17 @@ class ADEngine:
                 print(f"Posición final del dron {dron_id}: {final_position}")
                 # Actualizar estado del dron
                 self.drones_state[dron_id] = {'instruction': 'PENDING', 'reached': False}
-
-        self.send_positions_and_start_commands()
         
 
     def send_positions_and_start_commands(self):
         for dron_id in self.connected_drones:
             self.send_final_position(dron_id, self.final_positions[dron_id])
-            #cuaqndo esten todos conectado la instruccion
-            if self.check_all_drones_in_position():
+        
+        if self.are_all_drones_connected():
+            for dron_id in self.connected_drones:
                 self.send_instruction_to_drone(dron_id, 'START')
+            print("Instrucción START enviada a todos los drones.")
+
 
 
     def check_drone_position(self, dron_id):
@@ -408,14 +428,6 @@ class ADEngine:
     def get_final_position(self, dron_id):
         # Supongamos que las posiciones finales se almacenan en un diccionario
         return self.final_positions.get(dron_id)
-
-    def update_drone_position(self, dron_id, position):
-        # Solo verifica si el dron ha llegado a la posición final
-        final_position = self.final_positions.get(dron_id)
-        if final_position and tuple(position) == final_position:
-            print(f"Dron {dron_id} ha confirmado llegada a la posición final.")
-            self.send_instruction_to_drone(dron_id, 'END')  # Enviar señal de que ha llegado a la posición final
-            #self.send_message_to_map_viewer(dron_id, position, state)
         
         
 if __name__ == "__main__":
