@@ -160,7 +160,7 @@ class ADEngine:
 
             # Cifrar el mensaje
             encrypted_data = self.public_key.encrypt(
-                original_message_json.encode('utf-8'),
+                original_message_json.encode(),
                 padding.OAEP(
                     mgf=padding.MGF1(algorithm=hashes.SHA256()),
                     algorithm=hashes.SHA256(),

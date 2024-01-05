@@ -13,6 +13,11 @@ import threading
 from kafka import KafkaConsumer, KafkaProducer
 import json
 import argparse
+import base64
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.backends import default_backend
 
 app = Flask(__name__)
 CORS(app)
@@ -58,9 +63,7 @@ def create_app(mongo_address, kafka_address):
 
     # Añade el manejador al logger
     auditoria_logger.addHandler(file_handler)
-
-
-
+    
 
     # Esta función obtiene los datos del clima para una ciudad
     def get_weather(city_name):
@@ -118,6 +121,31 @@ def create_app(mongo_address, kafka_address):
 
 
     ###### KAFKA ######
+    def load_drone_keys(drone_id):
+        try:
+            # Obtener la clave privada del dron desde MongoDB
+            key_document = db.Claves.find_one({'ID': drone_id})
+            
+            # Comprobar si se encontró el documento
+            if key_document is None:
+                print(f"No se encontró la clave para el dron ID {drone_id}")
+                return None
+            
+            # Cargar la clave privada desde el documento
+            private_key_data = key_document['PrivateKey']
+            private_key = serialization.load_pem_private_key(
+                private_key_data.encode(),
+                password=None,
+                backend=default_backend()
+            )
+            return private_key
+        except Exception as e:
+            print(f"Error al cargar clave privada: {e}")
+            return None
+
+    
+    
+    
     def kafka_listener():
         consumer = KafkaConsumer(
         'drone_position_updates',
@@ -138,16 +166,51 @@ def create_app(mongo_address, kafka_address):
 
     def kafka_final_positions_listener():
         consumer = KafkaConsumer(
-            'drone_final_position',  # Asegúrate de usar el tópico correcto
+            'drone_final_position',
             bootstrap_servers=kafka_address,
-            value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+            value_deserializer=lambda m: json.loads(m.decode('utf-8')) if m else None
         )
 
         for message in consumer:
-            dron_id = message.value['dron_id']
-            final_position = message.value['final_position']
-            final_drone_positions[dron_id] = final_position
+            try:
+                message_content = message.value
+                # Verificar si el contenido del mensaje está vacío
+                if not message_content:
+                    print("Mensaje Kafka recibido está vacío.")
+                    continue
+                # Asumiendo que 'Data' y 'dron_id' están en el mensaje
+                message_dict = json.loads(message_content)
+                if not message_dict:
+                    print("El contenido del mensaje no se pudo decodificar como JSON.")
+                    continue
+                drone_id = message_dict['dron_id']
+                encrypted_data = base64.b64decode(message_dict['Data'])
 
+                # Cargar clave privada y descifrar datos
+                private_key = load_drone_keys(drone_id)
+                if private_key is None:
+                    raise ValueError(f"No se pudo cargar la clave privada para el dron {drone_id}")
+
+                decrypted_data = private_key.decrypt(
+                    encrypted_data,
+                    padding.OAEP(
+                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                        algorithm=hashes.SHA256(),
+                        label=None
+                    )
+                )
+                print(f"Datos descifrados: {decrypted_data}")
+                try:
+                    decrypted_message = json.loads(decrypted_data.decode('utf-8'))
+                except json.JSONDecodeError:
+                    print(f"Los datos descifrados no son un JSON válido: {decrypted_data}")
+                    continue
+                print(f"Mensaje descifrado: {decrypted_message}")
+            except json.JSONDecodeError as e:
+                print(f"Error al decodificar el mensaje JSON: {e}")
+            except Exception as e:
+                print(f"Error al manejar el mensaje Kafka: {e}")
+            
     threading.Thread(target=kafka_final_positions_listener, daemon=True).start()
 
     @app.route('/get_final_drone_positions', methods=['GET'])
@@ -174,11 +237,6 @@ def create_app(mongo_address, kafka_address):
         db.users.insert_one({"username": username, "password_hash": password_hash})
         auditoria_logger.info('Evento específico en /registro_usuario')
         return jsonify({"msg": "Usuario registrado exitosamente"}), 201
-
-    
-
-
-
 
     @app.route('/login', methods=['POST'])
     def login():
