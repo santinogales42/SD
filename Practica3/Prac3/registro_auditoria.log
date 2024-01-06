@@ -475,3 +475,6 @@
 2024-01-05 18:39:33,177 - INFO - Evento específico en /borrar_dron/<drone_id>
 2024-01-05 18:39:35,313 - INFO - Evento específico en /login
 2024-01-05 18:39:39,350 - INFO - Evento específico en /login
+2024-01-05 18:48:49,836 - INFO - Evento específico en /borrar_dron/<drone_id>
+2024-01-05 18:48:52,156 - INFO - Evento específico en /login
+2024-01-05 18:48:57,125 - INFO - Evento específico en /login

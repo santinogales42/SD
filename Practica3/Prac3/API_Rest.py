@@ -142,6 +142,28 @@ def create_app(mongo_address, kafka_address):
         except Exception as e:
             print(f"Error al cargar clave privada: {e}")
             return None
+        
+    def load_engine_keys():
+        try:
+            # Obtener la clave privada del dron desde MongoDB
+            key_document = db.Claves.find_one({'ID': 'ADEngine'})
+            
+            # Comprobar si se encontró el documento
+            if key_document is None:
+                print(f"No se encontró la clave para el ADEngine")
+                return None
+            
+            # Cargar la clave privada desde el documento
+            private_key_data = key_document['PrivateKey']
+            private_key = serialization.load_pem_private_key(
+                private_key_data.encode(),
+                password=None,
+                backend=default_backend()
+            )
+            return private_key
+        except Exception as e:
+            print(f"Error al cargar clave privada: {e}")
+            return None
 
     
     
@@ -165,6 +187,7 @@ def create_app(mongo_address, kafka_address):
     final_drone_positions = {}
 
     def kafka_final_positions_listener():
+        #cifrar y descifrar
         consumer = KafkaConsumer(
             'drone_final_position',
             bootstrap_servers=kafka_address,
@@ -187,7 +210,7 @@ def create_app(mongo_address, kafka_address):
                 encrypted_data = base64.b64decode(message_dict['Data'])
 
                 # Cargar clave privada y descifrar datos
-                private_key = load_drone_keys(drone_id)
+                private_key = load_engine_keys()
                 if private_key is None:
                     raise ValueError(f"No se pudo cargar la clave privada para el dron {drone_id}")
 

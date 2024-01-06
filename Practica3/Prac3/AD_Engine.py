@@ -48,6 +48,13 @@ class ADEngine:
             public_exponent=65537,
             key_size=2048
         )
+        private_key_pem = self.private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption()
+        )
+        self.db.Claves.update_one({'ID': 'ADEngine'}, {'$set': {'PrivateKey': private_key_pem}}, upsert=True)
+        
         self.public_key = self.private_key.public_key()
         #Para conexiones seguras
         #self.context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
@@ -257,7 +264,9 @@ class ADEngine:
             'dron_id': dron_id,
             'final_position': final_position
         }
-        self.send_encrypted_kafka_message('drone_final_position', message)
+        #sin cifrar
+        self.kafka_producer.send('drone_final_position', message)
+        #self.send_encrypted_kafka_message('drone_final_position', message)
         #self.kafka_producer.send('drone_final_position', value=message)
         self.kafka_producer.flush()
 
