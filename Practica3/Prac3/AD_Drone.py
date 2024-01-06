@@ -20,6 +20,7 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
 import base64
 import json
+import binascii
 
 
 
@@ -90,20 +91,49 @@ class ADDrone(threading.Thread):
         except Exception as e:
             print(f"Error al generar claves: {e}")
             return None
-
-
         
-    def handle_drone_registered_message(self, message):
-        if message.value.get('ID') == self.dron_id:
-            print(f"ADDrone: Registrado exitosamente")
+    def start_consuming_messages_sin_cifrar(self):
+        print("ADDrone: Esperando mensajes de Kafka...")
+        consumer = KafkaConsumer(
+            'drone_final_position',
+            bootstrap_servers=self.broker_address,
+            auto_offset_reset='latest',
+            enable_auto_commit=True,
+            group_id='drone-group-{}'.format(self.dron_id),
+            value_deserializer=lambda x: json.loads(x.decode('utf-8')),
+            ssl_cafile='ssl/certificado_CA.crt',
+            ssl_certfile='ssl/certificado_registry.crt',
+            ssl_keyfile='ssl/clave_privada_registry.pem'
+        )
+
+        for message in consumer:
+            print("ADDrone: Mensaje recibido de Kafka:", message.value)
+            try:
+                # Convertir el mensaje a un diccionario si es necesario
+                if isinstance(message.value, str):
+                    message_dict = json.loads(message.value)
+                else:
+                    message_dict = message.value
+
+                # Procesar el mensaje basado en su tipo
+                if message_dict['type'] == 'final_position':
+                    self.handle_final_position_message(message_dict)
+                elif message_dict['type'] == 'instruction':
+                    self.handle_instruction_message(message_dict)
+                else:
+                    print("Mensaje no reconocido o falta información clave.")
+
+            except Exception as e:
+                print(f"Error al procesar el mensaje de Kafka: {e}")
+                print("Mensaje recibido:", message.value)
+
+
     
 
     def start_consuming_messages(self):
-        print("ADDrone: Esperando mensajes de Kafka...")
+        print("ADDrone: Esperando mensajes de Kafka...1")
         consumer = KafkaConsumer(
             'drone_messages_topic',
-            'drones_registered',
-            'drone_final_position',
             bootstrap_servers=self.broker_address,
             auto_offset_reset='latest',
             enable_auto_commit=True,
@@ -116,22 +146,43 @@ class ADDrone(threading.Thread):
         )
 
         for message in consumer:
-            decrypted_message = self.decrypt_message(message.value)
-            if decrypted_message is None:
-                continue
+            try:
+                # Intenta decodificar el mensaje de Base64. Si falla, asume que no está cifrado.
+                try:
+                    decoded_message = base64.b64decode(message.value).decode('utf-8')
+                    # Intenta descifrar el mensaje
+                    decrypted_message_json = self.decrypt_message(decoded_message)
+                    if decrypted_message_json is None:
+                        continue
+                    # Asumir que el mensaje descifrado es un JSON y convertirlo en diccionario
+                    decrypted_message = json.loads(decrypted_message_json)
+                except (binascii.Error, ValueError, json.JSONDecodeError):
+                    # Si la decodificación Base64 falla o no es un JSON, asume que el mensaje no está cifrado
+                    decrypted_message = message.value
+                    if isinstance(decrypted_message, str):
+                        decrypted_message = json.loads(decrypted_message)
 
-            if message.topic == 'drones_registered':
-                self.handle_drone_registered_message(decrypted_message)  # asumiendo que decrypted_message es un dict
-            elif message.topic == 'drone_messages_topic':
-                self.handle_instruction_message(decrypted_message)  # asumiendo que decrypted_message es un dict
-            elif message.topic == 'drone_final_position':
-                self.handle_final_position_message(decrypted_message)  # asumiendo que decrypted_message es un dict
-    
-    
+                # Asegúrate de que decrypted_message es un diccionario
+                if not isinstance(decrypted_message, dict):
+                    raise ValueError("El mensaje descifrado no es un diccionario")
+
+                # Ahora usa `decrypted_message` para el resto de la lógica
+                elif message.topic == 'drone_messages_topic':
+                    self.handle_instruction_message(decrypted_message)
+                elif message.topic == 'drone_final_position':
+                    self.handle_final_position_message(decrypted_message)
+
+            except Exception as e:
+                print(f"Error al procesar el mensaje de Kafka: {e}")
+
     def decrypt_message(self, encrypted_message):
         try:
             # Decodificar el mensaje de Base64
-            encrypted_data = base64.b64decode(encrypted_message)
+            if not isinstance(encrypted_message, bytes):
+            # Si no es bytes, intentar decodificar desde Base64
+                encrypted_data = base64.b64decode(encrypted_message)
+            else:
+                encrypted_data = encrypted_message
             decrypted_data = self.private_key.decrypt(
                 encrypted_data,
                 padding.OAEP(
@@ -154,14 +205,10 @@ class ADDrone(threading.Thread):
             print(f"Error al desencriptar mensaje: {e}")
             return None
         
-        
-        
 
     def handle_instruction_message(self, message):
         try:
-
             instruction = message.get('instruction')
-            
             if instruction == 'join_show':
                 self.in_show_mode = True
                 print(f"ADDrone: Uniendo al show con ID {self.dron_id}...")
@@ -182,12 +229,19 @@ class ADDrone(threading.Thread):
             print(f"Received non-JSON message: {message.value}")
         
             
-
     def handle_final_position_message(self, message):
-        if message.value.get('dron_id') == self.dron_id:
-            final_position = message.value.get('final_position')
-            if final_position:
-                self.final_position = tuple(final_position)
+        try:
+            # Verificar si 'final_position' está en el mensaje
+            if 'final_position' in message:
+                final_position = message['final_position']
+                if final_position:
+                    self.final_position = tuple(final_position)
+                    print(f"ADDrone: Nueva posición final recibida: {self.final_position}")
+            else:
+                print(f"ADDrone: Mensaje no contiene 'final_position'. Mensaje recibido: {message}")
+        except Exception as e:
+            print(f"Error al procesar el mensaje de posición final: {e}")
+
 
 
 
@@ -222,7 +276,7 @@ class ADDrone(threading.Thread):
             next_y -= 1
 
         self.current_position = (next_x, next_y)
-        
+
 
     def send_kafka_message(self, topic, message):
         try:
@@ -243,7 +297,7 @@ class ADDrone(threading.Thread):
             encoded_message = base64.b64encode(encrypted_data).decode('utf-8')
 
             #Enviar a Kafka
-            self.kafka_producer.send(topic, value=encoded_message)
+            self.kafka_producer.send(topic, key=str(self.dron_id).encode(), value=encoded_message)
             self.kafka_producer.flush()
             print("Mensaje Kafka enviado (cifrado y codificado):", encoded_message)
 
@@ -266,7 +320,8 @@ class ADDrone(threading.Thread):
             'ID': self.dron_id,
             'Position': self.current_position
         }
-        self.kafka_producer.send('drone_position_updates', value=json.dumps(message).encode('utf-8'))
+        #self.send_kafka_message('drone_position_updates', message)
+        self.kafka_producer.send('drone_position_updates', value=message)
         self.kafka_producer.flush()
         print(f"Nueva posición: {self.current_position}")
     
@@ -504,7 +559,7 @@ class ADDrone(threading.Thread):
 
                         # Iniciar el consumo de mensajes en un hilo separado
                         self.in_show_mode = True
-                        threading.Thread(target=self.start_consuming_messages, daemon=True).start()
+                        threading.Thread(target=self.start_consuming_messages_sin_cifrar, daemon=True).start()
                     else:
                         print(f"Drone {self.dron_id} failed to join the show. Server response: {response}")
                 else:

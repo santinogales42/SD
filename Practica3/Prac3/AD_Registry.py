@@ -33,7 +33,6 @@ class ADRegistry:
 
 
 #####SOCKET#####
-
     def load_drone_keys(self, drone_id):
         #Cargar la clave privada del dron desde MongoDB
         try:            
@@ -73,7 +72,7 @@ class ADRegistry:
             if private_key is None:
                 raise ValueError(f"No se pudo cargar la clave privada para el dron {drone_id}")
 
-            #Descifrar los datos
+            #Descifrar los datos con la clave privada del dron
             decrypted_data = private_key.decrypt(
                 encrypted_data,
                 padding.OAEP(
@@ -116,14 +115,12 @@ class ADRegistry:
                 print(f"Nueva solicitud de registro desde {addr}")
                 client_thread = threading.Thread(target=self.handle_client, args=(client_socket, addr))
                 client_thread.start()
-                kafka_thread = threading.Thread(target=self.consume_drone_registered_messages)
-                kafka_thread.start()
+
                 
         except KeyboardInterrupt:
             print("AD_Registry detenido por el usuario")
         finally:
             server_socket.close()
-            kafka_thread.close()
             client_thread.close()
 
     def register_drone(self, drone_id, alias):
@@ -141,7 +138,7 @@ class ADRegistry:
             'InitialPosition': initial_position
         }
 
-        #Cifrar el mensaje con la clave pública
+        #Cifrar el mensaje con la clave pública del dron
         encrypted_message = self.public_key.encrypt(
             json.dumps(drone_data_message).encode(),
             padding.OAEP(
@@ -167,7 +164,6 @@ class ADRegistry:
         self.db.MensajesKafka.insert_one(kafka_message_document)
         
         return drone_data_message
-        
 
             
     # Función para registrar un dron en la base de datos
@@ -179,38 +175,6 @@ class ADRegistry:
             return response.json()
         else:
             return {'status': 'error', 'message': 'Error en la solicitud API'}
-        
-    
-    def consume_drone_registered_messages(self):
-        consumer = KafkaConsumer(
-            'drone_registered',
-            bootstrap_servers=self.broker_address,
-            auto_offset_reset='earliest',
-            group_id='drone-management-group'
-        )
-
-        for message in consumer:
-            encrypted_data = message.value  #Datos cifrados
-
-            try:
-                #Descifrar los datos
-                decrypted_data = self.private_key.decrypt(
-                    base64.b64decode(encrypted_data),
-                    padding.OAEP(
-                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                        algorithm=hashes.SHA256(),
-                        label=None
-                    )
-                )
-                drone_data = json.loads(decrypted_data.decode('utf-8')) 
-
-                if drone_data['type'] == 'register':
-                    # Procesar la información del dron registrado
-                    print(f"Dron registrado: {drone_data['ID']} con alias {drone_data['Alias']}")
-                    # Almacenar el mensaje descifrado en MongoDB
-                    self.db.drones.insert_one(drone_data)
-            except Exception as e:
-                print(f"Error al descifrar mensaje: {e}")
 
 
 if __name__ == "__main__":

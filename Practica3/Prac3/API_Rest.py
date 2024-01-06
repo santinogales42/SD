@@ -170,13 +170,21 @@ def create_app(mongo_address, kafka_address):
     
     def kafka_listener():
         consumer = KafkaConsumer(
-        'drone_position_updates',
-        bootstrap_servers=kafka_address,
-        value_deserializer=lambda m: json.loads(m.decode('utf-8'))
+            'drone_position_updates',
+            bootstrap_servers=kafka_address,
+            value_deserializer=lambda m: m.decode('utf-8')  # Decodifica como cadena
         )
 
         for message in consumer:
             message_data = message.value
+            try:
+                # Intenta convertir la cadena a un diccionario JSON
+                message_data = json.loads(message_data)
+            except json.JSONDecodeError:
+                print(f"El mensaje no es un JSON válido: {message_data}")
+                continue  # Salta este mensaje y continúa con el siguiente
+
+            # Ahora puedes acceder a message_data como un diccionario
             dron_id = message_data['ID']
             position = message_data['Position']
 
@@ -184,8 +192,9 @@ def create_app(mongo_address, kafka_address):
             drone_positions[dron_id] = position
             print(f"Actualización recibida: Drone ID {dron_id}, Posición {position}")
 
-    final_drone_positions = {}
 
+    final_drone_positions = {}
+    """
     def kafka_final_positions_listener():
         #cifrar y descifrar
         consumer = KafkaConsumer(
@@ -235,6 +244,35 @@ def create_app(mongo_address, kafka_address):
                 print(f"Error al manejar el mensaje Kafka: {e}")
             
     threading.Thread(target=kafka_final_positions_listener, daemon=True).start()
+    """
+    
+    def kafka_final_positions_listener():
+        consumer = KafkaConsumer(
+            'drone_final_position',
+            bootstrap_servers=kafka_address,
+            value_deserializer=lambda m: json.loads(m.decode('utf-8')) if m else None
+        )
+
+        for message in consumer:
+            if not message.value:
+                print("Mensaje recibido está vacío.")
+                continue
+
+            try:
+                # Asumimos que el mensaje es un JSON y lo convertimos a un diccionario
+                message_dict = message.value
+                dron_id = message_dict['dron_id']
+                final_position = message_dict['final_position']
+                final_drone_positions[dron_id] = final_position
+                print(f"Posición final actualizada: Drone ID {dron_id}, Posición {final_position}")
+            except json.JSONDecodeError as e:
+                print(f"Error al decodificar el mensaje JSON: {e}")
+            except TypeError as e:
+                print(f"Error de tipo en el mensaje: {e}")
+            except KeyError as e:
+                print(f"Falta clave esperada en el mensaje: {e}")
+
+
 
     @app.route('/get_final_drone_positions', methods=['GET'])
     def get_final_drone_positions():

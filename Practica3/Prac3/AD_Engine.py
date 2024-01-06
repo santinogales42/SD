@@ -35,7 +35,7 @@ class ADEngine:
         self.server_socket.listen(15)
         self.kafka_producer = KafkaProducer(
             bootstrap_servers=[self.broker_address],
-            value_serializer=lambda m: json.dumps(m).encode('utf-8'),
+            value_serializer=lambda x: json.dumps(x).encode('utf-8'),
             #security_protocol='SSL',
             ssl_cafile='ssl/certificado_CA.crt',  # El certificado de la Autoridad Certificadora
             ssl_certfile='ssl/certificado_registry.crt',  # Certificado de tu servidor
@@ -100,7 +100,7 @@ class ADEngine:
             )
             self.db.MensajesKafka.insert_one({
                 'DroneID': drone_id,
-                'Type': 'Incoming',
+                'Type': 'Incoming a ADEngine',
                 'EncryptedMessage': data_dict['Data'],
                 'DecryptedMessage': decrypted_data.decode('utf-8')
             })
@@ -136,7 +136,8 @@ class ADEngine:
         
     def load_drone_keys(self, drone_id):
         #Cargar la clave privada del dron desde MongoDB
-        try:            
+        try:
+            print(f"Cargando clave privada para el dron {drone_id}...")            
             #obtener la clave privada del dron
             key_document = self.db.Claves.find_one({'ID': drone_id})
             
@@ -210,10 +211,11 @@ class ADEngine:
         message = {
             'type': 'instruction',
             'dron_id': dron_id,
-            'instruction': instruction
+            'instruction': instruction,
+            'final_position': self.final_positions[dron_id]
         }
-        self.send_encrypted_kafka_message('drone_messages_topic', message)
-        #self.kafka_producer.send('drone_messages_topic', message)
+        #self.send_encrypted_kafka_message('drone_messages_topic', message)
+        self.kafka_producer.send('drone_final_position', message)
         self.kafka_producer.flush()
         print(f"Instrucción {instruction} enviada al dron {dron_id}")
         with self.state_lock:  # Asegurar el acceso al diccionario de estados
@@ -251,7 +253,7 @@ class ADEngine:
             'instruction': 'STOP',
             'reason': f"Advertencia de clima frío en {city_name}: {temp_celsius}°C"
         }
-        self.kafka_producer.send('drone_messages_topic', warning_message)
+        self.kafka_producer.send('drone_final_position', warning_message)
         self.kafka_producer.flush()
         print(f"Enviada advertencia de clima frío para todos los drones.")
 
@@ -265,8 +267,8 @@ class ADEngine:
             'final_position': final_position
         }
         #sin cifrar
-        self.kafka_producer.send('drone_final_position', message)
-        #self.send_encrypted_kafka_message('drone_final_position', message)
+        #self.kafka_producer.send('drone_final_position', message)
+        self.send_encrypted_kafka_message('drone_final_position', message)
         #self.kafka_producer.send('drone_final_position', value=message)
         self.kafka_producer.flush()
 
@@ -306,7 +308,6 @@ class ADEngine:
         self.connected_drones.clear()
         self.final_positions.clear()
 
-
     def close(self):
         self.stop_event.set()
         if self.kafka_consumer_thread:
@@ -315,8 +316,7 @@ class ADEngine:
         self.kafka_producer.close()
         print("AD_Engine ha cerrado todos los recursos.")
         
-        
-        
+    
     def start_kafka_consumer(self):
         consumer = KafkaConsumer(
             'drone_position_reached',
@@ -324,18 +324,46 @@ class ADEngine:
             auto_offset_reset='latest',
             enable_auto_commit=True,
             group_id='engine-group',
-            value_deserializer=lambda x: json.loads(x.decode('utf-8')),
-            #security_protocol='SSL',
-            ssl_cafile='ssl/certificado_CA.crt',  # El certificado de la Autoridad Certificadora
-            ssl_certfile='ssl/certificado_registry.crt',  # Certificado de tu servidor
-            ssl_keyfile='ssl/clave_privada_registry.pem'  # Clave privada de tu servidor
+            key_deserializer=lambda x: x.decode('utf-8') if x else None,
+            value_deserializer=lambda x: x.decode('utf-8') if x else None,
+            ssl_cafile='ssl/certificado_CA.crt',
+            ssl_certfile='ssl/certificado_registry.crt',
+            ssl_keyfile='ssl/clave_privada_registry.pem'
         )
 
         for message in consumer:
-            if message.value['type'] == 'position_reached':
-                dron_id = message.value['dron_id']
-                final_position = message.value['final_position']
-                self.handle_drone_position_reached(dron_id, final_position)
+            try:
+                print(f"Mensaje recibido de Kafka: {message.value}")
+                # Obtener el dron_id de la clave del mensaje
+                dron_id = message.key
+                # Decodificar y descifrar
+                private_key = self.load_drone_keys(dron_id)
+                encrypted_data = base64.b64decode(message.value)
+                decrypted_data = private_key.decrypt(
+                    encrypted_data,
+                    padding.OAEP(
+                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                        algorithm=hashes.SHA256(),
+                        label=None
+                    )
+                )
+                message_data = json.loads(decrypted_data.decode('utf-8'))
+
+                print(f"Mensaje decodificado: {message_data}")
+
+                # Procesar el mensaje si es del tipo esperado
+                if message_data['type'] == 'position_reached':
+                    final_position = message_data['final_position']
+                    self.handle_drone_position_reached(dron_id, final_position)
+
+            except json.JSONDecodeError:
+                print("Error al decodificar el mensaje JSON.")
+            except TypeError:
+                print("Error en el formato del mensaje. Se esperaba un diccionario.")
+            except KeyError:
+                print("Clave no encontrada en el mensaje.")
+            except Exception as e:
+                print(f"Error inesperado al procesar el mensaje de Kafka: {e}")
 
 
     def handle_drone_position_reached(self, dron_id, final_position):
