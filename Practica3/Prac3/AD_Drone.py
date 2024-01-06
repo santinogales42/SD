@@ -83,11 +83,7 @@ class ADDrone(threading.Thread):
                 'PrivateKey': private_key.private_bytes(encoding=serialization.Encoding.PEM, format=serialization.PrivateFormat.TraditionalOpenSSL, encryption_algorithm=serialization.NoEncryption()),
                 'PublicKey': public_key.public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo)
             }
-            self.db.Claves.update_one(
-                {'ID': self.dron_id}, 
-                {'$set': key_document}, 
-                upsert=True
-            )
+            self.db.Claves.replace_one({'ID': self.dron_id}, key_document, upsert=True)
         except Exception as e:
             print(f"Error al generar claves: {e}")
             return None
@@ -157,10 +153,7 @@ class ADDrone(threading.Thread):
                     # Asumir que el mensaje descifrado es un JSON y convertirlo en diccionario
                     decrypted_message = json.loads(decrypted_message_json)
                 except (binascii.Error, ValueError, json.JSONDecodeError):
-                    # Si la decodificación Base64 falla o no es un JSON, asume que el mensaje no está cifrado
-                    decrypted_message = message.value
-                    if isinstance(decrypted_message, str):
-                        decrypted_message = json.loads(decrypted_message)
+                    decrypted_message = json.loads(message.value)
 
                 # Asegúrate de que decrypted_message es un diccionario
                 if not isinstance(decrypted_message, dict):
@@ -237,12 +230,13 @@ class ADDrone(threading.Thread):
                 if final_position:
                     self.final_position = tuple(final_position)
                     print(f"ADDrone: Nueva posición final recibida: {self.final_position}")
+                    if self.in_show_mode:
+                        print("ADDrone: Iniciando movimiento hacia la nueva posición final...")
+                        self.move_to_final_position()
             else:
                 print(f"ADDrone: Mensaje no contiene 'final_position'. Mensaje recibido: {message}")
         except Exception as e:
             print(f"Error al procesar el mensaje de posición final: {e}")
-
-
 
 
     def move_to_final_position(self):

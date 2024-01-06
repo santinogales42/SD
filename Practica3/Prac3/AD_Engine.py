@@ -47,15 +47,9 @@ class ADEngine:
         self.private_key = rsa.generate_private_key(
             public_exponent=65537,
             key_size=2048
-        )
-        private_key_pem = self.private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.PKCS8,
-            encryption_algorithm=serialization.NoEncryption()
-        )
-        self.db.Claves.update_one({'ID': 'ADEngine'}, {'$set': {'PrivateKey': private_key_pem}}, upsert=True)
-        
+        )     
         self.public_key = self.private_key.public_key()
+        self.drones_involucrados = set()
         #Para conexiones seguras
         #self.context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         #self.context.load_cert_chain(certfile="ssl/certificado_registry.crt", keyfile="ssl/clave_privada_registry.pem")
@@ -112,6 +106,7 @@ class ADEngine:
             if request_json.get('action') == 'join':
                 if drone_id in self.final_positions:
                     self.connected_drones.add(drone_id)
+                    self.drones_involucrados.add(drone_id)
                     if self.are_all_drones_connected():
                         print("Todos los drones necesarios están conectados. Preparando para iniciar el espectáculo.")
                         self.send_positions_and_start_commands()
@@ -135,29 +130,62 @@ class ADEngine:
             client_socket.close()
         
     def load_drone_keys(self, drone_id):
-        #Cargar la clave privada del dron desde MongoDB
         try:
-            print(f"Cargando clave privada para el dron {drone_id}...")            
-            #obtener la clave privada del dron
-            key_document = self.db.Claves.find_one({'ID': drone_id})
             
-            #Comprobar si se encontró el documento
+            key_document = self.db.Claves.find_one({'ID': 1})
             if key_document is None:
-                print(f"No se encontró la clave para el dron ID {drone_id}")
-                return None
-            
-            #Cargar la clave privada desde el documento
+               key_document = self.db.Claves.find_one({'ID': 2})
+               if key_document is None:
+                    key_document = self.db.Claves.find_one({'ID': 3})
+                    if key_document is None:
+                        key_document = self.db.Claves.find_one({'ID': 4})
+                        if key_document is None:
+                            key_document = self.db.Claves.find_one({'ID': 5})
+                            if key_document is None:
+                                key_document = self.db.Claves.find_one({'ID': 6})
+                                if key_document is None:
+                                    key_document = self.db.Claves.find_one({'ID': 7})
+                                    if key_document is None:
+                                        key_document = self.db.Claves.find_one({'ID': 8})
+                                        if key_document is None:
+                                            key_document = self.db.Claves.find_one({'ID': 9})
+                                            if key_document is None:
+                                                key_document = self.db.Claves.find_one({'ID': 10})
+                                                if key_document is None:
+                                                    key_document = self.db.Claves.find_one({'ID': 11})
+                                                    if key_document is None:
+                                                        key_document = self.db.Claves.find_one({'ID': 12})
+                                                        if key_document is None:
+                                                            key_document = self.db.Claves.find_one({'ID': 13})
+                                                            if key_document is None:
+                                                                key_document = self.db.Claves.find_one({'ID': 14})
+                                                                if key_document is None:
+                                                                    key_document = self.db.Claves.find_one({'ID': 15})
+                                                                    if key_document is None:
+                                                                        key_document = self.db.Claves.find_one({'ID': 16})
+                                                                        if key_document is None:
+                                                                            print("No se encontró la clave privada")
+                                                                            return None
+                            
+
             private_key_data = key_document['PrivateKey']
+            if not private_key_data:
+                print(f"Datos de clave privada vacíos para el dron ID {drone_id}")
+                return None
+
             private_key = serialization.load_pem_private_key(
                 private_key_data,
                 password=None,
                 backend=default_backend()
             )
             return private_key
-
+        except pymongo.errors.PyMongoError as e:
+            logging.error(f"Error de base de datos al cargar la clave: {e}")
+        except ValueError as e:
+            logging.error(f"Error al deserializar la clave privada: {e}")
         except Exception as e:
-            print(f"Error al cargar clave privada: {e}")
-            return None
+            logging.error(f"Error inesperado: {e}")
+        return None
             
             
     def send_encrypted_kafka_message(self, topic, message):
@@ -267,8 +295,8 @@ class ADEngine:
             'final_position': final_position
         }
         #sin cifrar
-        #self.kafka_producer.send('drone_final_position', message)
-        self.send_encrypted_kafka_message('drone_final_position', message)
+        self.kafka_producer.send('drone_final_position', message)
+        #self.send_encrypted_kafka_message('drone_final_position', message)
         #self.kafka_producer.send('drone_final_position', value=message)
         self.kafka_producer.flush()
 
@@ -334,8 +362,12 @@ class ADEngine:
         for message in consumer:
             try:
                 print(f"Mensaje recibido de Kafka: {message.value}")
-                # Obtener el dron_id de la clave del mensaje
-                dron_id = message.key
+                # Convertir el dron_id a entero
+                dron_id = int(message.key) if message.key.isdigit() else None
+                if dron_id is None:
+                    print(f"ID de dron inválido: {message.key}")
+                    continue
+
                 # Decodificar y descifrar
                 private_key = self.load_drone_keys(dron_id)
                 encrypted_data = base64.b64decode(message.value)
@@ -366,25 +398,40 @@ class ADEngine:
                 print(f"Error inesperado al procesar el mensaje de Kafka: {e}")
 
 
+
     def handle_drone_position_reached(self, dron_id, final_position):
-        # Convertir la posición reportada a una tupla si es una lista
         final_position_tuple = tuple(final_position) if isinstance(final_position, list) else final_position
         self.current_positions[dron_id] = final_position_tuple
         print(f"Drone {dron_id} ha alcanzado su posición final: {final_position_tuple}")
+        #ponerlo a true en el diccionario de estados
         with self.state_lock:
-            if dron_id in self.drones_state:
-                self.drones_state[dron_id]['reached'] = True
+            self.drones_state[dron_id]['reached'] = True
+        self.gestionar_estado_drones()
+
+    def gestionar_estado_drones(self):
         if self.check_all_drones_in_position():
+            print("Todos los drones han alcanzado su posición final.")
             self.load_next_figure()
-                
+        else:
+            print("Aún hay drones que no han alcanzado su posición final.")
+            print("Estado actual de los drones:")
+            with self.state_lock:
+                for dron_id, state in self.drones_state.items():
+                    print(f"Dron {dron_id}: {state}")
+
+
     def check_all_drones_in_position(self):
         with self.state_lock:
-            for dron_id, state in self.drones_state.items():
-                if not state['reached']:
+            # Verificar todos los drones requeridos para la figura actual
+            for dron_id in self.final_positions.keys():
+                # Si algún dron no ha alcanzado su posición, devuelve False
+                if dron_id not in self.drones_state or not self.drones_state[dron_id]['reached']:
                     print(f"Dron {dron_id} aún no ha alcanzado su posición final.")
                     return False
-        print("Todos los drones han alcanzado su posición final.")
-        return True       
+            # Todos los drones han alcanzado su posición
+            print("Todos los drones han alcanzado su posición final.")
+            return True
+
 
 
     def load_next_figure(self):
