@@ -1,0 +1,227 @@
+body {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    background-color: #fca738;
+}
+
+.top-bar {
+    background-color: #000a02;
+    padding: 10px;
+    text-align: center;
+    color: #fca738;
+}
+
+nav {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+}
+
+nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    background-color: #000;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    display: none;
+}
+
+nav li {
+    display: inline-block;
+    margin: 0;
+}
+
+nav a {
+    display: block;
+    padding: 10px 15px;
+    text-decoration: none;
+    color: #FFF;
+}
+
+nav a:hover {
+    background-color: #333;
+}
+
+.dropdown-btn {
+    cursor: pointer;
+    background-color: #000;
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+}
+
+.burger-icon {
+    width: 20px;
+    height: 20px;
+    fill: white;
+    margin-right: 5px;
+}
+
+/* Estilos para el mapa de drones */
+#drone-map {
+    display: grid;
+    grid-template-columns: repeat(20, 1fr);
+    grid-template-rows: repeat(20, 1fr);
+    gap: 2px;
+    margin-left: 400px;
+    margin-top: 50px;
+    width: 700px;
+    height: 700px;
+}
+
+.drone {
+    width: 20px;
+    height: 20px;
+    background-color: red;
+    position: absolute;
+    border-radius: 50%;
+}
+
+#drone-positions-table {
+    width: 250px;
+    float: left;
+    margin-left: 20px;
+    margin-top: 50px;
+    background-color: black;
+    color: #fca738;
+    padding: 10px;
+    overflow-y: auto;
+}
+
+
+.drone-cell {
+    border: 1px solid black;
+    background-color: black;
+}
+.occupied-cell{
+    border: 1px solid black;
+    background-color: red;
+}
+.final-cell{
+    border: 1px solid black;
+    background-color: green;
+}
+/* Estilos para la sección de la lista de drones */
+#drone-list-section {
+    position: absolute;
+    top: 250px;
+    right: 400px;
+    width: 200px;
+    background-color: black;
+    color:#fca738;
+    padding: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    border-radius: 5px;
+}
+
+#drone-list {
+    list-style: none;
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 0;
+    margin: 0;
+}
+
+#drone-list li {
+    margin-bottom: 5px;
+    padding: 5px;
+    background-color: #fca738;
+    color: black;
+    border-radius: 3px;
+}
+
+#add-drone-btn {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    background-color: #fca738;
+    color: black;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+#del-drone-btn {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    background-color: #fca738;
+    color: black;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#add-drone-btn:hover {
+    background-color: #fca738;
+}
+
+.black-container {
+    background-color: black;
+    padding: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 20%;
+    margin-left:400px;
+    margin-top:20px;
+}
+
+.orange-background {
+    background-color: #fca738;
+    color: black;
+    border: none;
+    border-radius: 5px;
+    padding: 10px;
+    width: 50%; /* Puedes ajustar el ancho según tus necesidades */
+}
+
+#city-name::placeholder {
+    color: black; /* Cambia el color del placeholder a negro */
+}
+
+.orange-button {
+    background-color: #fca738;
+    color: black;
+    border: none;
+    border-radius: 5px;
+    padding: 10px;
+    cursor: pointer;
+}
+
+.orange-button:hover {
+    background-color: #fca738;
+}
+
+.error-container {
+    background-color: black; /* Fondo negro para el contenedor */
+    color: #fca738; /* Texto en color naranja */
+    padding: 10px;
+    margin: 20px 400px; /* Ajuste para alinear con otros elementos */
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); /* Sombra para destacar */
+}
+
+.error-container h2 {
+    margin-top: 0;
+    color: #fca738; /* Título en color naranja */
+}
+
+#error-list {
+    max-height: 300px; /* Altura máxima con desplazamiento vertical */
+    overflow-y: auto;
+    list-style-type: none; /* Sin viñetas */
+    padding: 0;
+}
+
+#error-list p {
+    background-color: #333; /* Fondo oscuro para cada error */
+    margin-bottom: 5px;
+    padding: 5px;
+    border-radius: 3px;
+}
+
