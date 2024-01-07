@@ -476,29 +476,31 @@ class ADDrone(threading.Thread):
         # Primero intenta eliminar el dron a través de la API
         headers = {'Authorization': f'Bearer {self.access_token}'}
         api_address = args.api_address  # args.api_address es el argumento que recibes
-        response = requests.delete(f'{api_address}/borrar_dron/{self.dron_id}', headers=headers, verify=False)
-        #response = requests.delete(f'http://localhost:5000/borrar_dron/{self.dron_id}', headers=headers)
-        
-        if response.status_code == 200:
-            print("Dron eliminado exitosamente.")
-        else:
-            print(f"Error al eliminar dron en la API: {response.text}")
+        try:
+            response = requests.delete(f'{api_address}/borrar_dron/{self.dron_id}', headers=headers, verify=False)
+            
+            if response.status_code == 200:
+                print("Dron eliminado exitosamente.")
+                return
+            else:
+                print(f"Error al eliminar dron en la API: {response.text}")
+        except requests.exceptions.ConnectionError:
+            print("No se pudo conectar a la API. Intentando eliminar desde la base de datos local.")
 
-            # Si la API falla, intenta eliminarlo de la base de datos local
-            mongo_address = args.mongo_address  # args.mongo_address es el argumento que recibes
-            mongo_client = pymongo.MongoClient(mongo_address)
-            #mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
-            db = mongo_client["dronedb"]
-            drones_collection = db["drones"]
+        # Si la API falla, intenta eliminarlo de la base de datos local
+        mongo_address = args.mongo_address  # args.mongo_address es el argumento que recibes
+        mongo_client = pymongo.MongoClient(mongo_address)
+        db = mongo_client["dronedb"]
+        drones_collection = db["drones"]
 
-            try:
-                result = drones_collection.delete_one({'ID': int(self.dron_id)})
-                if result.deleted_count == 1:
-                    print(f"Dron con ID {self.dron_id} eliminado de la base de datos.")
-                else:
-                    print(f"No se encontró el dron con ID {self.dron_id} en la base de datos.")
-            except Exception as e:
-                print(f"Error al eliminar dron de la base de datos: {e}")
+        try:
+            result = drones_collection.delete_one({'ID': int(self.dron_id)})
+            if result.deleted_count == 1:
+                print(f"Dron con ID {self.dron_id} eliminado de la base de datos.")
+            else:
+                print(f"No se encontró el dron con ID {self.dron_id} en la base de datos.")
+        except Exception as e:
+            print(f"Error al eliminar dron de la base de datos: {e}")   
 
 
     def join_show(self):
@@ -615,14 +617,18 @@ class ADDrone(threading.Thread):
             print("Error al obtener token JWT")
 
     def request_jwt_token(self, username, password):
-        # Solicitar el token JWT a la API
-        api_address = args.api_address  # args.api_address es el argumento que recibes
-        response = requests.post(f'{api_address}/login', json={'username': username, 'password': password}, verify=False)
-        #response = requests.post('http://localhost:5000/login', json={'username': username, 'password': password})
-        if response.status_code == 200:
-            return response.json().get('access_token')
-        else:
-            print(f"Error al obtener token JWT: {response.text}")
+        try:
+            # Solicitar el token JWT a la API
+            api_address = args.api_address  # args.api_address es el argumento que recibes
+            response = requests.post(f'{api_address}/login', json={'username': username, 'password': password}, verify=False)
+            #response = requests.post('http://localhost:5000/login', json={'username': username, 'password': password})
+            if response.status_code == 200:
+                return response.json().get('access_token')
+            else:
+                print(f"Error al obtener token JWT: {response.text}")
+                return None
+        except requests.exceptions.ConnectionError:
+            print("No se pudo conectar a la API. Por favor, inicia el módulo de API.")
             return None
         
         

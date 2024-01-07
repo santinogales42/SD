@@ -172,7 +172,10 @@ def create_app(mongo_address, kafka_address):
         consumer = KafkaConsumer(
             'drone_position_updates',
             bootstrap_servers=kafka_address,
-            value_deserializer=lambda m: m.decode('utf-8')  # Decodifica como cadena
+            value_deserializer=lambda m: m.decode('utf-8'),  # Decodifica como cadena
+            ssl_cafile='ssl/certificado_CA.crt',
+            ssl_certfile='ssl/certificado_registry.crt',
+            ssl_keyfile='ssl/clave_privada_registry.pem'
         )
 
         for message in consumer:
@@ -194,63 +197,15 @@ def create_app(mongo_address, kafka_address):
 
 
     final_drone_positions = {}
-    """
-    def kafka_final_positions_listener():
-        #cifrar y descifrar
-        consumer = KafkaConsumer(
-            'drone_final_position',
-            bootstrap_servers=kafka_address,
-            value_deserializer=lambda m: json.loads(m.decode('utf-8')) if m else None
-        )
-
-        for message in consumer:
-            try:
-                message_content = message.value
-                # Verificar si el contenido del mensaje está vacío
-                if not message_content:
-                    print("Mensaje Kafka recibido está vacío.")
-                    continue
-                # Asumiendo que 'Data' y 'dron_id' están en el mensaje
-                message_dict = json.loads(message_content)
-                if not message_dict:
-                    print("El contenido del mensaje no se pudo decodificar como JSON.")
-                    continue
-                drone_id = message_dict['dron_id']
-                encrypted_data = base64.b64decode(message_dict['Data'])
-
-                # Cargar clave privada y descifrar datos
-                private_key = load_engine_keys()
-                if private_key is None:
-                    raise ValueError(f"No se pudo cargar la clave privada para el dron {drone_id}")
-
-                decrypted_data = private_key.decrypt(
-                    encrypted_data,
-                    padding.OAEP(
-                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                        algorithm=hashes.SHA256(),
-                        label=None
-                    )
-                )
-                print(f"Datos descifrados: {decrypted_data}")
-                try:
-                    decrypted_message = json.loads(decrypted_data.decode('utf-8'))
-                except json.JSONDecodeError:
-                    print(f"Los datos descifrados no son un JSON válido: {decrypted_data}")
-                    continue
-                print(f"Mensaje descifrado: {decrypted_message}")
-            except json.JSONDecodeError as e:
-                print(f"Error al decodificar el mensaje JSON: {e}")
-            except Exception as e:
-                print(f"Error al manejar el mensaje Kafka: {e}")
-            
-    threading.Thread(target=kafka_final_positions_listener, daemon=True).start()
-    """
     
     def kafka_final_positions_listener():
         consumer = KafkaConsumer(
             'drone_final_position',
             bootstrap_servers=kafka_address,
-            value_deserializer=lambda m: json.loads(m.decode('utf-8')) if m else None
+            value_deserializer=lambda m: json.loads(m.decode('utf-8')) if m else None,
+            ssl_cafile='ssl/certificado_CA.crt',
+            ssl_certfile='ssl/certificado_registry.crt',
+            ssl_keyfile='ssl/clave_privada_registry.pem'
         )
 
         for message in consumer:
