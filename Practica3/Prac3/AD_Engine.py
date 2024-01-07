@@ -121,7 +121,6 @@ class ADEngine:
                 print(f"Received unknown action from drone: {request_json.get('action')}")
                 response = {'status': 'error', 'message': 'Unknown action'}
             
-            print(f"Sending response to drone {drone_id}: {response}")
             client_socket.send(json.dumps(response).encode('utf-8'))
 
         except Exception as e:
@@ -152,14 +151,49 @@ class ADEngine:
         except Exception as e:
             print(f"Error al cargar clave privada: {e}")
             return None
+        
+    def encrypted_message(self, topic, message):
+        try:
+            # Convertir el mensaje original a JSON
+            original_message_json = json.dumps(message)
+
+            # Cifrar el mensaje
+            encrypted_data = self.public_key.encrypt(
+                original_message_json.encode(),
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
+                    label=None
+                )
+            )
+
+            # Verificar que los datos cifrados no son None
+            if encrypted_data is None:
+                raise ValueError("Los datos cifrados son None")
+            # Codificar en base64
+            encoded_message = base64.b64encode(encrypted_data).decode('utf-8')
+            # Verificar que el mensaje codificado no es None
+            if encoded_message is None:
+                raise ValueError("El mensaje codificado es None")
+
+
+            # Almacenar en MongoDB
+            kafka_message_document = {
+                'Clase': 'ADEngine',
+                'Topic': topic,
+                'OriginalMessage': message,
+                'EncryptedMessage': encoded_message
+            }
+            self.db.MensajesKafka.insert_one(kafka_message_document)
+        except Exception as e:
+            print(f"Error al enviar mensaje Kafka: {e}")
+        
             
             
     def send_encrypted_kafka_message(self, topic, message):
         try:
             # Convertir el mensaje original a JSON
             original_message_json = json.dumps(message)
-            print("Mensaje original:", original_message_json)
-
             # Cifrar el mensaje
             encrypted_data = self.public_key.encrypt(
                 original_message_json.encode(),
@@ -183,8 +217,8 @@ class ADEngine:
 
             # Enviar a Kafka
             self.kafka_producer.send(topic, value=encoded_message)
+            self.encrypted_message(topic, message)
             self.kafka_producer.flush()
-            print("Mensaje Kafka enviado (cifrado y codificado):", encoded_message)
 
 
             # Almacenar en MongoDB
@@ -248,6 +282,7 @@ class ADEngine:
             'reason': f"Advertencia de clima frío en {city_name}: {temp_celsius}°C"
         }
         self.kafka_producer.send('drone_final_position', warning_message)
+        self.encrypted_message('drone_final_position', warning_message)
         self.kafka_producer.flush()
         print(f"Enviada advertencia de clima frío para todos los drones.")
 
@@ -262,8 +297,8 @@ class ADEngine:
         }
         #sin cifrar
         self.kafka_producer.send('drone_final_position', message)
+        self.encrypted_message('drone_final_position', message)
         #self.send_encrypted_kafka_message('drone_final_position', message)
-        #self.kafka_producer.send('drone_final_position', value=message)
         self.kafka_producer.flush()
 
     def procesar_datos_json(self, ruta_archivo_json):
@@ -337,7 +372,6 @@ class ADEngine:
 
         for message in consumer:
             try:
-                print(f"Mensaje recibido de Kafka: {message.value}")
                 # Convertir el dron_id a entero
                 dron_id = int(message.key) if message.key.isdigit() else None
                 if dron_id is None:
@@ -356,8 +390,6 @@ class ADEngine:
                     )
                 )
                 message_data = json.loads(decrypted_data.decode('utf-8'))
-
-                print(f"Mensaje decodificado: {message_data}")
 
                 # Procesar el mensaje si es del tipo esperado
                 if message_data['type'] == 'position_reached':
@@ -387,10 +419,6 @@ class ADEngine:
             self.load_next_figure()
         else:
             print("Aún hay drones que no han alcanzado su posición final.")
-            print("Estado actual de los drones:")
-            with self.state_lock:
-                for dron_id, state in self.drones_state.items():
-                    print(f"Dron {dron_id}: {state}")
 
 
     def check_all_drones_in_position(self):
@@ -399,7 +427,6 @@ class ADEngine:
             for dron_id in self.final_positions.keys():
                 # Si algún dron no ha alcanzado su posición, devuelve False
                 if dron_id not in self.drones_state or not self.drones_state[dron_id]['reached']:
-                    print(f"Dron {dron_id} aún no ha alcanzado su posición final.")
                     return False
             # Todos los drones han alcanzado su posición
             print("Todos los drones han alcanzado su posición final.")

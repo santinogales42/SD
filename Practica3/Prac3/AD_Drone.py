@@ -106,7 +106,6 @@ class ADDrone(threading.Thread):
         )
 
         for message in consumer:
-            print("ADDrone: Mensaje recibido de Kafka:", message.value)
             try:
                 # Convertir el mensaje a un diccionario si es necesario
                 if isinstance(message.value, str):
@@ -302,7 +301,6 @@ class ADDrone(threading.Thread):
             #Enviar a Kafka
             self.kafka_producer.send(topic, key=str(self.dron_id).encode(), value=encoded_message)
             self.kafka_producer.flush()
-            print("Mensaje Kafka enviado (cifrado y codificado):", encoded_message)
 
             #Almacenar en MongoDB
             kafka_message_document = {
