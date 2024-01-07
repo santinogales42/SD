@@ -42,8 +42,8 @@ def create_app(mongo_address, kafka_address):
         # Implementar lógica de reintento o manejo de fallo aquí
 
     db = client.dronedb
+    app.config["JWT_SECRET_KEY"] = os.getenv(".env", "default_secret_key")
     jwt = JWTManager(app)
-    app.config["JWT_SECRET_KEY"] = "tu_clave_secreta"
 
     drone_positions = {}
 
@@ -283,9 +283,7 @@ def create_app(mongo_address, kafka_address):
         return jsonify(drone_positions)
 
 
-
     ###### SEGURIDAD ######
-
     @app.route('/registro_usuario', methods=['POST'])
     def registro_usuario():
         username = request.json.get("username")
@@ -311,22 +309,17 @@ def create_app(mongo_address, kafka_address):
             return jsonify(access_token=access_token)
         return jsonify({"msg": "Credenciales incorrectas"}), 401
 
-
     @app.route('/protegido', methods=['GET'])
     @jwt_required()
     def protegido():
         return jsonify(msg="Ruta protegida")
 
-
     ##### AUDITORIA #####
-
     @app.route('/evento', methods=['GET'])
     @jwt_required()
     def evento():
         logging.info("Evento registrado")
         return jsonify(msg="Evento registrado")
-
-
 
     ##### API #####
     @app.errorhandler(Exception)
@@ -341,7 +334,6 @@ def create_app(mongo_address, kafka_address):
             errors = file.readlines()
         return jsonify(errors)
 
-    
     
     @app.route('/errores', methods=['GET'])
     def obtener_errores():
@@ -362,8 +354,6 @@ def create_app(mongo_address, kafka_address):
             return e
         log_error(e)  # Función personalizada para registrar errores
         return jsonify({'error': 'Ocurrió un error'}), getattr(e, 'code', 500)
-
-
 
 
     @app.route('/registro', methods=['POST'])

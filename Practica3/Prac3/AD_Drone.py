@@ -52,6 +52,9 @@ class ADDrone(threading.Thread):
         
         self.registered_drones = {}
         self.in_show_mode = False
+        self.token_time_received = None  # Tiempo en el que se recibió el token
+        self.last_heartbeat_received = time.time()
+        self.heartbeat_timeout = 20  
         
         self.public_key = None
         self.private_key = None
@@ -224,19 +227,26 @@ class ADDrone(threading.Thread):
             
     def handle_final_position_message(self, message):
         try:
-            # Verificar si 'final_position' está en el mensaje
-            if 'final_position' in message:
+            # Verificar si 'final_position' y 'dron_id' están en el mensaje
+            if 'final_position' in message and 'dron_id' in message:
+                message_dron_id = message['dron_id']
                 final_position = message['final_position']
-                if final_position:
-                    self.final_position = tuple(final_position)
-                    print(f"ADDrone: Nueva posición final recibida: {self.final_position}")
-                    if self.in_show_mode:
-                        print("ADDrone: Iniciando movimiento hacia la nueva posición final...")
-                        self.move_to_final_position()
+
+                # Procesar el mensaje solo si es para este dron
+                if message_dron_id == self.dron_id:
+                    if final_position:
+                        self.final_position = tuple(final_position)
+                        print(f"ADDrone: Nueva posición final recibida: {self.final_position}")
+                        if self.in_show_mode:
+                            print("ADDrone: Iniciando movimiento hacia la nueva posición final...")
+                            self.move_to_final_position()
+                # No se imprime nada si el mensaje no es para este dron
             else:
-                print(f"ADDrone: Mensaje no contiene 'final_position'. Mensaje recibido: {message}")
+                print(f"ADDrone: Mensaje no contiene 'final_position' o 'dron_id'. Mensaje recibido: {message}")
         except Exception as e:
             print(f"Error al procesar el mensaje de posición final: {e}")
+
+
 
 
     def move_to_final_position(self):
@@ -289,7 +299,6 @@ class ADDrone(threading.Thread):
 
             #Codificar en base64
             encoded_message = base64.b64encode(encrypted_data).decode('utf-8')
-
             #Enviar a Kafka
             self.kafka_producer.send(topic, key=str(self.dron_id).encode(), value=encoded_message)
             self.kafka_producer.flush()
@@ -320,6 +329,11 @@ class ADDrone(threading.Thread):
         print(f"Nueva posición: {self.current_position}")
     
     def input_drone_data(self):
+        if not (self.access_token):
+            print("Es necesario registrarse y obtener un token antes de unirse al show.")
+            return
+
+        headers = {'Authorization': f'Bearer {self.access_token}'}
         while True:
             user_input = input("Introduce el ID del dron (número entre 1 y 99): ")
             alias = input("Introduce el alias del dron: ")
@@ -362,7 +376,6 @@ class ADDrone(threading.Thread):
             host, port = self.registry_address.split(':')
             registry_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             registry_socket.connect((host, int(port)))
-
             # Datos del dron
             dron_data = {'ID': self.dron_id, 'Alias': self.alias}
 
@@ -381,11 +394,9 @@ class ADDrone(threading.Thread):
 
             # Enviar datos cifrados
             registry_socket.sendall(data_to_send)
-            
             # Recibir y procesar respuesta
             response = registry_socket.recv(1024).decode()
             response_json = json.loads(response)
-
             registry_socket.close()
             
             if self.id_exists(self.dron_id):
@@ -550,7 +561,6 @@ class ADDrone(threading.Thread):
                         else:
                             print("Invalid format for final position received from the server.")
                         print(f"Drone {self.dron_id} has received final position: {self.final_position}")
-
                         # Iniciar el consumo de mensajes en un hilo separado
                         self.in_show_mode = True
                         threading.Thread(target=self.start_consuming_messages_sin_cifrar, daemon=True).start()
@@ -564,7 +574,6 @@ class ADDrone(threading.Thread):
             print("Failed to decode the server response. Ensure the server sends a valid JSON.")
         except ConnectionError as e:
             print(f"Unable to connect to the ADEngine: {e}")
-
 
 
     def register_user(self):
@@ -600,6 +609,7 @@ class ADDrone(threading.Thread):
         password = input("Introduce tu contraseña: ")
         self.access_token = self.request_jwt_token(username, password)
         if self.access_token:
+            self.token_time_received = time.time()  # Guardar el momento en que se obtiene el token
             print("Token JWT obtenido con éxito.")
         else:
             print("Error al obtener token JWT")
@@ -646,6 +656,15 @@ class ADDrone(threading.Thread):
         except Exception as e:
             print(f"Error al listar drones: {e}")
             return []
+    
+    def cleanbd(self):
+        try:
+            self.db.Claves.delete_many({})
+            self.db.MensajesKafka.delete_many({})
+            self.db.drones.delete_many({})
+            print("Base de datos limpiada.")
+        except Exception as e:
+            print(f"Error al limpiar la base de datos: {e}")
 
                
     def show_menu(self):
@@ -654,7 +673,8 @@ class ADDrone(threading.Thread):
             "2": self.join_show,
             "3": self.delete_drones,
             "4": self.get_jwt_token,
-            "5": self.take_over_drone  # Agregar la nueva opción aquí
+            "5": self.take_over_drone,  # Agregar la nueva opción aquí
+            "6": self.cleanbd
         }
         try:
             while True:
@@ -665,9 +685,10 @@ class ADDrone(threading.Thread):
                     print("3. Delete Drone")
                     print("4. Get Token")
                     print("5. Take Over Drone")
-                    print("6. Exit")
+                    print("6. Clean Database")
+                    print("7. Exit")
                     choice = input("Select an option: ")
-                    if choice == "6":
+                    if choice == "7":
                         try:
                             self.db.Claves.delete_one({'ID': self.dron_id})
                             print(f"Database entries for drone ID {self.dron_id} deleted.")

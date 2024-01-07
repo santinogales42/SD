@@ -21,3 +21,4 @@ create_app.<locals>.error_response() takes 1 positional argument but 2 were give
 create_app.<locals>.error_response() takes 1 positional argument but 2 were given
 create_app.<locals>.error_response() takes 1 positional argument but 2 were given
 create_app.<locals>.error_response() takes 1 positional argument but 2 were given
+create_app.<locals>.error_response() takes 1 positional argument but 2 were given

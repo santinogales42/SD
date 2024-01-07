@@ -130,62 +130,28 @@ class ADEngine:
             client_socket.close()
         
     def load_drone_keys(self, drone_id):
-        try:
+        #Cargar la clave privada del dron desde MongoDB
+        try:            
+            #obtener la clave privada del dron
+            key_document = self.db.Claves.find_one({'ID': drone_id})
             
-            key_document = self.db.Claves.find_one({'ID': 1})
+            #Comprobar si se encontró el documento
             if key_document is None:
-               key_document = self.db.Claves.find_one({'ID': 2})
-               if key_document is None:
-                    key_document = self.db.Claves.find_one({'ID': 3})
-                    if key_document is None:
-                        key_document = self.db.Claves.find_one({'ID': 4})
-                        if key_document is None:
-                            key_document = self.db.Claves.find_one({'ID': 5})
-                            if key_document is None:
-                                key_document = self.db.Claves.find_one({'ID': 6})
-                                if key_document is None:
-                                    key_document = self.db.Claves.find_one({'ID': 7})
-                                    if key_document is None:
-                                        key_document = self.db.Claves.find_one({'ID': 8})
-                                        if key_document is None:
-                                            key_document = self.db.Claves.find_one({'ID': 9})
-                                            if key_document is None:
-                                                key_document = self.db.Claves.find_one({'ID': 10})
-                                                if key_document is None:
-                                                    key_document = self.db.Claves.find_one({'ID': 11})
-                                                    if key_document is None:
-                                                        key_document = self.db.Claves.find_one({'ID': 12})
-                                                        if key_document is None:
-                                                            key_document = self.db.Claves.find_one({'ID': 13})
-                                                            if key_document is None:
-                                                                key_document = self.db.Claves.find_one({'ID': 14})
-                                                                if key_document is None:
-                                                                    key_document = self.db.Claves.find_one({'ID': 15})
-                                                                    if key_document is None:
-                                                                        key_document = self.db.Claves.find_one({'ID': 16})
-                                                                        if key_document is None:
-                                                                            print("No se encontró la clave privada")
-                                                                            return None
-                            
-
-            private_key_data = key_document['PrivateKey']
-            if not private_key_data:
-                print(f"Datos de clave privada vacíos para el dron ID {drone_id}")
+                print(f"No se encontró la clave para el dron ID {drone_id}")
                 return None
-
+            
+            #Cargar la clave privada desde el documento
+            private_key_data = key_document['PrivateKey']
             private_key = serialization.load_pem_private_key(
                 private_key_data,
                 password=None,
                 backend=default_backend()
             )
             return private_key
-        except pymongo.errors.PyMongoError as e:
-            logging.error(f"Error de base de datos al cargar la clave: {e}")
-        except ValueError as e:
-            logging.error(f"Error al deserializar la clave privada: {e}")
+
         except Exception as e:
-            logging.error(f"Error inesperado: {e}")
-        return None
+            print(f"Error al cargar clave privada: {e}")
+            return None
             
             
     def send_encrypted_kafka_message(self, topic, message):
@@ -242,8 +208,8 @@ class ADEngine:
             'instruction': instruction,
             'final_position': self.final_positions[dron_id]
         }
-        #self.send_encrypted_kafka_message('drone_messages_topic', message)
-        self.kafka_producer.send('drone_final_position', message)
+        self.send_encrypted_kafka_message('drone_messages_topic', message)
+        #self.kafka_producer.send('drone_final_position', message)
         self.kafka_producer.flush()
         print(f"Instrucción {instruction} enviada al dron {dron_id}")
         with self.state_lock:  # Asegurar el acceso al diccionario de estados
@@ -315,6 +281,8 @@ class ADEngine:
         self.kafka_consumer_thread.start()
         self.weather_warning_thread = threading.Thread(target=self.check_weather_warnings)
         self.weather_warning_thread.start()
+        self.heartbeat_thread = threading.Thread(target=self.send_heartbeat_messages)
+        self.heartbeat_thread.start()
         
         try:
             while True:
@@ -327,6 +295,14 @@ class ADEngine:
             print("AD_Engine detenido por el usuario.")
         finally:
             self.close()
+            
+    def send_heartbeat_messages(self):
+        while True:
+            # Aquí se envía el mensaje de 'heartbeat'
+            heartbeat_message = {'type': 'heartbeat'}
+            self.kafka_producer.send('engine_heartbeat_topic', heartbeat_message)
+            self.kafka_producer.flush()
+            time.sleep(5)  # Envía el mensaje cada 10 segundos
 
 
 
@@ -398,12 +374,9 @@ class ADEngine:
                 print(f"Error inesperado al procesar el mensaje de Kafka: {e}")
 
 
-
     def handle_drone_position_reached(self, dron_id, final_position):
         final_position_tuple = tuple(final_position) if isinstance(final_position, list) else final_position
         self.current_positions[dron_id] = final_position_tuple
-        print(f"Drone {dron_id} ha alcanzado su posición final: {final_position_tuple}")
-        #ponerlo a true en el diccionario de estados
         with self.state_lock:
             self.drones_state[dron_id]['reached'] = True
         self.gestionar_estado_drones()
