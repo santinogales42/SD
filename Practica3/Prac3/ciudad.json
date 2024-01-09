@@ -1,7 +1,7 @@
 {
     "coord": {
-        "lon": -0.5658,
-        "lat": 38.1917
+        "lon": 21.0118,
+        "lat": 52.2298
     },
     "weather": [
         {
@@ -13,31 +13,31 @@
     ],
     "base": "stations",
     "main": {
-        "temp": 288.17,
-        "feels_like": 287.35,
-        "temp_min": 287.57,
-        "temp_max": 289.99,
-        "pressure": 1033,
-        "humidity": 62
+        "temp": 263.41,
+        "feels_like": 256.41,
+        "temp_min": 262.03,
+        "temp_max": 265.25,
+        "pressure": 1032,
+        "humidity": 67
     },
     "visibility": 10000,
     "wind": {
-        "speed": 2.57,
-        "deg": 130
+        "speed": 4.63,
+        "deg": 30
     },
     "clouds": {
         "all": 0
     },
-    "dt": 1702915294,
+    "dt": 1704709807,
     "sys": {
         "type": 2,
-        "id": 2012500,
-        "country": "ES",
-        "sunrise": 1702883600,
-        "sunset": 1702917842
+        "id": 2032856,
+        "country": "PL",
+        "sunrise": 1704696197,
+        "sunset": 1704724860
     },
     "timezone": 3600,
-    "id": 2511102,
-    "name": "Santa Pola",
+    "id": 756135,
+    "name": "Warsaw",
     "cod": 200
 }

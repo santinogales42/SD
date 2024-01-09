@@ -231,6 +231,8 @@ def create_app(mongo_address, kafka_address):
 
     @app.route('/get_final_drone_positions', methods=['GET'])
     def get_final_drone_positions():
+        auditoria_logger.info('Evento específico en /get_final_drone_positions')
+
         return jsonify(final_drone_positions)
 
     @app.route('/get_drone_positions')
@@ -335,6 +337,8 @@ def create_app(mongo_address, kafka_address):
             }
 
             db.drones.insert_one(new_drone)
+            auditoria_logger.info('Evento específico en /registro_dron')
+
 
             return jsonify({'status': 'success', 'drone_id': drone_id}), 201
         except errors.PyMongoError as e:

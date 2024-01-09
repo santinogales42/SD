@@ -522,7 +522,7 @@ if __name__ == "__main__":
     parser.add_argument('--listen_port', type=int, default=8080, help='Port to listen on for drone connections')
     parser.add_argument('--max_drones', type=int, default=20, help='Maximum number of drones to support')
     parser.add_argument('--broker_address', default="127.0.0.1:29092", help='Address of the Kafka broker')
-    parser.add_argument('--database_address', default="mongodb://localhost:27017/", help='MongoDB URI for the drones database')
+    parser.add_argument('--database_address', default="localhost:27017", help='MongoDB URI for the drones database')
     parser.add_argument('--json', default="PRUEBAS/AwD_figuras_Correccion.json", help='Path to the JSON file with figures configuration')
 
     # Parsear los argumentos

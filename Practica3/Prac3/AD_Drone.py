@@ -736,3 +736,5 @@ if __name__ == "__main__":
     # Inicia cada dron como un hilo separado
     for dron in drones:
         dron.start()
+        
+    #python AD_Drone.py --engine_ip 172.20.10.6 --engine_port 8080 --api_address https://172.20.10.7:5000
