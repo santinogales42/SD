@@ -1,43 +1,43 @@
 {
     "coord": {
-        "lon": 21.0118,
-        "lat": 52.2298
+        "lon": -0.4815,
+        "lat": 38.3452
     },
     "weather": [
         {
-            "id": 800,
-            "main": "Clear",
-            "description": "clear sky",
-            "icon": "01d"
+            "id": 801,
+            "main": "Clouds",
+            "description": "few clouds",
+            "icon": "02d"
         }
     ],
     "base": "stations",
     "main": {
-        "temp": 263.41,
-        "feels_like": 256.41,
-        "temp_min": 262.03,
-        "temp_max": 265.25,
-        "pressure": 1032,
-        "humidity": 67
+        "temp": 287.4,
+        "feels_like": 286.84,
+        "temp_min": 286.88,
+        "temp_max": 288.1,
+        "pressure": 1018,
+        "humidity": 75
     },
     "visibility": 10000,
     "wind": {
-        "speed": 4.63,
-        "deg": 30
+        "speed": 2.57,
+        "deg": 220
     },
     "clouds": {
-        "all": 0
+        "all": 20
     },
-    "dt": 1704709807,
+    "dt": 1704899831,
     "sys": {
-        "type": 2,
-        "id": 2032856,
-        "country": "PL",
-        "sunrise": 1704696197,
-        "sunset": 1704724860
+        "type": 1,
+        "id": 6391,
+        "country": "ES",
+        "sunrise": 1704871132,
+        "sunset": 1704905944
     },
     "timezone": 3600,
-    "id": 756135,
-    "name": "Warsaw",
+    "id": 2521978,
+    "name": "Alicante",
     "cod": 200
 }

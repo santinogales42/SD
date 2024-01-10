@@ -507,73 +507,73 @@ class ADDrone(threading.Thread):
             return
 
         headers = {'Authorization': f'Bearer {self.access_token}'}
-        
-        try:
-            # Crear un contexto SSL para el cliente
-            context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
-            # Cargar el certificado de la autoridad certificadora
-            context.load_verify_locations('ssl/certificado_CA.crt')
-            context.load_cert_chain(certfile='ssl/certificado_registry.crt', keyfile='ssl/clave_privada_registry.pem')
-            #with socket.create_connection((host, port)) as sock:
-            #    with context.wrap_socket(sock, server_hostname=host) as secure_sock:
-            #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as raw_socket:
-                # Envolver el socket en el contexto SSL
-            #    secure_socket = context.wrap_socket(raw_socket, server_hostname="registry")
+        waiting_for_figure = True
+        while waiting_for_figure:
+            try:
+                # Crear un contexto SSL para el cliente
+                context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+                # Cargar el certificado de la autoridad certificadora
+                context.load_verify_locations('ssl/certificado_CA.crt')
+                context.load_cert_chain(certfile='ssl/certificado_registry.crt', keyfile='ssl/clave_privada_registry.pem')
+                #with socket.create_connection((host, port)) as sock:
+                #    with context.wrap_socket(sock, server_hostname=host) as secure_sock:
+                #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as raw_socket:
+                    # Envolver el socket en el contexto SSL
+                #    secure_socket = context.wrap_socket(raw_socket, server_hostname="registry")
 
-            #    secure_socket.connect(self.engine_address)
-            #    join_message = {'action': 'join', 'ID': self.dron_id, 'Alias': self.alias}
-            #    secure_socket.send(json.dumps(join_message).encode('utf-8'))
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as engine_socket:
-                engine_socket.connect(self.engine_address)
+                #    secure_socket.connect(self.engine_address)
+                #    join_message = {'action': 'join', 'ID': self.dron_id, 'Alias': self.alias}
+                #    secure_socket.send(json.dumps(join_message).encode('utf-8'))
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as engine_socket:
+                    engine_socket.connect(self.engine_address)
 
-                # Preparar el mensaje para enviar
-                join_message = {'action': 'join', 'ID': self.dron_id, 'Alias': self.alias}
-                encoded_message = json.dumps(join_message).encode()
+                    # Preparar el mensaje para enviar
+                    join_message = {'action': 'join', 'ID': self.dron_id, 'Alias': self.alias}
+                    encoded_message = json.dumps(join_message).encode()
 
-                # Cifrar el mensaje
-                encrypted_message = self.public_key.encrypt(
-                    encoded_message,
-                    padding.OAEP(
-                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                        algorithm=hashes.SHA256(),
-                        label=None
+                    # Cifrar el mensaje
+                    encrypted_message = self.public_key.encrypt(
+                        encoded_message,
+                        padding.OAEP(
+                            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                            algorithm=hashes.SHA256(),
+                            label=None
+                        )
                     )
-                )
 
-                # Preparar el mensaje final con ID y datos cifrados
-                final_message = json.dumps({'ID': self.dron_id, 'Data': base64.b64encode(encrypted_message).decode()}).encode()
-                self.db.MensajesKafka.insert_one({
-                    'DroneID': self.dron_id,
-                    'MessageType': 'join',
-                    'OriginalMessage': join_message,
-                    'EncryptedMessage': base64.b64encode(encrypted_message).decode()
-                })
-                # Enviar el mensaje cifrado
-                engine_socket.sendall(final_message)
-                
-                response_data = engine_socket.recv(1024).decode()
-                #response_data = secure_socket.recv(1024).decode()
-                if response_data:
-                    response = json.loads(response_data)
-                    if 'final_position' in response:
-                        if isinstance(response['final_position'], list):
-                            self.final_position = tuple(response['final_position'])
+                    # Preparar el mensaje final con ID y datos cifrados
+                    final_message = json.dumps({'ID': self.dron_id, 'Data': base64.b64encode(encrypted_message).decode()}).encode()
+                    self.db.MensajesKafka.insert_one({
+                        'DroneID': self.dron_id,
+                        'MessageType': 'join',
+                        'OriginalMessage': join_message,
+                        'EncryptedMessage': base64.b64encode(encrypted_message).decode()
+                    })
+                    # Enviar el mensaje cifrado
+                    engine_socket.sendall(final_message)
+                    
+                    response_data = engine_socket.recv(1024).decode()
+                    if response_data:
+                        response = json.loads(response_data)
+                        if 'final_position' in response:
+                            if isinstance(response['final_position'], list):
+                                self.final_position = tuple(response['final_position'])
+                                print(f"Drone {self.dron_id} has received final position: {self.final_position}")
+                                self.in_show_mode = True
+                                threading.Thread(target=self.start_consuming_messages_sin_cifrar, daemon=True).start()
+                                waiting_for_figure = False  # Cambia el estado a modo activo
+                            else:
+                                print("Invalid format for final position received from the server.")
                         else:
-                            print("Invalid format for final position received from the server.")
-                        print(f"Drone {self.dron_id} has received final position: {self.final_position}")
-                        # Iniciar el consumo de mensajes en un hilo separado
-                        self.in_show_mode = True
-                        threading.Thread(target=self.start_consuming_messages_sin_cifrar, daemon=True).start()
+                            print(f"Drone {self.dron_id} is not needed for the current figure. Waiting for the next figure...")
+                            time.sleep(10)  # Espera antes de reintentar
                     else:
-                        print(f"Drone {self.dron_id} failed to join the show. Server response: {response}")
-                else:
-                    print(f"Drone {self.dron_id} failed to join the show. No response from server.")
-        except ssl.SSLError as e:
-            print(f"Error SSL: {e}")
-        except json.JSONDecodeError:
-            print("Failed to decode the server response. Ensure the server sends a valid JSON.")
-        except ConnectionError as e:
-            print(f"Unable to connect to the ADEngine: {e}")
+                        print(f"Drone {self.dron_id} did not receive a response from the server. Retrying in 10 seconds...")
+                        time.sleep(10)  # Espera antes de reintentar
+
+            except (ConnectionError, json.JSONDecodeError, socket.timeout) as e:
+                print(f"An error occurred: {e}. Retrying in 10 seconds...")
+                time.sleep(10)  # Espera antes de reintentar
 
 
     def register_user(self):
