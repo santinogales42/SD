@@ -389,6 +389,23 @@ def create_app(mongo_address, kafka_address):
         except errors.PyMongoError as e:
             return jsonify({'error': str(e)}), 500
 
+    @app.route('/borrar_drones', methods=['POST'])
+    def borrar_drones():
+        try:
+            data = request.json
+            drone_ids = data.get('drone_ids')
+            
+            if not drone_ids:
+                return jsonify({'message': 'No se proporcionaron IDs de drones'}), 400
+
+            # Elimina cada dron por su ID
+            for drone_id in drone_ids:
+                db.drones.delete_one({'ID': int(drone_id)})
+
+            return jsonify({'message': f'Drones eliminados correctamente'}), 200
+        except errors.PyMongoError as e:
+            return jsonify({'error': str(e)}), 500
+
     
     
 

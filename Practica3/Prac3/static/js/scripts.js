@@ -186,7 +186,29 @@ function deleteDrone(droneId) {
     });
 }
 
+
+// Función para borrar drones seleccionados
+function delSelectedDrones() {
+    const selectedDrones = document.querySelectorAll('#drone-list input[name="drone"]:checked');
+    const droneIds = Array.from(selectedDrones).map(checkbox => checkbox.value);
+
+    fetch('/borrar_drones', { 
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ drone_ids: droneIds })
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log(data);
+        updateDroneList();
+    })
+    .catch(error => console.error('Error al borrar los drones:', error));
+}
+
 function updateDroneList() {
+    // Aquí el código para obtener la lista de drones del servidor...
     fetch('/listar_drones')
         .then(response => response.json())
         .then(drones => {
@@ -194,16 +216,13 @@ function updateDroneList() {
             listElement.innerHTML = '';
             drones.forEach(drone => {
                 const listItem = document.createElement('li');
-                listItem.innerHTML = `<input type="checkbox" class="drone-checkbox" id="drone${drone.ID}" value="${drone.ID}"> <label for="drone${drone.ID}">ID: ${drone.ID}, Alias: ${drone.Alias}</label>`;
+                listItem.innerHTML = `
+                    <input type="checkbox" class="drone-checkbox" name="drone" value="${drone.ID}">
+                    <label for="drone${drone.ID}">ID: ${drone.ID}, Alias: ${drone.Alias}</label>
+                `;
                 listElement.appendChild(listItem);
             });
-            /*
-            const joinButton = document.createElement('button');
-            joinButton.innerText = 'Unir al Show';
-            joinButton.onclick = confirmJoinShow;
-            listElement.appendChild(joinButton);*/
-        })
-        .catch(error => console.error('Error al listar drones:', error));
+        });
 }
 
 setInterval(function() {
