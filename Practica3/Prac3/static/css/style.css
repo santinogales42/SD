@@ -225,3 +225,11 @@ nav a:hover {
     border-radius: 3px;
 }
 
+.drone-at-final-position {
+    background-color: green;
+}
+
+.drone-moving {
+    background-color: red; /* O cualquier color que prefieras para representar movimiento */
+}
+

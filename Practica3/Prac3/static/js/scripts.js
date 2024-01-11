@@ -79,7 +79,7 @@ function addDrone() {
         const droneAlias = prompt("Ingrese el alias del dron:");
 
         if (droneID && droneAlias) {
-            fetch('/registro', {
+            fetch('/registroWEB', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

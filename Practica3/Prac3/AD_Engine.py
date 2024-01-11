@@ -43,7 +43,7 @@ class ADEngine:
         )
         self.accept_thread = threading.Thread(target=self.accept_connections)
         self.accept_thread.start()
-        self.last_weather_check = {"city_name": None, "temp_celsius": None}
+        self.last_weather_check = {"city_name": None, "temp_celsius": 10}
         self.private_key = rsa.generate_private_key(
             public_exponent=65537,
             key_size=2048
@@ -246,7 +246,7 @@ class ADEngine:
         #self.kafka_producer.send('drone_final_position', message)
         self.kafka_producer.flush()
         print(f"Instrucción {instruction} enviada al dron {dron_id}")
-        with self.state_lock:  # Asegurar el acceso al diccionario de estados
+        with self.state_lock:
             self.drones_state[dron_id] = {'instruction': instruction, 'reached': False}
             
     def are_all_drones_connected(self):
@@ -267,12 +267,20 @@ class ADEngine:
                     print(f"Temperatura actual en {city_name}: {temp_celsius}°C")
                     if temp_celsius < 0:
                         self.send_warning_to_drones(city_name, temp_celsius)
+                    elif self.last_weather_check['temp_celsius'] < 0 and temp_celsius >= 0:                        
+                        self.resend_positions_and_restart_drones()
 
                     # Actualizar la última comprobación de clima
                     self.last_weather_check['city_name'] = city_name
                     self.last_weather_check['temp_celsius'] = temp_celsius
 
-            time.sleep(10)  # Check every 10 seconds (ajustar según sea necesario)
+            time.sleep(5)
+            
+    def resend_positions_and_restart_drones(self):
+        print("Temperatura normalizada. Reenviando posiciones finales y reiniciando drones.")
+        for dron_id in self.connected_drones:
+            self.send_final_position(dron_id, self.final_positions[dron_id])
+            self.send_instruction_to_drone(dron_id, 'START')
 
     def send_warning_to_drones(self, city_name, temp_celsius):
         warning_message = {
@@ -285,8 +293,17 @@ class ADEngine:
         self.encrypted_message('drone_final_position', warning_message)
         self.kafka_producer.flush()
         print(f"Enviada advertencia de clima frío para todos los drones.")
-
-
+            
+    def send_start_to_drones(self):
+        start_message = {
+            'type': 'instruction',
+            'dron_id': 'all',
+            'instruction': 'START'
+        }
+        self.kafka_producer.send('drone_final_position', start_message)
+        self.encrypted_message('drone_final_position', start_message)
+        self.kafka_producer.flush()
+        print("Enviada instrucción START para todos los drones.")
 
 
     def send_final_position(self, dron_id, final_position):
@@ -311,7 +328,6 @@ class ADEngine:
 
     def start(self):
         print(f"AD_Engine en funcionamiento. Escuchando en el puerto {self.listen_port}...")
-        
         self.kafka_consumer_thread = threading.Thread(target=self.start_kafka_consumer)
         self.kafka_consumer_thread.start()
         self.weather_warning_thread = threading.Thread(target=self.check_weather_warnings)

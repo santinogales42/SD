@@ -313,9 +313,9 @@ def create_app(mongo_address, kafka_address):
         return jsonify({'error': 'Ocurrió un error'}), getattr(e, 'code', 500)
 
 
-    @app.route('/registro', methods=['POST'])
+    @app.route('/registroWEB', methods=['POST'])
     @jwt_required()
-    def registro():
+    def registroWEB():
         try:
             data = request.json
             Alias = data.get('Alias', '').strip()  # Usar 'Alias' con mayúscula
@@ -327,7 +327,29 @@ def create_app(mongo_address, kafka_address):
             # Verificar si el ID ya existe
             if db.drones.find_one({'ID': drone_id}):
                 return jsonify({'error': 'El ID ya existe'}), 409
+            
+            # Generar claves privada y pública
+            private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
+            public_key = private_key.public_key()
 
+            # Convertir las claves a formato PEM
+            private_key_pem = private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            )
+            public_key_pem = public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+            
+            key_document = {
+                'ID': drone_id,
+                'PrivateKey': private_key.private_bytes(encoding=serialization.Encoding.PEM, format=serialization.PrivateFormat.TraditionalOpenSSL, encryption_algorithm=serialization.NoEncryption()),
+                'PublicKey': public_key.public_bytes(encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo)
+            }
+            db.Claves.replace_one({'ID': drone_id}, key_document, upsert=True)
+            
             new_drone = {
                 '_id': ObjectId(),  # Generar ObjectId automáticamente
                 'type': 'register',
@@ -343,9 +365,37 @@ def create_app(mongo_address, kafka_address):
             return jsonify({'status': 'success', 'drone_id': drone_id}), 201
         except errors.PyMongoError as e:
             return jsonify({'error': str(e)}), 500
+        
+        
+    @app.route('/registro', methods=['POST'])
+    @jwt_required()
+    def registro():
+        try:
+            data = request.json
+            Alias = data.get('Alias', '').strip()  # Usar 'Alias' con mayúscula
+            drone_id = int(data.get('ID')) # Obtener el ID proporcionado
 
+            if not Alias or not drone_id:
+                return jsonify({'error': 'Falta el Alias o el ID del dron'}), 400
 
+            # Verificar si el ID ya existe
+            if db.drones.find_one({'ID': drone_id}):
+                return jsonify({'error': 'El ID ya existe'}), 409
+            
+            new_drone = {
+                '_id': ObjectId(),  # Generar ObjectId automáticamente
+                'type': 'register',
+                'ID': drone_id,  # Usar el ID proporcionado
+                'Alias': Alias,
+                'InitialPosition': [1, 1]
+            }
 
+            db.drones.insert_one(new_drone)
+            auditoria_logger.info('Evento específico en /registro_dron')
+
+            return jsonify({'status': 'success', 'drone_id': drone_id}), 201
+        except errors.PyMongoError as e:
+            return jsonify({'error': str(e)}), 500
 
 
     @app.route('/listar_drones', methods=['GET'])
@@ -405,9 +455,23 @@ def create_app(mongo_address, kafka_address):
             return jsonify({'message': f'Drones eliminados correctamente'}), 200
         except errors.PyMongoError as e:
             return jsonify({'error': str(e)}), 500
+        
+        
+    @app.route('/unir_drones_al_show', methods=['POST'])
+    def unir_drones_al_show():
+        data = request.json
+        drone_ids = data.get('drone_ids')
 
-    
-    
+        if not drone_ids:
+            return jsonify({'message': 'No se proporcionaron IDs de drones'}), 400
+
+        for drone_id in drone_ids:
+            kafka_producer.send(
+                'drone_messages_topic', 
+                {'type': 'instruction', 'dron_id': drone_id, 'instruction': 'join_show'}
+            )
+        return jsonify({'message': f'Drones {drone_ids} invitados a unirse al show'}), 200
+
 
     threading.Thread(target=kafka_listener, daemon=True).start()
     context = ('ssl/certificado_registry.crt', 'ssl/clave_privada_registry.pem')

@@ -61,16 +61,13 @@ class ADDrone(threading.Thread):
                 
         warnings.filterwarnings('ignore', category=InsecureRequestWarning)
         #logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
-
-
-        
+     
     def start(self):
         self.show_menu()
         
         
     def generate_keys(self):
         try:
-            
             if self.dron_id is None:
                 raise ValueError("Drone ID is not set. Can't generate keys.")
             
@@ -125,8 +122,6 @@ class ADDrone(threading.Thread):
                 print(f"Error al procesar el mensaje de Kafka: {e}")
                 print("Mensaje recibido:", message.value)
 
-
-    
 
     def start_consuming_messages(self):
         print("ADDrone: Esperando mensajes de Kafka...1")
@@ -218,7 +213,8 @@ class ADDrone(threading.Thread):
                 print("ADDrone: Instrucción STOP recibida, deteniendo y regresando a la base...")
                 self.final_position = self.base_position
                 self.in_show_mode = False
-                self.move_to_final_position()
+                self.return_to_base()
+                self.in_show_mode = True
         
         except json.JSONDecodeError:
             print(f"Received non-JSON message: {message.value}")
@@ -226,12 +222,10 @@ class ADDrone(threading.Thread):
             
     def handle_final_position_message(self, message):
         try:
-            # Verificar si 'final_position' y 'dron_id' están en el mensaje
             if 'final_position' in message and 'dron_id' in message:
                 message_dron_id = message['dron_id']
                 final_position = message['final_position']
 
-                # Procesar el mensaje solo si es para este dron
                 if message_dron_id == self.dron_id:
                     if final_position:
                         self.final_position = tuple(final_position)
@@ -239,14 +233,19 @@ class ADDrone(threading.Thread):
                         if self.in_show_mode:
                             print("ADDrone: Iniciando movimiento hacia la nueva posición final...")
                             self.move_to_final_position()
-                # No se imprime nada si el mensaje no es para este dron
             else:
                 print(f"ADDrone: Mensaje no contiene 'final_position' o 'dron_id'. Mensaje recibido: {message}")
         except Exception as e:
             print(f"Error al procesar el mensaje de posición final: {e}")
-
-
-
+            
+            
+    def return_to_base(self):
+        # Método similar a move_to_final_position pero específico para regresar a la base
+        while self.current_position != self.base_position:
+            self.calculate_movement()
+            self.send_position_update()
+            time.sleep(1)
+        print(f"ADDrone: Posición base alcanzada: {self.current_position}")
 
     def move_to_final_position(self):
         if not self.in_show_mode:
@@ -346,7 +345,6 @@ class ADDrone(threading.Thread):
                         #mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
                         db = mongo_client["dronedb"]
                         drones_collection = db["drones"]
-
                         existing_dron = drones_collection.find_one({"ID": dron_id})
                         
                         if existing_dron:
@@ -420,8 +418,7 @@ class ADDrone(threading.Thread):
         except Exception as e:
             print(f"Error inesperado: {e}")
             
-            
-            
+                   
     def register_via_api(self):
         data = {'ID': str(self.dron_id), 'Alias': self.alias}
         headers = {'Authorization': f'Bearer {self.access_token}'}
@@ -442,31 +439,7 @@ class ADDrone(threading.Thread):
             self.register_drone()
         if method == "2":
             self.register_via_api()
-    
-    
-    
-    def request_final_position_from_db(self):
-        # Conectar a la base de datos de MongoDB
-        mongo_address = args.mongo_address  # args.mongo_address es el argumento que recibes
-        mongo_client = pymongo.MongoClient(mongo_address)
-        #mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
-        db = mongo_client["dronedb"]
-        drones_collection = db["drones_fp"]
-
-        # Consultar la posición final del dron por su ID
-        drone_data = drones_collection.find_one({"ID": self.dron_id})
-
-        if drone_data and "FinalPosition" in drone_data:
-            # Si la posición final ha cambiado, imprimir el mensaje de la nueva figura
-            if self.final_position and self.final_position != drone_data["FinalPosition"]:
-                print("\nSiguiente figura con esta posición final:")
             
-            self.final_position = drone_data["FinalPosition"]
-            print(f"{self.final_position}")
-        else:
-            print(f"No se pudo obtener la posición final para el dron ID: {self.dron_id}")
-        # Cerrar la conexión con la base de datos
-        mongo_client.close()
 
     def delete_drones(self):
         self.dron_id = input("Introduce el ID del dron: ")
