@@ -103,16 +103,16 @@ function addDrone() {
     .catch(error => console.error('Error:', error));
 }
 
+function handleLogin() {
+    const username = prompt("Introduce tu nombre de usuario:");
+    const password = prompt("Introduce tu contraseña:");
+    return request_jwt_token(username, password);
+}
+
 
 function get_jwt_token() {
     return new Promise((resolve, reject) => {
         const tiene_usuario = prompt("¿Ya tienes un usuario? (si/no)").toLowerCase();
-
-        function handleLogin() {
-            const username = prompt("Introduce tu nombre de usuario:");
-            const password = prompt("Introduce tu contraseña:");
-            return request_jwt_token(username, password);
-        }
 
         if (tiene_usuario === "no") {
             register_user()
@@ -131,8 +131,6 @@ function get_jwt_token() {
         }
     });
 }
-
-
 
 
 function request_jwt_token() {
@@ -232,33 +230,50 @@ setInterval(function() {
 
 function updateMapWithTableData() {
     const tableRows = document.querySelectorAll('#drone-positions-table tr');
-    const occupiedPositions = new Set();
-
-    for (let i = 1; i < tableRows.length; i++) {
-        const cells = tableRows[i].cells;
-        const posX = parseInt(cells[1].textContent, 10);
-        const posY = parseInt(cells[2].textContent, 10);
-        occupiedPositions.add(`${posX},${posY}`);
-    }
-
     const mapContainer = document.getElementById('drone-map');
     mapContainer.innerHTML = '';
 
+    // Crea un mapa para almacenar las posiciones de los drones
+    const dronePositions = new Map();
+
+    for (let i = 1; i < tableRows.length; i++) {
+        const cells = tableRows[i].cells;
+        const droneID = cells[0].textContent; // ID del dron
+        const posX = parseInt(cells[1].textContent, 10);
+        const posY = parseInt(cells[2].textContent, 10);
+        const droneColor = getDroneColor(droneID); // Función para obtener el color del dron
+
+        // Agregar la posición y color del dron al mapa
+        dronePositions.set(`${posX},${posY}`, { id: droneID, color: droneColor });
+    }
+
     for (let y = 0; y < 20; y++) {
         for (let x = 0; x < 20; x++) {
-            const cell = document.createElement('div');
             const positionKey = `${x},${y}`;
-            if (finalDronePositions[positionKey]) {
-                cell.classList.add('final-cell');
-            } else if (occupiedPositions.has(positionKey)) {
-                cell.classList.add('occupied-cell');
-            } else {
-                cell.classList.add('drone-cell');
+            const cell = document.createElement('div');
+            cell.classList.add('drone-cell');
+
+            if (dronePositions.has(positionKey)) {
+                const droneData = dronePositions.get(positionKey);
+                cell.style.backgroundColor = droneData.color; // Colorea el dron según su estado
+                cell.textContent = droneData.id; // Muestra el ID del dron en la celda
             }
+
             mapContainer.appendChild(cell);
         }
     }
 }
+
+function getDroneColor(droneID) {
+    // Implementar la lógica para obtener el color del dron
+    // Puedes ajustar esta función según tu lógica de aplicación
+    // Por ejemplo, devolver un color según si el dron ha llegado a su posición final
+    if (finalDronePositions[droneID]) {
+        return 'green'; // Color si el dron ha llegado a su posición final
+    }
+    return 'red'; // Color por defecto
+}
+
 
 
 function updateDronePositions() {

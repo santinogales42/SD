@@ -50,6 +50,7 @@ class ADEngine:
         )     
         self.public_key = self.private_key.public_key()
         self.drones_involucrados = set()
+        self.new_instructions_sent = False
         #Para conexiones seguras
         #self.context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         #self.context.load_cert_chain(certfile="ssl/certificado_registry.crt", keyfile="ssl/clave_privada_registry.pem")
@@ -354,7 +355,6 @@ class ADEngine:
             self.kafka_producer.send('engine_heartbeat_topic', heartbeat_message)
             self.kafka_producer.flush()
             time.sleep(5)  # Envía el mensaje cada 10 segundos
-
 
 
     def end_show(self):
