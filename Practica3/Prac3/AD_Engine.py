@@ -70,7 +70,6 @@ class ADEngine:
             client_socket, _ = self.server_socket.accept()
             threading.Thread(target=self.handle_drone_connection, args=(client_socket,)).start()
                 
-    # En la clase ADEngine
     def handle_drone_connection(self, client_socket):
         try:
             data = client_socket.recv(1024).decode('utf-8')
@@ -234,8 +233,6 @@ class ADEngine:
             print(f"Error al enviar mensaje Kafka: {e}")
 
             
-            
-
     def send_instruction_to_drone(self, dron_id, instruction):
         message = {
             'type': 'instruction',
@@ -252,7 +249,6 @@ class ADEngine:
             
     def are_all_drones_connected(self):
         return len(self.connected_drones) >= self.required_drones
-
 
 
     def check_weather_warnings(self):
@@ -294,17 +290,6 @@ class ADEngine:
         self.encrypted_message('drone_final_position', warning_message)
         self.kafka_producer.flush()
         print(f"Enviada advertencia de clima frío para todos los drones.")
-            
-    def send_start_to_drones(self):
-        start_message = {
-            'type': 'instruction',
-            'dron_id': 'all',
-            'instruction': 'START'
-        }
-        self.kafka_producer.send('drone_final_position', start_message)
-        self.encrypted_message('drone_final_position', start_message)
-        self.kafka_producer.flush()
-        print("Enviada instrucción START para todos los drones.")
 
 
     def send_final_position(self, dron_id, final_position):
@@ -318,13 +303,6 @@ class ADEngine:
         self.encrypted_message('drone_final_position', message)
         #self.send_encrypted_kafka_message('drone_final_position', message)
         self.kafka_producer.flush()
-
-    def procesar_datos_json(self, ruta_archivo_json):
-        with open(ruta_archivo_json, 'r') as archivo:
-            datos = json.load(archivo)
-        self.final_positions = {dron['ID']: tuple(map(int, dron['POS'].split(',')))
-                                for figura in datos['figuras']
-                                for dron in figura['Drones']}
 
 
     def start(self):
@@ -350,11 +328,10 @@ class ADEngine:
             
     def send_heartbeat_messages(self):
         while True:
-            # Aquí se envía el mensaje de 'heartbeat'
             heartbeat_message = {'type': 'heartbeat'}
             self.kafka_producer.send('engine_heartbeat_topic', heartbeat_message)
             self.kafka_producer.flush()
-            time.sleep(5)  # Envía el mensaje cada 10 segundos
+            time.sleep(5)
 
 
     def end_show(self):
@@ -467,7 +444,6 @@ class ADEngine:
         self.indice_figura_actual = 0  # Índice para seguir la figura actual
         self.cargar_figura(self.indice_figura_actual)
 
-    # En la clase ADEngine
 
     def cargar_figura(self, indice_figura):
         figura_actual = self.figuras[indice_figura]
@@ -495,53 +471,13 @@ class ADEngine:
                 self.send_instruction_to_drone(dron_id, 'START')
             print("Instrucción START enviada a todos los drones.")
 
-
-
-    def check_drone_position(self, dron_id):
-        current_position = self.get_current_position(dron_id)
-        final_position = self.get_final_position(dron_id)
-        if current_position == final_position:
-            self.drones_completed[dron_id] = True  # Marca como completado
-            print(f"Dron {dron_id} ha confirmado llegada a la posición final.")
-        else:
-            print(f"Dron {dron_id} aún no ha llegado a la posición final.")
-            
-    def show_in_progress(self):
-        for dron_id, position in self.current_positions.items():
-            if position != self.final_positions.get(dron_id, position):
-                print(f"Dron {dron_id} está en la posición {position}")
-                # Si algún dron no está en su posición final, el espectáculo sigue en progreso
-                return True
-        # Si todos los drones están en su posición final, el espectáculo no está en progreso
-        return False
-    
-    def get_initial_position(self, dron_id):
-        dron_data = self.db.drones.find_one({"ID": dron_id})
-        # Si el dron se encuentra en la base de datos, devuelve su posición inicial
-        if dron_data:
-            return dron_data.get('InitialPosition')  # Devuelve una posición predeterminada si no se encuentra 'InitialPosition'
-
-    def get_current_position(self, dron_id):
-        # Supongamos que las posiciones actuales se almacenan en el estado de la clase
-        return self.current_positions.get(dron_id, self.get_initial_position(dron_id))
-    
-    def get_final_position(self, dron_id):
-        # Supongamos que las posiciones finales se almacenan en un diccionario
-        return self.final_positions.get(dron_id)
-        
-        
 if __name__ == "__main__":
-    # Crear el analizador de argumentos
     parser = argparse.ArgumentParser(description='AD_Engine start-up arguments')
-
-    # Agregar argumentos esperados con valores por defecto
     parser.add_argument('--listen_port', type=int, default=8080, help='Port to listen on for drone connections')
     parser.add_argument('--max_drones', type=int, default=20, help='Maximum number of drones to support')
     parser.add_argument('--broker_address', default="127.0.0.1:29092", help='Address of the Kafka broker')
     parser.add_argument('--database_address', default="localhost:27017", help='MongoDB URI for the drones database')
     parser.add_argument('--json', default="PRUEBAS/AwD_figuras.json", help='Path to the JSON file with figures configuration')
-
-    # Parsear los argumentos
     args = parser.parse_args()
 
     # Inicializar ADEngine con los argumentos parseados
@@ -552,8 +488,5 @@ if __name__ == "__main__":
         database_address=args.database_address
     )
 
-    # Cargar configuración de figuras desde el archivo JSON
     engine.procesar_datos_json(args.json)
-
-    # Iniciar el motor (AD_Engine)
     engine.start()

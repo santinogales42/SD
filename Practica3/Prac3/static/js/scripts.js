@@ -1,8 +1,3 @@
-function toggleDropdown() {
-    var dropdownMenu = document.getElementById("dropdown-menu");
-    dropdownMenu.style.display = (dropdownMenu.style.display === "block") ? "none" : "block";
-}
-
 function createDroneMap() {
     const mapContainer = document.getElementById('drone-map');
     for (let i = 0; i < 400; i++) {
@@ -11,13 +6,6 @@ function createDroneMap() {
         mapContainer.appendChild(cell);
     }
 }
-
-
-window.onload = function() {
-    createDroneMap();
-    updateDroneList();
-    updateDronePositions();
-};
 
 function getWeather(city) {
     fetch('/weather/' + city)
@@ -33,7 +21,6 @@ function getWeather(city) {
 
     })
 }
-
 
 
 function register_user() {
@@ -109,7 +96,6 @@ function handleLogin() {
     return request_jwt_token(username, password);
 }
 
-
 function get_jwt_token() {
     return new Promise((resolve, reject) => {
         const tiene_usuario = prompt("¿Ya tienes un usuario? (si/no)").toLowerCase();
@@ -131,7 +117,6 @@ function get_jwt_token() {
         }
     });
 }
-
 
 function request_jwt_token() {
     return new Promise((resolve, reject) => {
@@ -184,8 +169,6 @@ function deleteDrone(droneId) {
     });
 }
 
-
-// Función para borrar drones seleccionados
 function delSelectedDrones() {
     const selectedDrones = document.querySelectorAll('#drone-list input[name="drone"]:checked');
     const droneIds = Array.from(selectedDrones).map(checkbox => checkbox.value);
@@ -206,7 +189,6 @@ function delSelectedDrones() {
 }
 
 function updateDroneList() {
-    // Aquí el código para obtener la lista de drones del servidor...
     fetch('/listar_drones')
         .then(response => response.json())
         .then(drones => {
@@ -226,14 +208,13 @@ function updateDroneList() {
 setInterval(function() {
     updateDronePositions();
     updateMapWithTableData();
-}, 500); // Actualiza cada 2 segundos
+}, 500);
 
 function updateMapWithTableData() {
     const tableRows = document.querySelectorAll('#drone-positions-table tr');
     const mapContainer = document.getElementById('drone-map');
     mapContainer.innerHTML = '';
 
-    // Crea un mapa para almacenar las posiciones de los drones
     const dronePositions = new Map();
 
     for (let i = 1; i < tableRows.length; i++) {
@@ -258,7 +239,6 @@ function updateMapWithTableData() {
                 cell.style.backgroundColor = droneData.color; // Colorea el dron según su estado
                 cell.textContent = droneData.id; // Muestra el ID del dron en la celda
             }
-
             mapContainer.appendChild(cell);
         }
     }
@@ -269,12 +249,10 @@ function getDroneColor(droneID) {
     // Puedes ajustar esta función según tu lógica de aplicación
     // Por ejemplo, devolver un color según si el dron ha llegado a su posición final
     if (finalDronePositions[droneID]) {
-        return 'green'; // Color si el dron ha llegado a su posición final
+        return 'green';
     }
-    return 'red'; // Color por defecto
+    return 'red';
 }
-
-
 
 function updateDronePositions() {
     fetch('/get_drone_positions')
@@ -303,16 +281,33 @@ function updateFinalDronePositions() {
         .catch(error => console.error('Error al obtener posiciones finales de drones:', error));
 }
 
+function listenForErrors() {
+    const eventSource = new EventSource('/stream_errors');
+    eventSource.onmessage = function(event) {
+        const errors = JSON.parse(event.data);
+        displayErrors(errors);
+    };
+}
 
-// Llamar a la función para actualizar las posiciones finales
+function displayErrors(errors) {
+    const errorList = document.getElementById('error-list');
+    errorList.innerHTML = '';
+    errors.forEach(error => {
+        const listItem = document.createElement('li');
+        listItem.textContent = error;
+        errorList.appendChild(listItem);
+    });
+}
+
 updateFinalDronePositions();
 
 window.onload = function() {
     createDroneMap();
     updateDroneList();
     updateDronePositions();
-    updateFinalPositions(); // Agregar esta línea
+    updateFinalPositions();
     loadErrors();
+    listenForErrors();
 };
 
 function loadErrors() {

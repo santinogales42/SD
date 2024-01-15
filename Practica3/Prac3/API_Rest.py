@@ -5,6 +5,7 @@ from bson import ObjectId
 from datetime import timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_cors import CORS
+from flask import Response
 import os
 import requests
 import logging
@@ -18,6 +19,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
+import time
 
 app = Flask(__name__)
 CORS(app)
@@ -117,6 +119,18 @@ def create_app(mongo_address, kafka_address):
     def error_response(e):
         logging.error(f'Error no capturado: {e}', exc_info=True)
         return jsonify(error=str(e)), 500
+    
+    
+    @app.route('/stream_errors')
+    def stream_errors():
+        def generate():
+            while True:
+                # Suponiendo que tienes una función que obtiene los errores
+                errors = obtener_errores()  
+                yield f"data: {json.dumps(errors)}\n\n"
+                time.sleep(1)  # Ajustar la frecuencia de actualización según sea necesario
+
+        return Response(generate(), mimetype='text/event-stream')
 
 
 

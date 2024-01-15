@@ -22,8 +22,6 @@ import base64
 import json
 import binascii
 
-
-
 class ADDrone(threading.Thread):
     def __init__(self, engine_address, broker_address, mongo_address, api_address, engine_registry_address):
         super().__init__()
@@ -71,13 +69,11 @@ class ADDrone(threading.Thread):
             if self.dron_id is None:
                 raise ValueError("Drone ID is not set. Can't generate keys.")
             
-            # Generar y guardar las claves
             private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
             public_key = private_key.public_key()
             self.private_key = private_key
             self.public_key = public_key
 
-            #Almacenar las claves en MongoDB
             key_document = {
                 'ID': self.dron_id,
                 'PrivateKey': private_key.private_bytes(encoding=serialization.Encoding.PEM, format=serialization.PrivateFormat.TraditionalOpenSSL, encryption_algorithm=serialization.NoEncryption()),
@@ -110,7 +106,6 @@ class ADDrone(threading.Thread):
                 else:
                     message_dict = message.value
 
-                # Procesar el mensaje basado en su tipo
                 if message_dict['type'] == 'final_position':
                     self.handle_final_position_message(message_dict)
                 elif message_dict['type'] == 'instruction':
@@ -140,7 +135,6 @@ class ADDrone(threading.Thread):
 
         for message in consumer:
             try:
-                # Intenta decodificar el mensaje de Base64. Si falla, asume que no está cifrado.
                 try:
                     decoded_message = base64.b64decode(message.value).decode('utf-8')
                     # Intenta descifrar el mensaje
@@ -240,7 +234,6 @@ class ADDrone(threading.Thread):
             
             
     def return_to_base(self):
-        # Método similar a move_to_final_position pero específico para regresar a la base
         while self.current_position != self.base_position:
             self.calculate_movement()
             self.send_position_update()
@@ -340,7 +333,7 @@ class ADDrone(threading.Thread):
                     dron_id = int(user_input)
 
                     if 1 <= dron_id <= 99:
-                        mongo_address = args.mongo_address  # args.mongo_address es el argumento que recibes
+                        mongo_address = args.mongo_address 
                         mongo_client = pymongo.MongoClient(mongo_address)
                         #mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
                         db = mongo_client["dronedb"]
@@ -372,7 +365,6 @@ class ADDrone(threading.Thread):
             host, port = self.registry_address.split(':')
             registry_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             registry_socket.connect((host, int(port)))
-            # Datos del dron
             dron_data = {'ID': self.dron_id, 'Alias': self.alias}
 
             # Cifrar los datos
@@ -387,7 +379,6 @@ class ADDrone(threading.Thread):
 
             # Preparar datos para enviar
             data_to_send = json.dumps({'ID': self.dron_id, 'Data': base64.b64encode(encrypted_data).decode()}).encode()
-
             # Enviar datos cifrados
             registry_socket.sendall(data_to_send)
             # Recibir y procesar respuesta
@@ -409,7 +400,6 @@ class ADDrone(threading.Thread):
                     'Alias': self.alias,
                     'InitialPosition': self.current_position
                 }
-                #Cifrar y enviar el mensaje a Kafka
                 self.send_kafka_message('drone_messages_topic', full_message)
             else:
                 print(f"Error en el registro: {response_json['message']}")
@@ -422,9 +412,8 @@ class ADDrone(threading.Thread):
     def register_via_api(self):
         data = {'ID': str(self.dron_id), 'Alias': self.alias}
         headers = {'Authorization': f'Bearer {self.access_token}'}
-        api_address = args.api_address  # args.api_address es el argumento que recibes
+        api_address = args.api_address
         response = requests.post(f'{api_address}/registro', json=data, headers=headers, verify=False)
-        #response = requests.post('http://localhost:5000/registro', json=data, headers=headers)
         if self.id_exists(self.dron_id):
             print("ID de dron ya existe. Introduce un ID diferente.")
             return
@@ -444,9 +433,8 @@ class ADDrone(threading.Thread):
     def delete_drones(self):
         self.dron_id = input("Introduce el ID del dron: ")
 
-        # Primero intenta eliminar el dron a través de la API
         headers = {'Authorization': f'Bearer {self.access_token}'}
-        api_address = args.api_address  # args.api_address es el argumento que recibes
+        api_address = args.api_address
         try:
             response = requests.delete(f'{api_address}/borrar_dron/{self.dron_id}', headers=headers, verify=False)
             
@@ -458,8 +446,7 @@ class ADDrone(threading.Thread):
         except requests.exceptions.ConnectionError:
             print("No se pudo conectar a la API. Intentando eliminar desde la base de datos local.")
 
-        # Si la API falla, intenta eliminarlo de la base de datos local
-        mongo_address = args.mongo_address  # args.mongo_address es el argumento que recibes
+        mongo_address = args.mongo_address
         mongo_client = pymongo.MongoClient(mongo_address)
         db = mongo_client["dronedb"]
         drones_collection = db["drones"]
@@ -522,7 +509,6 @@ class ADDrone(threading.Thread):
                         'OriginalMessage': join_message,
                         'EncryptedMessage': base64.b64encode(encrypted_message).decode()
                     })
-                    # Enviar el mensaje cifrado
                     engine_socket.sendall(final_message)
                     
                     response_data = engine_socket.recv(1024).decode()
@@ -557,9 +543,8 @@ class ADDrone(threading.Thread):
             if not username or not password:
                 print("Nombre de usuario y contraseña son obligatorios.")
                 continue
-            api_address = args.api_address  # args.api_address es el argumento que recibes
+            api_address = args.api_address
             response = requests.post(f'{api_address}/registro_usuario', json={'username': username, 'password': password}, verify=False)
-            #response = requests.post('http://localhost:5000/registro_usuario', json={'username': username, 'password': password})
 
             if response.status_code == 201:
                 print("Usuario registrado exitosamente.")
@@ -582,17 +567,15 @@ class ADDrone(threading.Thread):
         password = input("Introduce tu contraseña: ")
         self.access_token = self.request_jwt_token(username, password)
         if self.access_token:
-            self.token_time_received = time.time()  # Guardar el momento en que se obtiene el token
+            self.token_time_received = time.time()
             print("Token JWT obtenido con éxito.")
         else:
             print("Error al obtener token JWT")
 
     def request_jwt_token(self, username, password):
         try:
-            # Solicitar el token JWT a la API
-            api_address = args.api_address  # args.api_address es el argumento que recibes
+            api_address = args.api_address
             response = requests.post(f'{api_address}/login', json={'username': username, 'password': password}, verify=False)
-            #response = requests.post('http://localhost:5000/login', json={'username': username, 'password': password})
             if response.status_code == 200:
                 return response.json().get('access_token')
             else:
@@ -650,7 +633,7 @@ class ADDrone(threading.Thread):
             "2": self.join_show,
             "3": self.delete_drones,
             "4": self.get_jwt_token,
-            "5": self.take_over_drone,  # Agregar la nueva opción aquí
+            "5": self.take_over_drone,
             "6": self.cleanbd
         }
         try:
@@ -694,7 +677,6 @@ if __name__ == "__main__":
     parser.add_argument('--mongo_address', type=str, default='localhost:27017', help='Address of the MongoDB server')
     parser.add_argument('--api_address', type=str, default='https://localhost:5000', help='Address of the API server')
     args = parser.parse_args()
-    #python tu_script.py --mongo_address mi_servidor_mongodb:27017 --api_address http://mi_servidor_api:5000 --engine_registry_address mi_servidor_engine_registry:8081
     
     drones = []
     dron = ADDrone(
@@ -706,7 +688,6 @@ if __name__ == "__main__":
     )
     drones.append(dron)
 
-    # Inicia cada dron como un hilo separado
     for dron in drones:
         dron.start()
         
