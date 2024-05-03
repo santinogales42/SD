@@ -2,7 +2,11 @@ Cosas que debo de hacer para Julio:
 
 1. Lo que pase el profesor
 2. Base de datos individual para cada dron
+<<<<<<< Updated upstream
 3. Token visible en la base de datos (XD)
+=======
+3. Token visible en la base de datos (XD) -> Hecho pero no comprobado en API_Rest
+>>>>>>> Stashed changes
 4. Seguridad en el aspecto de Kafka, es decir, mejorar la de Engine con Drone.
 5. Tengo ya el asimetrico con las claves RSa, pero en aspecto de seguridad me hace falta el simetrico, aun ns
 6. Distribuido

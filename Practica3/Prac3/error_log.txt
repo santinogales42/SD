@@ -4,6 +4,7 @@
 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+<<<<<<< Updated upstream
 create_app.<locals>.error_response() takes 1 positional argument but 2 were given
 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
 create_app.<locals>.error_response() takes 1 positional argument but 2 were given
@@ -27,5 +28,7 @@ create_app.<locals>.error_response() takes 1 positional argument but 2 were give
 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+=======
+>>>>>>> Stashed changes
 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.

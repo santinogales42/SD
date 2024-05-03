@@ -244,6 +244,7 @@ function updateMapWithTableData() {
     }
 }
 
+<<<<<<< Updated upstream
 function getDroneColor(droneID) {
     // Implementar la lógica para obtener el color del dron
     // Puedes ajustar esta función según tu lógica de aplicación
@@ -253,6 +254,26 @@ function getDroneColor(droneID) {
     }
     return 'red';
 }
+=======
+function cargarAuditoria() {
+    fetch('/auditoria')
+    .then(response => response.json())
+    .then(data => {
+        const lista = document.getElementById('lista-auditoria');
+        lista.innerHTML = ''; // Limpiar lista actual
+        data.forEach(log => {
+            const item = document.createElement('li');
+            item.textContent = `${log.timestamp}: ${log.evento}`;
+            lista.appendChild(item);
+        });
+    })
+    .catch(error => console.error('Error al cargar auditoría:', error));
+}
+
+setInterval(cargarAuditoria, 5000);
+
+
+>>>>>>> Stashed changes
 
 function updateDronePositions() {
     fetch('/get_drone_positions')

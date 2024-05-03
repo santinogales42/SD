@@ -14,14 +14,21 @@ import threading
 from kafka import KafkaConsumer, KafkaProducer
 import json
 import argparse
+<<<<<<< Updated upstream
 import base64
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
 import time
+=======
+import datetime
+from flask_socketio import SocketIO, emit
+
+>>>>>>> Stashed changes
 
 app = Flask(__name__)
+socketio = SocketIO(app)
 CORS(app)
 #logging.basicConfig(level=logging.INFO)
 
@@ -268,6 +275,11 @@ def create_app(mongo_address, kafka_address):
         auditoria_logger.info('Evento específico en /registro_usuario')
         return jsonify({"msg": "Usuario registrado exitosamente"}), 201
 
+<<<<<<< Updated upstream
+=======
+    
+    #TODO: Comprobar la expiracion y visualizacion de los token
+>>>>>>> Stashed changes
     @app.route('/login', methods=['POST'])
     def login():
         username = request.json.get("username")
@@ -275,11 +287,28 @@ def create_app(mongo_address, kafka_address):
         user = db.users.find_one({"username": username})
 
         if user and check_password_hash(user['password_hash'], password):
+            # Genera el token con una vida útil de 20 segundos
             access_token = create_access_token(identity=username, expires_delta=timedelta(seconds=20))
-            auditoria_logger.info('Evento específico en /login')
+            
+            db.tokens.insert_one({
+                'username': username,
+                'token': access_token,
+                'created_at': datetime.now(),
+                'expires_at': datetime.now() + timedelta(seconds=20)
+            })
+            
+            # Crear un índice para borrar automáticamente tokens expirados
+            db.tokens.create_index("expires_at", expireAfterSeconds=20)
+
+            auditoria_logger.info('Usuario {} ha iniciado sesión'.format(username))
             return jsonify(access_token=access_token)
         return jsonify({"msg": "Credenciales incorrectas"}), 401
 
+<<<<<<< Updated upstream
+=======
+
+
+>>>>>>> Stashed changes
     @app.route('/protegido', methods=['GET'])
     @jwt_required()
     def protegido():
@@ -291,6 +320,16 @@ def create_app(mongo_address, kafka_address):
     def evento():
         logging.info("Evento registrado")
         return jsonify(msg="Evento registrado")
+    
+    @app.route('/auditoria', methods=['GET'])
+    def obtener_auditoria():
+        try:
+            logs = list(db.auditoria.find({}, {'_id': 0, 'timestamp': 1, 'evento': 1}).sort('timestamp', -1))
+            return jsonify(logs)
+        except Exception as e:
+            logging.error(f"Error al recuperar los eventos de auditoría: {e}")
+            return jsonify({"error": "Error al obtener los eventos de auditoría"}), 500
+
 
     ##### API #####
     @app.errorhandler(Exception)

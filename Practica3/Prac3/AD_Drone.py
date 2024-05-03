@@ -22,6 +22,7 @@ import base64
 import json
 import binascii
 
+
 class ADDrone(threading.Thread):
     def __init__(self, engine_address, broker_address, mongo_address, api_address, engine_registry_address):
         super().__init__()
