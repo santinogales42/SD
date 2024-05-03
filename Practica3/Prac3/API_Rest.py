@@ -14,18 +14,16 @@ import threading
 from kafka import KafkaConsumer, KafkaProducer
 import json
 import argparse
-<<<<<<< Updated upstream
 import base64
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
 import time
-=======
+
 import datetime
 from flask_socketio import SocketIO, emit
 
->>>>>>> Stashed changes
 
 app = Flask(__name__)
 socketio = SocketIO(app)
@@ -275,11 +273,8 @@ def create_app(mongo_address, kafka_address):
         auditoria_logger.info('Evento específico en /registro_usuario')
         return jsonify({"msg": "Usuario registrado exitosamente"}), 201
 
-<<<<<<< Updated upstream
-=======
     
     #TODO: Comprobar la expiracion y visualizacion de los token
->>>>>>> Stashed changes
     @app.route('/login', methods=['POST'])
     def login():
         username = request.json.get("username")
@@ -304,11 +299,7 @@ def create_app(mongo_address, kafka_address):
             return jsonify(access_token=access_token)
         return jsonify({"msg": "Credenciales incorrectas"}), 401
 
-<<<<<<< Updated upstream
-=======
 
-
->>>>>>> Stashed changes
     @app.route('/protegido', methods=['GET'])
     @jwt_required()
     def protegido():

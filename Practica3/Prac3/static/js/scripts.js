@@ -244,7 +244,6 @@ function updateMapWithTableData() {
     }
 }
 
-<<<<<<< Updated upstream
 function getDroneColor(droneID) {
     // Implementar la lógica para obtener el color del dron
     // Puedes ajustar esta función según tu lógica de aplicación
@@ -254,7 +253,7 @@ function getDroneColor(droneID) {
     }
     return 'red';
 }
-=======
+
 function cargarAuditoria() {
     fetch('/auditoria')
     .then(response => response.json())
@@ -273,7 +272,6 @@ function cargarAuditoria() {
 setInterval(cargarAuditoria, 5000);
 
 
->>>>>>> Stashed changes
 
 function updateDronePositions() {
     fetch('/get_drone_positions')
