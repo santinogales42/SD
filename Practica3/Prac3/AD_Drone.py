@@ -64,7 +64,7 @@ class ADDrone(threading.Thread):
     def start(self):
         self.show_menu()
         
-        
+                    
     def generate_keys(self):
         try:
             if self.dron_id is None:
@@ -677,6 +677,7 @@ if __name__ == "__main__":
     parser.add_argument('--broker_address', type=str, default='localhost:29092', help='Address of the Kafka broker')
     parser.add_argument('--mongo_address', type=str, default='localhost:27017', help='Address of the MongoDB server')
     parser.add_argument('--api_address', type=str, default='https://localhost:5000', help='Address of the API server')
+    parser.add_argument('--drones_count', type=int, default=1, help='Number of drones to automatically register and join')
     args = parser.parse_args()
     
     drones = []

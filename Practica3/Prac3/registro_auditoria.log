@@ -64,3 +64,8 @@
 2024-01-16 18:27:12,671 - INFO - Evento específico en /registro_dron
 2024-01-16 18:27:14,528 - INFO - Evento específico en /login
 2024-01-16 18:27:38,825 - INFO - Evento específico en /registro_usuario
+2024-05-07 15:34:25,749 - INFO - Evento específico en /get_final_drone_positions
+2024-05-07 15:35:24,632 - INFO - Evento específico en /get_final_drone_positions
+2024-05-07 15:41:03,571 - INFO - Evento específico en /registro_usuario
+2024-05-07 15:43:40,186 - INFO - Evento específico en /registro_usuario
+2024-05-07 15:48:04,280 - INFO - Usuario a ha iniciado sesión

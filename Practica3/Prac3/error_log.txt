@@ -32,3 +32,9 @@ create_app.<locals>.error_response() takes 1 positional argument but 2 were give
 >>>>>>> Stashed changes
 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
 404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+404 Not Found: The requested URL was not found on the server. If you entered the URL manually please check your spelling and try again.
+module 'datetime' has no attribute 'now'
+module 'datetime' has no attribute 'now'
+module 'datetime' has no attribute 'now'
+module 'datetime' has no attribute 'now'
+module 'datetime' has no attribute 'now'
