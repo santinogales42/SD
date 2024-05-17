@@ -321,6 +321,17 @@ def create_app(mongo_address, kafka_address):
         except Exception as e:
             logging.error(f"Error al recuperar los eventos de auditoría: {e}")
             return jsonify({"error": "Error al obtener los eventos de auditoría"}), 500
+        
+    @app.route('/stream_auditoria', methods=['GET'])
+    def stream_auditoria():
+        def generate():
+            while True:
+                logs = list(db.auditoria.find({}, {'_id': 0, 'timestamp': 1, 'evento': 1}).sort('timestamp', -1))
+                yield f"data: {json.dumps(logs)}\n\n"
+                time.sleep(5)  # Ajusta el intervalo de tiempo según sea necesario
+
+        return Response(generate(), mimetype='text/event-stream')
+
 
 
     ##### API #####

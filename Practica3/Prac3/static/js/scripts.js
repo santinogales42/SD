@@ -254,6 +254,8 @@ function getDroneColor(droneID) {
     return 'red';
 }
 
+
+//TODO: Implementar funcion para obtener auditoria de la practica final
 function cargarAuditoria() {
     fetch('/auditoria')
     .then(response => response.json())
@@ -269,7 +271,19 @@ function cargarAuditoria() {
     .catch(error => console.error('Error al cargar auditoría:', error));
 }
 
-setInterval(cargarAuditoria, 5000);
+function listenForAuditUpdates() {
+    const eventSource = new EventSource('/stream_auditoria');
+    eventSource.onmessage = function(event) {
+        const auditoria = JSON.parse(event.data);
+        const lista = document.getElementById('lista-auditoria');
+        lista.innerHTML = ''; // Limpiar lista actual
+        auditoria.forEach(log => {
+            const item = document.createElement('li');
+            item.textContent = `${log.timestamp}: ${log.evento}`;
+            lista.appendChild(item);
+        });
+    };
+}
 
 
 
@@ -327,6 +341,7 @@ window.onload = function() {
     updateFinalPositions();
     loadErrors();
     listenForErrors();
+    listenForAuditUpdates();
 };
 
 function loadErrors() {

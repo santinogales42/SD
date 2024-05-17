@@ -318,6 +318,8 @@ class ADDrone(threading.Thread):
         self.kafka_producer.send('drone_position_updates', value=message)
         self.kafka_producer.flush()
         print(f"Nueva posición: {self.current_position}")
+        self.log_auditoria('Actualización de posición', f'Dron {self.dron_id} actualizado a posición {self.current_position}.')
+
     
     def input_drone_data(self):
         if not (self.access_token):
@@ -402,6 +404,7 @@ class ADDrone(threading.Thread):
                     'InitialPosition': self.current_position
                 }
                 self.send_kafka_message('drone_messages_topic', full_message)
+                self.log_auditoria('Registro', f"Registro exitoso del dron {self.dron_id}")
             else:
                 print(f"Error en el registro: {response_json['message']}")
         except ConnectionRefusedError:
@@ -420,6 +423,7 @@ class ADDrone(threading.Thread):
             return
         if response.status_code == 201:
             print(f"Registrado via API para el dron {self.dron_id}.")
+            self.log_auditoria('Registro de dron via API', f'Dron {self.dron_id} registrado exitosamente via API.')
         else:
             print(f"Error al registrar via API: {response.text}")
 
@@ -456,6 +460,7 @@ class ADDrone(threading.Thread):
             result = drones_collection.delete_one({'ID': int(self.dron_id)})
             if result.deleted_count == 1:
                 print(f"Dron con ID {self.dron_id} eliminado de la base de datos.")
+                self.log_auditoria('Eliminación de dron local', f'Dron {self.dron_id} eliminado de la base de datos local.')
             else:
                 print(f"No se encontró el dron con ID {self.dron_id} en la base de datos.")
         except Exception as e:
@@ -522,6 +527,7 @@ class ADDrone(threading.Thread):
                                 self.in_show_mode = True
                                 threading.Thread(target=self.start_consuming_messages_sin_cifrar, daemon=True).start()
                                 waiting_for_figure = False  # Cambia el estado a modo activo
+                                self.log_auditoria('Unión al show', f'Dron {self.dron_id} unido al show con posición final {self.final_position}.')
                             else:
                                 print("Invalid format for final position received from the server.")
                         else:
@@ -626,6 +632,23 @@ class ADDrone(threading.Thread):
             print("Base de datos limpiada.")
         except Exception as e:
             print(f"Error al limpiar la base de datos: {e}")
+    
+    #TODO: Implementar el método de auditoría      
+    def log_auditoria(evento, descripcion):
+        try:
+            data = {
+                'evento': evento,
+                'descripcion': descripcion,
+                'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
+            }
+            response = requests.post(f'{args.api_address}/auditoria', json=data, verify=False)
+            if response.status_code == 201:
+                print(f"Evento de auditoría registrado: {evento}")
+            else:
+                print(f"Error al registrar evento de auditoría: {response.text}")
+        except requests.exceptions.RequestException as e:
+            print(f"Error de conexión al registrar evento de auditoría: {e}")
+
 
                
     def show_menu(self):
