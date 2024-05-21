@@ -12,16 +12,24 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
 import base64
+import requests
+import warnings
+from urllib3.exceptions import InsecureRequestWarning
+
+# Ignore InsecureRequestWarning
+#warnings.simplefilter('ignore', InsecureRequestWarning)
+
 
 #logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
 
 
 class ADEngine:
-    def __init__(self, listen_port, max_drones, broker_address, database_address):
+    def __init__(self, listen_port, max_drones, broker_address, database_address, api_address):
         self.listen_port = listen_port
         self.max_drones = max_drones
         self.broker_address = broker_address
         self.database_address = database_address
+        self.api_address = api_address
         self.client = pymongo.MongoClient(self.database_address)
         self.db = self.client["dronedb"]
         self.state_lock = threading.Lock()
@@ -112,6 +120,7 @@ class ADEngine:
                         self.send_positions_and_start_commands()
                     remaining_drones = self.required_drones - len(self.connected_drones)
                     print(f"Drone ID {drone_id} has joined. {remaining_drones} drones are still required.")
+                    self.log_auditoria('JOIN', f"El dron {drone_id} se ha unido al espectáculo.", tipo='engine')
                     final_position = self.final_positions[drone_id]
                     response = {'status': 'success', 'final_position': final_position}
                 else:
@@ -290,6 +299,7 @@ class ADEngine:
         self.encrypted_message('drone_final_position', warning_message)
         self.kafka_producer.flush()
         print(f"Enviada advertencia de clima frío para todos los drones.")
+        self.log_auditoria('STOP', 'Advertencia de clima frío enviada a todos los drones.', tipo='engine')
 
 
     def send_final_position(self, dron_id, final_position):
@@ -424,8 +434,7 @@ class ADEngine:
             # Todos los drones han alcanzado su posición
             print("Todos los drones han alcanzado su posición final.")
             return True
-
-
+        
 
     def load_next_figure(self):
         self.indice_figura_actual += 1
@@ -470,6 +479,26 @@ class ADEngine:
             for dron_id in self.connected_drones:
                 self.send_instruction_to_drone(dron_id, 'START')
             print("Instrucción START enviada a todos los drones.")
+            self.log_auditoria('START', 'Instrucción START enviada a todos los drones.', tipo='engine')
+            
+    #TODO: No se que pasa pero me sale un error raro al unir drones, EXCEPTION
+    def log_auditoria(self,evento, descripcion, tipo='engine'):
+        try:
+            data = {
+                'evento': evento,
+                'descripcion': descripcion,
+                'timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
+                'tipo': tipo  # Especificar el tipo de auditoría
+            }
+            # Enviar evento de auditoría a la API
+            response = requests.post(f'{args.api_address}/auditoria', json=data, verify='/ssl/certificado_CA.crt')
+            if response.status_code == 201:
+                print(f"Evento de auditoría registrado: {evento}")
+            else:
+                print(f"Error al registrar evento de auditoría: {response.text}")
+        except requests.exceptions.RequestException as e:
+            print(f"Error de conexión al registrar evento de auditoría: {e}")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='AD_Engine start-up arguments')
@@ -478,6 +507,7 @@ if __name__ == "__main__":
     parser.add_argument('--broker_address', default="127.0.0.1:29092", help='Address of the Kafka broker')
     parser.add_argument('--database_address', default="localhost:27017", help='MongoDB URI for the drones database')
     parser.add_argument('--json', default="PRUEBAS/AwD_figuras.json", help='Path to the JSON file with figures configuration')
+    parser.add_argument('--api_address', type=str, default='https://localhost:5000', help='Address of the API server')
     args = parser.parse_args()
 
     # Inicializar ADEngine con los argumentos parseados
@@ -485,7 +515,8 @@ if __name__ == "__main__":
         listen_port=args.listen_port,
         max_drones=args.max_drones,  # Asegúrate de manejar este argumento en tu clase ADEngine
         broker_address=args.broker_address,
-        database_address=args.database_address
+        database_address=args.database_address,
+        api_address=args.api_address
     )
 
     engine.procesar_datos_json(args.json)

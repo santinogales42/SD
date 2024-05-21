@@ -103,3 +103,35 @@
 2024-05-21 18:13:22,268 - INFO - Evento específico en /get_final_drone_positions
 2024-05-21 18:13:39,914 - INFO - Usuario a ha iniciado sesión
 2024-05-21 18:13:45,504 - INFO - Evento específico en /registro_dron
+2024-05-21 18:19:01,154 - INFO - Evento específico en /get_final_drone_positions
+2024-05-21 18:19:01,190 - INFO - Evento específico en /get_final_drone_positions
+2024-05-21 18:19:10,120 - INFO - Usuario a ha iniciado sesión
+2024-05-21 18:19:21,015 - INFO - Evento específico en /registro_dron
+2024-05-21 18:19:25,274 - INFO - Usuario a ha iniciado sesión
+2024-05-21 18:19:49,235 - INFO - Usuario a ha iniciado sesión
+2024-05-21 19:30:30,387 - INFO - Evento específico en /get_final_drone_positions
+2024-05-21 19:30:30,432 - INFO - Evento específico en /get_final_drone_positions
+2024-05-21 19:31:12,758 - INFO - Evento específico en /registro_usuario
+2024-05-21 19:31:14,522 - INFO - Usuario a ha iniciado sesión
+2024-05-21 19:31:18,619 - INFO - Evento específico en /registro_dron
+2024-05-21 19:31:34,872 - INFO - Usuario a ha iniciado sesión
+2024-05-21 19:32:50,308 - INFO - Usuario a ha iniciado sesión
+2024-05-21 19:32:59,126 - INFO - Usuario a ha iniciado sesión
+2024-05-21 19:43:50,181 - INFO - Evento específico en /get_final_drone_positions
+2024-05-21 19:43:50,211 - INFO - Evento específico en /get_final_drone_positions
+2024-05-21 19:43:56,677 - INFO - Evento específico en /borrar_dron/<drone_id>
+2024-05-21 19:44:06,604 - INFO - Usuario a ha iniciado sesión
+2024-05-21 19:44:14,641 - INFO - Evento específico en /registro_dron
+2024-05-21 19:44:30,364 - INFO - Usuario a ha iniciado sesión
+2024-05-21 19:46:06,953 - INFO - Evento específico en /get_final_drone_positions
+2024-05-21 19:46:06,994 - INFO - Evento específico en /get_final_drone_positions
+2024-05-21 19:46:11,329 - INFO - Evento específico en /borrar_dron/<drone_id>
+2024-05-21 19:46:40,595 - INFO - Usuario a ha iniciado sesión
+2024-05-21 19:46:42,285 - INFO - Evento específico en /registro_dron
+2024-05-21 19:47:00,237 - INFO - Usuario a ha iniciado sesión
+2024-05-21 19:51:11,872 - INFO - Usuario a ha iniciado sesión
+2024-05-21 19:51:15,925 - INFO - Evento específico en /registro_dron
+2024-05-21 19:51:19,898 - INFO - Usuario a ha iniciado sesión
+2024-05-21 19:52:50,988 - INFO - Usuario a ha iniciado sesión
+2024-05-21 19:52:53,674 - INFO - Evento específico en /registro_dron
+2024-05-21 19:52:56,674 - INFO - Usuario a ha iniciado sesión

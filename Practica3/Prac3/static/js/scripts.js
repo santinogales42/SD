@@ -255,17 +255,23 @@ function getDroneColor(droneID) {
 }
 
 
-//TODO: Implementar funcion para obtener auditoria de la practica final
 function cargarAuditoria() {
     fetch('/auditoria')
     .then(response => response.json())
     .then(data => {
-        const lista = document.getElementById('lista-auditoria');
-        lista.innerHTML = ''; // Limpiar lista actual
+        const listaDrones = document.getElementById('lista-auditoria');
+        const listaEngine = document.getElementById('lista-auditoria-engine');
+        listaDrones.innerHTML = ''; // Limpiar lista actual
+        listaEngine.innerHTML = ''; // Limpiar lista actual
+
         data.forEach(log => {
             const item = document.createElement('li');
             item.textContent = `${log.timestamp}: ${log.evento} - ${log.descripcion}`;
-            lista.appendChild(item);
+            if (log.tipo === 'engine') {
+                listaEngine.appendChild(item);
+            } else {
+                listaDrones.appendChild(item);
+            }
         });
     })
     .catch(error => console.error('Error al cargar auditoría:', error));
@@ -275,12 +281,19 @@ function listenForAuditUpdates() {
     const eventSource = new EventSource('/stream_auditoria');
     eventSource.onmessage = function(event) {
         const auditoria = JSON.parse(event.data);
-        const lista = document.getElementById('lista-auditoria');
-        lista.innerHTML = ''; // Limpiar lista actual
+        const listaDrones = document.getElementById('lista-auditoria');
+        const listaEngine = document.getElementById('lista-auditoria-engine');
+        listaDrones.innerHTML = ''; // Limpiar lista actual
+        listaEngine.innerHTML = ''; // Limpiar lista actual
+
         auditoria.forEach(log => {
             const item = document.createElement('li');
             item.textContent = `${log.timestamp}: ${log.evento} - ${log.descripcion}`;
-            lista.appendChild(item);
+            if (log.tipo === 'engine') {
+                listaEngine.appendChild(item);
+            } else {
+                listaDrones.appendChild(item);
+            }
         });
     };
 }
@@ -290,11 +303,10 @@ window.onload = function() {
     updateDroneList();
     updateDronePositions();
     updateFinalDronePositions();
-    //loadErrors();
-    //listenForErrors();
     listenForAuditUpdates();
     cargarAuditoria(); // Asegúrate de llamar a esta función al cargar la página
 };
+
 
 
 

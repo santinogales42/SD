@@ -402,8 +402,7 @@ class ADDrone(threading.Thread):
                     'InitialPosition': self.current_position
                 }
                 self.send_kafka_message('drone_messages_topic', full_message)
-                #TODO: Error inesperado: ADDrone.log_auditoria() takes 2 positional arguments but 3 were given
-                self.log_auditoria('Registro', f"Registro exitoso del dron {self.dron_id}")
+                self.log_auditoria('Registro', f"Registro exitoso del dron {self.dron_id}", tipo='drone')
             else:
                 print(f"Error en el registro: {response_json['message']}")
         except ConnectionRefusedError:
@@ -422,7 +421,7 @@ class ADDrone(threading.Thread):
             return
         if response.status_code == 201:
             print(f"Registrado via API para el dron {self.dron_id}.")
-            self.log_auditoria('Registro de dron via API', f'Dron {self.dron_id} registrado exitosamente via API.')
+            self.log_auditoria('Registro de dron via API', f'Dron {self.dron_id} registrado exitosamente via API.', tipo='drone')
         else:
             print(f"Error al registrar via API: {response.text}")
 
@@ -459,7 +458,7 @@ class ADDrone(threading.Thread):
             result = drones_collection.delete_one({'ID': int(self.dron_id)})
             if result.deleted_count == 1:
                 print(f"Dron con ID {self.dron_id} eliminado de la base de datos.")
-                self.log_auditoria('Eliminación de dron local', f'Dron {self.dron_id} eliminado de la base de datos local.')
+                self.log_auditoria('Eliminación de dron local', f'Dron {self.dron_id} eliminado de la base de datos local.',tipo='drone')
             else:
                 print(f"No se encontró el dron con ID {self.dron_id} en la base de datos.")
         except Exception as e:
@@ -526,7 +525,7 @@ class ADDrone(threading.Thread):
                                 self.in_show_mode = True
                                 threading.Thread(target=self.start_consuming_messages_sin_cifrar, daemon=True).start()
                                 waiting_for_figure = False  # Cambia el estado a modo activo
-                                self.log_auditoria('Unión al show', f'Dron {self.dron_id} unido al show con posición final {self.final_position}.')
+                                self.log_auditoria('Unión al show', f'Dron {self.dron_id} unido al show con posición final {self.final_position}.', tipo='drone')
                             else:
                                 print("Invalid format for final position received from the server.")
                         else:
@@ -577,7 +576,7 @@ class ADDrone(threading.Thread):
             print("Token JWT obtenido con éxito.")
             #Auditoria
             #TODO
-            self.log_auditoria('Token obtenido', f"Usuario {username} ha obtenido el token exitoso")
+            self.log_auditoria('Token obtenido', f"Usuario {username} ha obtenido el token exitoso", tipo='drone')
         else:
             print("Error al obtener token JWT")
 
@@ -594,7 +593,7 @@ class ADDrone(threading.Thread):
             print("No se pudo conectar a la API. Por favor, inicia el módulo de API.")
             return None
         
-        
+    #TODO: An error occurred: 'NoneType' object has no attribute 'encrypt'
     def take_over_drone(self):
         print("Seleccionando un dron existente para controlar...")
         drones = self.list_drones_in_db()
@@ -612,11 +611,31 @@ class ADDrone(threading.Thread):
                 selected_drone = drones[selected_idx]
                 self.dron_id = selected_drone['ID']
                 self.alias = selected_drone['Alias']
+                self.load_drones_keys(self.dron_id)
                 print(f"Has tomado el control del dron ID: {self.dron_id}, Alias: {self.alias}")
             else:
                 print("Selección inválida.")
         except ValueError:
             print("Por favor, introduce un número válido.")
+            
+    def load_drones_keys(self,drone_id):
+        try:
+            key_document = self.db.Claves.find_one({'ID': drone_id})
+            if key_document:
+                self.private_key = serialization.load_pem_private_key(
+                    key_document['PrivateKey'],
+                    password=None,
+                    backend=default_backend()
+                )
+                self.public_key = serialization.load_pem_public_key(
+                    key_document['PublicKey'],
+                    backend=default_backend()
+                )
+                print(f"Claves cargadas para el dron ID {drone_id}")
+            else:
+                print(f"No se encontraron claves para el dron ID {drone_id}")
+        except Exception as e:
+            print(f"Error al cargar claves para el dron ID {drone_id}: {e}")
 
     def list_drones_in_db(self):
         try:
@@ -636,12 +655,13 @@ class ADDrone(threading.Thread):
             print(f"Error al limpiar la base de datos: {e}")
     
     #TODO: Implementar el método de auditoría      
-    def log_auditoria(self, evento, descripcion):
+    def log_auditoria(self, evento, descripcion, tipo='drone'):
         try:
             data = {
                 'evento': evento,
                 'descripcion': descripcion,
-                'timestamp': time.strftime("%Y-%m-%d %H:%M:%S")
+                'timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
+                'tipo':tipo
             }
             response = requests.post(f'{args.api_address}/auditoria', json=data, verify=False)
             if response.status_code == 201:
