@@ -232,3 +232,43 @@ nav a:hover {
 .drone-moving {
     background-color: red; /* O cualquier color que prefieras para representar movimiento */
 }
+.audit-container {
+    margin: 20px 400px; /* Ajusta según sea necesario */
+    background-color: black;
+    color: #fca738;
+    padding: 10px;
+    border-radius: 5px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.audit-container table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.audit-container th, .audit-container td {
+    padding: 10px;
+    border: 1px solid #fca738;
+    text-align: left;
+    vertical-align: top;
+}
+
+.audit-container th {
+    background-color: #333;
+}
+
+.audit-container ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.audit-container li {
+    background-color: #fca738;
+    color: black;
+    margin-bottom: 5px;
+    padding: 5px;
+    border-radius: 3px;
+}
