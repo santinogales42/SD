@@ -318,8 +318,6 @@ class ADDrone(threading.Thread):
         self.kafka_producer.send('drone_position_updates', value=message)
         self.kafka_producer.flush()
         print(f"Nueva posición: {self.current_position}")
-        self.log_auditoria('Actualización de posición', f'Dron {self.dron_id} actualizado a posición {self.current_position}.')
-
     
     def input_drone_data(self):
         if not (self.access_token):
@@ -404,6 +402,7 @@ class ADDrone(threading.Thread):
                     'InitialPosition': self.current_position
                 }
                 self.send_kafka_message('drone_messages_topic', full_message)
+                #TODO: Error inesperado: ADDrone.log_auditoria() takes 2 positional arguments but 3 were given
                 self.log_auditoria('Registro', f"Registro exitoso del dron {self.dron_id}")
             else:
                 print(f"Error en el registro: {response_json['message']}")
@@ -576,6 +575,9 @@ class ADDrone(threading.Thread):
         if self.access_token:
             self.token_time_received = time.time()
             print("Token JWT obtenido con éxito.")
+            #Auditoria
+            #TODO
+            self.log_auditoria('Token obtenido', f"Usuario {username} ha obtenido el token exitoso")
         else:
             print("Error al obtener token JWT")
 
@@ -634,7 +636,7 @@ class ADDrone(threading.Thread):
             print(f"Error al limpiar la base de datos: {e}")
     
     #TODO: Implementar el método de auditoría      
-    def log_auditoria(evento, descripcion):
+    def log_auditoria(self, evento, descripcion):
         try:
             data = {
                 'evento': evento,
@@ -648,9 +650,7 @@ class ADDrone(threading.Thread):
                 print(f"Error al registrar evento de auditoría: {response.text}")
         except requests.exceptions.RequestException as e:
             print(f"Error de conexión al registrar evento de auditoría: {e}")
-
-
-               
+           
     def show_menu(self):
         options = {
             "1": self.input_drone_data,

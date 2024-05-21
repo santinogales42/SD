@@ -264,7 +264,7 @@ function cargarAuditoria() {
         lista.innerHTML = ''; // Limpiar lista actual
         data.forEach(log => {
             const item = document.createElement('li');
-            item.textContent = `${log.timestamp}: ${log.evento}`;
+            item.textContent = `${log.timestamp}: ${log.evento} - ${log.descripcion}`;
             lista.appendChild(item);
         });
     })
@@ -279,11 +279,22 @@ function listenForAuditUpdates() {
         lista.innerHTML = ''; // Limpiar lista actual
         auditoria.forEach(log => {
             const item = document.createElement('li');
-            item.textContent = `${log.timestamp}: ${log.evento}`;
+            item.textContent = `${log.timestamp}: ${log.evento} - ${log.descripcion}`;
             lista.appendChild(item);
         });
     };
 }
+
+window.onload = function() {
+    createDroneMap();
+    updateDroneList();
+    updateDronePositions();
+    updateFinalDronePositions();
+    //loadErrors();
+    //listenForErrors();
+    listenForAuditUpdates();
+    cargarAuditoria(); // Asegúrate de llamar a esta función al cargar la página
+};
 
 
 
@@ -333,16 +344,6 @@ function displayErrors(errors) {
 }
 
 updateFinalDronePositions();
-
-window.onload = function() {
-    createDroneMap();
-    updateDroneList();
-    updateDronePositions();
-    updateFinalPositions();
-    loadErrors();
-    listenForErrors();
-    listenForAuditUpdates();
-};
 
 function loadErrors() {
     fetch('/get_errors')
