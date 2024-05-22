@@ -38,6 +38,10 @@
                 <tr>
                     <th>Eventos de Auditoría de Drones</th>
                     <th>Eventos de Auditoría del Motor</th>
+                    <th>
+                        Auditoría Mensajes Cifrados
+                        <button onclick="makeEncryptedAuditVisible()">Hacer visible</button>
+                    </th>
                 </tr>
             </thead>
             <tbody>
@@ -47,6 +51,9 @@
                     </td>
                     <td>
                         <ul id="lista-auditoria-engine"></ul>
+                    </td>
+                    <td id="encrypted-audit" style="display: none;">
+                        <ul id="lista-auditoria-cifrada"></ul>
                     </td>
                 </tr>
             </tbody>

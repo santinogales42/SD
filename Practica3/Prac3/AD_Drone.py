@@ -303,6 +303,8 @@ class ADDrone(threading.Thread):
                 'EncryptedMessage': encoded_message
             }
             self.db.MensajesKafka.insert_one(kafka_message_document)
+            #TODO: arreglar
+            #self.log_auditoria('Mensaje enviado', f"Mensaje enviado a Kafka: {encoded_message}", tipo='encrypted')
 
         except Exception as e:
             print(f"Error al enviar mensaje Kafka: {e}")
@@ -655,7 +657,7 @@ class ADDrone(threading.Thread):
             print(f"Error al limpiar la base de datos: {e}")
     
     #TODO: Implementar el método de auditoría      
-    def log_auditoria(self, evento, descripcion, tipo='drone'):
+    def log_auditoria(self, evento, descripcion, tipo):
         try:
             data = {
                 'evento': evento,

@@ -255,6 +255,55 @@ function getDroneColor(droneID) {
 }
 
 
+function makeEncryptedAuditVisible() {
+    const username = prompt("Introduce tu nombre de usuario:");
+    const password = prompt("Introduce tu contraseña:");
+
+    fetch('/login', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ username: username, password: password }),
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        } else {
+            throw new Error("Error al obtener token JWT");
+        }
+    })
+    .then(data => {
+        const encryptedAudit = document.getElementById('encrypted-audit');
+        encryptedAudit.style.display = 'block';
+        loadEncryptedAuditData(data.access_token);
+    })
+    .catch(error => {
+        alert("Error durante el inicio de sesión: " + error.message);
+    });
+}
+
+function loadEncryptedAuditData(token) {
+    fetch('/auditoria', {
+        method: 'GET',
+        headers: {
+            'Authorization': 'Bearer ' + token
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        const listaCifrada = document.getElementById('lista-auditoria-cifrada');
+        listaCifrada.innerHTML = ''; // Limpiar lista actual
+
+        data.forEach(log => {
+            const item = document.createElement('li');
+            item.textContent = `${log.timestamp}: ${log.evento} - ${log.descripcion}`;
+            listaCifrada.appendChild(item);
+        });
+    })
+    .catch(error => console.error('Error al cargar auditoría cifrada:', error));
+}
+
 function cargarAuditoria() {
     fetch('/auditoria')
     .then(response => response.json())
@@ -269,7 +318,8 @@ function cargarAuditoria() {
             item.textContent = `${log.timestamp}: ${log.evento} - ${log.descripcion}`;
             if (log.tipo === 'engine') {
                 listaEngine.appendChild(item);
-            } else {
+            } 
+            else {
                 listaDrones.appendChild(item);
             }
         });
@@ -291,7 +341,8 @@ function listenForAuditUpdates() {
             item.textContent = `${log.timestamp}: ${log.evento} - ${log.descripcion}`;
             if (log.tipo === 'engine') {
                 listaEngine.appendChild(item);
-            } else {
+            }
+            else {
                 listaDrones.appendChild(item);
             }
         });
@@ -306,6 +357,7 @@ window.onload = function() {
     listenForAuditUpdates();
     cargarAuditoria(); // Asegúrate de llamar a esta función al cargar la página
 };
+
 
 
 function updateDronePositions() {

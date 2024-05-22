@@ -81,7 +81,7 @@ def create_app(mongo_address, kafka_address):
             'q': city_name,
             'appid': WEATHER_API_KEY,
         }
-        response = requests.get(BASE_URL, params=params)
+        response = requests.get(BASE_URL, params=params, verify=False)
         if response.status_code == 200:
             return response.json()  # Retorna el JSON de la respuesta
         else:
@@ -324,7 +324,7 @@ def create_app(mongo_address, kafka_address):
                 evento = data.get('evento')
                 descripcion = data.get('descripcion')
                 timestamp = data.get('timestamp')
-                tipo = data.get('tipo', 'dron')  # Nuevo campo para distinguir entre auditoría de dron y engine
+                tipo = data.get('tipo', 'dron')  # Campo para distinguir el tipo de auditoría
 
                 if not evento or not descripcion or not timestamp:
                     return jsonify({"error": "Faltan datos necesarios"}), 400
@@ -343,11 +343,16 @@ def create_app(mongo_address, kafka_address):
 
         elif request.method == 'GET':
             try:
-                logs = list(db.auditoria.find({}, {'_id': 0, 'timestamp': 1, 'evento': 1, 'descripcion': 1, 'tipo': 1}).sort('timestamp', -1))
-                return jsonify(logs)
+                general_logs = list(db.auditoria.find({"tipo": {"$ne": "encrypted"}}, {'_id': 0, 'timestamp': 1, 'evento': 1, 'descripcion': 1, 'tipo': 1}).sort('timestamp', -1))
+                encrypted_logs = list(db.auditoria.find({"tipo": "encrypted"}, {'_id': 0, 'timestamp': 1, 'evento': 1, 'descripcion': 1, 'tipo': 1}).sort('timestamp', -1))
+                return jsonify({
+                    "general": general_logs,
+                    "encrypted": encrypted_logs
+                }), 200
             except Exception as e:
                 logging.error(f"Error al recuperar los eventos de auditoría: {e}")
                 return jsonify({"error": "Error al obtener los eventos de auditoría"}), 500
+
 
             
     @app.route('/stream_auditoria', methods=['GET'])

@@ -5,38 +5,38 @@
     },
     "weather": [
         {
-            "id": 803,
-            "main": "Clouds",
-            "description": "broken clouds",
-            "icon": "04n"
+            "id": 800,
+            "main": "Clear",
+            "description": "clear sky",
+            "icon": "01d"
         }
     ],
     "base": "stations",
     "main": {
-        "temp": 284.81,
-        "feels_like": 283.91,
-        "temp_min": 284.29,
-        "temp_max": 285.45,
-        "pressure": 1021,
-        "humidity": 72
+        "temp": 296.85,
+        "feels_like": 296.87,
+        "temp_min": 294.9,
+        "temp_max": 300.32,
+        "pressure": 1011,
+        "humidity": 61
     },
     "visibility": 10000,
     "wind": {
         "speed": 4.63,
-        "deg": 80
+        "deg": 170
     },
     "clouds": {
-        "all": 75
+        "all": 0
     },
-    "dt": 1704993080,
+    "dt": 1716376803,
     "sys": {
-        "type": 1,
-        "id": 6391,
+        "type": 2,
+        "id": 2093430,
         "country": "ES",
-        "sunrise": 1704957522,
-        "sunset": 1704992402
+        "sunrise": 1716353119,
+        "sunset": 1716405133
     },
-    "timezone": 3600,
+    "timezone": 7200,
     "id": 2521978,
     "name": "Alicante",
     "cod": 200

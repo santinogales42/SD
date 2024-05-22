@@ -17,7 +17,7 @@ import warnings
 from urllib3.exceptions import InsecureRequestWarning
 
 # Ignore InsecureRequestWarning
-#warnings.simplefilter('ignore', InsecureRequestWarning)
+warnings.simplefilter('ignore', InsecureRequestWarning)
 
 
 #logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
@@ -491,7 +491,7 @@ class ADEngine:
                 'tipo': tipo  # Especificar el tipo de auditoría
             }
             # Enviar evento de auditoría a la API
-            response = requests.post(f'{args.api_address}/auditoria', json=data, verify='/ssl/certificado_CA.crt')
+            response = requests.post(f'{args.api_address}/auditoria', json=data, verify=False)
             if response.status_code == 201:
                 print(f"Evento de auditoría registrado: {evento}")
             else:
