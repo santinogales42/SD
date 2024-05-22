@@ -347,6 +347,7 @@ class ADEngine:
     def end_show(self):
         print("El espectáculo ha finalizado.")
         # Finalmente, limpia o reinicia variables si es necesario.
+        #TODO: si no hay movimiento vuelta a la posicion original
         self.connected_drones.clear()
         self.final_positions.clear()
 

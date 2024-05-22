@@ -175,3 +175,200 @@
 2024-05-22 13:47:25,408 - INFO - Evento específico en /get_final_drone_positions
 2024-05-22 13:47:50,318 - INFO - Usuario a ha iniciado sesión
 2024-05-22 13:48:02,716 - INFO - Usuario a ha iniciado sesión
+2024-05-22 13:49:11,466 - INFO - Evento específico en /borrar_dron/<drone_id>
+2024-05-22 13:54:06,558 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 13:54:06,587 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 13:54:28,064 - INFO - Usuario a ha iniciado sesión
+2024-05-22 13:54:30,052 - INFO - Evento específico en /registro_dron
+2024-05-22 13:54:32,224 - INFO - Usuario a ha iniciado sesión
+2024-05-22 14:03:57,588 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:03:57,626 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:03:58,084 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:03:58,119 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:03:58,220 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:03:58,256 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:08:09,471 - INFO - Usuario a ha iniciado sesión
+2024-05-22 14:08:32,370 - INFO - Usuario a ha iniciado sesión
+2024-05-22 14:08:32,450 - INFO - Evento específico en /registro_dron
+2024-05-22 14:09:15,728 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:09:15,760 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:10:41,319 - INFO - Usuario a ha iniciado sesión
+2024-05-22 14:10:41,386 - INFO - Evento específico en /registro_dron
+2024-05-22 14:10:44,475 - INFO - Usuario a ha iniciado sesión
+2024-05-22 14:10:44,540 - INFO - Evento específico en /registro_dron
+2024-05-22 14:10:47,417 - INFO - Usuario a ha iniciado sesión
+2024-05-22 14:10:47,493 - INFO - Evento específico en /registro_dron
+2024-05-22 14:11:23,070 - INFO - Usuario a ha iniciado sesión
+2024-05-22 14:11:27,294 - INFO - Usuario a ha iniciado sesión
+2024-05-22 14:11:34,232 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:11:34,268 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:12:45,604 - INFO - Usuario a ha iniciado sesión
+2024-05-22 14:12:45,672 - INFO - Evento específico en /registro_dron
+2024-05-22 14:12:48,455 - INFO - Usuario a ha iniciado sesión
+2024-05-22 14:12:48,521 - INFO - Evento específico en /registro_dron
+2024-05-22 14:12:51,913 - INFO - Usuario a ha iniciado sesión
+2024-05-22 14:12:51,980 - INFO - Evento específico en /registro_dron
+2024-05-22 14:13:41,370 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:13:41,403 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:13:47,981 - INFO - Evento específico en /borrar_dron/<drone_id>
+2024-05-22 14:14:09,430 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:14:09,460 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:14:11,934 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:14:11,962 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:14:12,005 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:14:12,044 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:14:12,135 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:14:12,170 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:14:12,263 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:14:12,294 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:14:12,365 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:14:12,404 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:14:12,484 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:14:12,514 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:14:46,146 - INFO - Usuario a ha iniciado sesión
+2024-05-22 14:14:46,217 - INFO - Evento específico en /registro_dron
+2024-05-22 14:14:48,723 - INFO - Usuario a ha iniciado sesión
+2024-05-22 14:14:48,811 - INFO - Evento específico en /registro_dron
+2024-05-22 14:14:51,579 - INFO - Usuario a ha iniciado sesión
+2024-05-22 14:14:51,701 - INFO - Evento específico en /registro_dron
+2024-05-22 14:15:31,367 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:15:31,402 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:15:31,959 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:15:31,986 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:15:32,080 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:15:32,117 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:15:32,211 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:15:32,244 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:16:01,846 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:16:01,877 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:16:26,773 - INFO - Usuario a ha iniciado sesión
+2024-05-22 14:16:29,123 - INFO - Evento específico en /registro_dron
+2024-05-22 14:16:38,686 - INFO - Usuario a ha iniciado sesión
+2024-05-22 14:17:04,521 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 14:17:04,559 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:47:30,547 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:47:30,608 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:47:57,376 - INFO - Usuario a ha iniciado sesión
+2024-05-22 17:48:02,855 - INFO - Evento específico en /registro_dron
+2024-05-22 17:48:11,131 - INFO - Usuario a ha iniciado sesión
+2024-05-22 17:48:13,079 - INFO - Evento específico en /registro_dron
+2024-05-22 17:48:15,403 - INFO - Usuario a ha iniciado sesión
+2024-05-22 17:48:48,593 - INFO - Usuario a ha iniciado sesión
+2024-05-22 17:48:48,665 - INFO - Evento específico en /registro_dron
+2024-05-22 17:48:51,672 - INFO - Usuario a ha iniciado sesión
+2024-05-22 17:48:51,737 - INFO - Evento específico en /registro_dron
+2024-05-22 17:48:54,633 - INFO - Usuario a ha iniciado sesión
+2024-05-22 17:48:54,700 - INFO - Evento específico en /registro_dron
+2024-05-22 17:50:02,217 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:50:02,247 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:54:10,383 - INFO - Usuario a ha iniciado sesión
+2024-05-22 17:54:10,495 - INFO - Evento específico en /registro_dron
+2024-05-22 17:54:13,389 - INFO - Usuario a ha iniciado sesión
+2024-05-22 17:54:13,519 - INFO - Evento específico en /registro_dron
+2024-05-22 17:54:15,456 - INFO - Usuario a ha iniciado sesión
+2024-05-22 17:54:15,592 - INFO - Evento específico en /registro_dron
+2024-05-22 17:55:13,059 - INFO - Usuario a ha iniciado sesión
+2024-05-22 17:55:13,152 - INFO - Evento específico en /registro_dron
+2024-05-22 17:55:14,970 - INFO - Usuario a ha iniciado sesión
+2024-05-22 17:55:15,071 - INFO - Evento específico en /registro_dron
+2024-05-22 17:55:17,530 - INFO - Usuario a ha iniciado sesión
+2024-05-22 17:55:17,662 - INFO - Evento específico en /registro_dron
+2024-05-22 17:55:23,713 - INFO - Usuario a ha iniciado sesión
+2024-05-22 17:55:36,761 - INFO - Usuario a ha iniciado sesión
+2024-05-22 17:55:40,766 - INFO - Usuario a ha iniciado sesión
+2024-05-22 17:57:04,153 - INFO - Usuario a ha iniciado sesión
+2024-05-22 17:58:29,358 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:58:29,394 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:58:30,680 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:58:30,705 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:58:37,547 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:58:37,578 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:58:39,899 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:58:39,928 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:58:40,372 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:58:40,399 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:58:40,546 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:58:40,575 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:58:40,684 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:58:40,725 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:58:40,814 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:58:40,848 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:58:40,938 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:58:40,965 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:59:00,437 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:59:00,465 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:59:01,760 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:59:01,792 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:59:01,930 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:59:01,960 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:59:02,109 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:59:02,148 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:59:30,326 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 17:59:30,360 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 18:00:52,035 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:00:52,113 - INFO - Evento específico en /registro_dron
+2024-05-22 18:00:54,361 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:00:57,359 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:00:57,443 - INFO - Evento específico en /registro_dron
+2024-05-22 18:00:59,882 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:01:03,020 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:01:03,129 - INFO - Evento específico en /registro_dron
+2024-05-22 18:01:04,878 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:01:42,845 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:02:00,475 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:02:00,589 - INFO - Evento específico en /registro_dron
+2024-05-22 18:02:02,168 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:02:02,272 - INFO - Evento específico en /registro_dron
+2024-05-22 18:02:04,911 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:02:05,028 - INFO - Evento específico en /registro_dron
+2024-05-22 18:02:07,619 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:08:27,778 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:08:32,576 - INFO - Evento específico en /registro_dron
+2024-05-22 18:08:41,592 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:08:43,634 - INFO - Evento específico en /registro_dron
+2024-05-22 18:09:34,973 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:09:38,629 - INFO - Evento específico en /registro_dron
+2024-05-22 18:11:03,401 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:11:03,484 - INFO - Evento específico en /registro_dron
+2024-05-22 18:11:49,730 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:11:49,834 - INFO - Evento específico en /registro_dron
+2024-05-22 18:11:52,932 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:11:53,033 - INFO - Evento específico en /registro_dron
+2024-05-22 18:11:55,954 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:11:56,079 - INFO - Evento específico en /registro_dron
+2024-05-22 18:13:02,299 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:13:09,385 - INFO - Evento específico en /registro_dron
+2024-05-22 18:13:12,001 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:16:03,729 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:16:03,829 - INFO - Evento específico en /registro_dron
+2024-05-22 18:16:06,720 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:16:06,811 - INFO - Evento específico en /registro_dron
+2024-05-22 18:16:09,475 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:16:09,607 - INFO - Evento específico en /registro_dron
+2024-05-22 18:16:59,424 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:16:59,527 - INFO - Evento específico en /registro_dron
+2024-05-22 18:17:02,070 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:17:02,162 - INFO - Evento específico en /registro_dron
+2024-05-22 18:17:04,736 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:17:04,834 - INFO - Evento específico en /registro_dron
+2024-05-22 18:18:35,925 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 18:18:35,963 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 18:22:06,577 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:22:06,656 - INFO - Evento específico en /registro_dron
+2024-05-22 18:22:09,585 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:22:09,666 - INFO - Evento específico en /registro_dron
+2024-05-22 18:22:12,216 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:22:12,317 - INFO - Evento específico en /registro_dron
+2024-05-22 18:22:33,804 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:22:38,931 - INFO - Evento específico en /registro_dron
+2024-05-22 18:23:09,323 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:23:09,409 - INFO - Evento específico en /registro_dron
+2024-05-22 18:23:11,848 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:23:11,954 - INFO - Evento específico en /registro_dron
+2024-05-22 18:23:14,595 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:23:14,730 - INFO - Evento específico en /registro_dron
+2024-05-22 18:23:20,411 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:23:22,999 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:23:25,451 - INFO - Usuario a ha iniciado sesión
+2024-05-22 18:23:50,599 - INFO - Evento específico en /get_final_drone_positions
+2024-05-22 18:23:50,630 - INFO - Evento específico en /get_final_drone_positions

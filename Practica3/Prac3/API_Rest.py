@@ -254,7 +254,7 @@ def create_app(mongo_address, kafka_address):
     @app.route('/get_final_drone_positions', methods=['GET'])
     def get_final_drone_positions():
         auditoria_logger.info('Evento específico en /get_final_drone_positions')
-
+        
         return jsonify(final_drone_positions)
 
     @app.route('/get_drone_positions')

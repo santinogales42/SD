@@ -21,6 +21,7 @@ from cryptography.hazmat.primitives import hashes
 import base64
 import json
 import binascii
+import datetime
 
 
 class ADDrone(threading.Thread):
@@ -54,6 +55,7 @@ class ADDrone(threading.Thread):
         self.token_time_received = None  # Tiempo en el que se recibió el token
         self.last_heartbeat_received = time.time()
         self.heartbeat_timeout = 20  
+        self.token_expiration_time = None
         
         self.public_key = None
         self.private_key = None
@@ -64,6 +66,8 @@ class ADDrone(threading.Thread):
     def start(self):
         self.show_menu()
         
+    def is_token_expired(self):
+        return datetime.datetime.now() > self.token_expiration_time
                     
     def generate_keys(self):
         try:
@@ -322,6 +326,7 @@ class ADDrone(threading.Thread):
         print(f"Nueva posición: {self.current_position}")
     
     def input_drone_data(self):
+        self.ensure_token_valid()
         if not (self.access_token):
             print("Es necesario registrarse y obtener un token antes de unirse al show.")
             return
@@ -414,10 +419,10 @@ class ADDrone(threading.Thread):
             
                    
     def register_via_api(self):
+        self.ensure_token_valid()
         data = {'ID': str(self.dron_id), 'Alias': self.alias}
         headers = {'Authorization': f'Bearer {self.access_token}'}
-        api_address = args.api_address
-        response = requests.post(f'{api_address}/registro', json=data, headers=headers, verify=False)
+        response = requests.post(f'{self.api_address}/registro', json=data, headers=headers, verify=False)
         if self.id_exists(self.dron_id):
             print("ID de dron ya existe. Introduce un ID diferente.")
             return
@@ -436,6 +441,7 @@ class ADDrone(threading.Thread):
             
 
     def delete_drones(self):
+        self.ensure_token_valid()
         self.dron_id = input("Introduce el ID del dron: ")
 
         headers = {'Authorization': f'Bearer {self.access_token}'}
@@ -468,6 +474,7 @@ class ADDrone(threading.Thread):
 
 
     def join_show(self):
+        self.ensure_token_valid()
         if not (self.dron_id and self.alias and self.access_token):
             print("Es necesario registrarse y obtener un token antes de unirse al show.")
             return
@@ -550,8 +557,7 @@ class ADDrone(threading.Thread):
             if not username or not password:
                 print("Nombre de usuario y contraseña son obligatorios.")
                 continue
-            api_address = args.api_address
-            response = requests.post(f'{api_address}/registro_usuario', json={'username': username, 'password': password}, verify=False)
+            response = requests.post(f'{self.api_address}/registro_usuario', json={'username': username, 'password': password}, verify=False)
 
             if response.status_code == 201:
                 print("Usuario registrado exitosamente.")
@@ -575,17 +581,15 @@ class ADDrone(threading.Thread):
         self.access_token = self.request_jwt_token(username, password)
         if self.access_token:
             self.token_time_received = time.time()
+            self.token_expiration_time = datetime.datetime.now() + datetime.timedelta(seconds=20)
             print("Token JWT obtenido con éxito.")
-            #Auditoria
-            #TODO
             self.log_auditoria('Token obtenido', f"Usuario {username} ha obtenido el token exitoso", tipo='drone')
         else:
             print("Error al obtener token JWT")
 
     def request_jwt_token(self, username, password):
         try:
-            api_address = args.api_address
-            response = requests.post(f'{api_address}/login', json={'username': username, 'password': password}, verify=False)
+            response = requests.post(f'{self.api_address}/login', json={'username': username, 'password': password}, verify=False)
             if response.status_code == 200:
                 return response.json().get('access_token')
             else:
@@ -594,6 +598,11 @@ class ADDrone(threading.Thread):
         except requests.exceptions.ConnectionError:
             print("No se pudo conectar a la API. Por favor, inicia el módulo de API.")
             return None
+    
+    def ensure_token_valid(self):
+        if self.is_token_expired():
+            print("Token expirado, obteniendo uno nuevo...")
+            self.get_jwt_token()
         
     #TODO: An error occurred: 'NoneType' object has no attribute 'encrypt'
     def take_over_drone(self):
@@ -665,7 +674,7 @@ class ADDrone(threading.Thread):
                 'timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
                 'tipo':tipo
             }
-            response = requests.post(f'{args.api_address}/auditoria', json=data, verify=False)
+            response = requests.post(f'{self.api_address}/auditoria', json=data, verify=False)
             if response.status_code == 201:
                 print(f"Evento de auditoría registrado: {evento}")
             else:
