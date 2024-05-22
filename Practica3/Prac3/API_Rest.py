@@ -21,7 +21,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
 import time
 
-import datetime
+from datetime import datetime, timedelta
 from flask_socketio import SocketIO, emit
 
 
@@ -70,6 +70,9 @@ def create_app(mongo_address, kafka_address):
 
     # Añade el manejador al logger
     auditoria_logger.addHandler(file_handler)
+    
+    db.auditoria.delete_many({})
+
     
 
     # Esta función obtiene los datos del clima para una ciudad
@@ -284,6 +287,7 @@ def create_app(mongo_address, kafka_address):
         if user and check_password_hash(user['password_hash'], password):
             # Genera el token con una vida útil de 20 segundos
             access_token = create_access_token(identity=username, expires_delta=timedelta(seconds=20))
+            print(access_token)
             
             db.tokens.insert_one({
                 'username': username,
@@ -312,14 +316,51 @@ def create_app(mongo_address, kafka_address):
         logging.info("Evento registrado")
         return jsonify(msg="Evento registrado")
     
-    @app.route('/auditoria', methods=['GET'])
-    def obtener_auditoria():
-        try:
-            logs = list(db.auditoria.find({}, {'_id': 0, 'timestamp': 1, 'evento': 1}).sort('timestamp', -1))
-            return jsonify(logs)
-        except Exception as e:
-            logging.error(f"Error al recuperar los eventos de auditoría: {e}")
-            return jsonify({"error": "Error al obtener los eventos de auditoría"}), 500
+    @app.route('/auditoria', methods=['GET', 'POST'])
+    def auditoria():
+        if request.method == 'POST':
+            try:
+                data = request.json
+                evento = data.get('evento')
+                descripcion = data.get('descripcion')
+                timestamp = data.get('timestamp')
+                tipo = data.get('tipo', 'dron')  # Nuevo campo para distinguir entre auditoría de dron y engine
+
+                if not evento or not descripcion or not timestamp:
+                    return jsonify({"error": "Faltan datos necesarios"}), 400
+
+                log_entry = {
+                    'evento': evento,
+                    'descripcion': descripcion,
+                    'timestamp': timestamp,
+                    'tipo': tipo  # Almacenar el tipo de auditoría
+                }
+                db.auditoria.insert_one(log_entry)
+                return jsonify({"message": "Evento de auditoría registrado"}), 201
+            except Exception as e:
+                logging.error(f"Error al registrar el evento de auditoría: {e}")
+                return jsonify({"error": "Error al registrar el evento de auditoría"}), 500
+
+        elif request.method == 'GET':
+            try:
+                logs = list(db.auditoria.find({}, {'_id': 0, 'timestamp': 1, 'evento': 1, 'descripcion': 1, 'tipo': 1}).sort('timestamp', -1))
+                return jsonify(logs)
+            except Exception as e:
+                logging.error(f"Error al recuperar los eventos de auditoría: {e}")
+                return jsonify({"error": "Error al obtener los eventos de auditoría"}), 500
+
+            
+    @app.route('/stream_auditoria', methods=['GET'])
+    def stream_auditoria():
+        def generate():
+            while True:
+                logs = list(db.auditoria.find({}, {'_id': 0, 'timestamp': 1, 'evento': 1, 'descripcion': 1, 'tipo': 1}).sort('timestamp', -1))
+                yield f"data: {json.dumps(logs)}\n\n"
+                time.sleep(5)  # Ajusta el intervalo de tiempo según sea necesario
+
+        return Response(generate(), mimetype='text/event-stream')
+
+
 
 
     ##### API #####
