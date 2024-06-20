@@ -213,7 +213,6 @@ def create_app(mongo_address, kafka_address):
 
             # Actualizar la posición del dron en el diccionario global
             drone_positions[dron_id] = position
-            print(f"Actualización recibida: Drone ID {dron_id}, Posición {position}")
 
 
     final_drone_positions = {}

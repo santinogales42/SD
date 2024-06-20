@@ -49,6 +49,8 @@ class ADDrone(threading.Thread):
         self.access_token = None
         self.mongo_client = pymongo.MongoClient(mongo_address)  # Usamos el argumento proporcionado
         self.db = self.mongo_client["dronedb"]
+        self.is_returning_to_base = False
+
         
         self.registered_drones = {}
         self.in_show_mode = False
@@ -201,9 +203,9 @@ class ADDrone(threading.Thread):
             if instruction == 'join_show':
                 self.in_show_mode = True
                 print(f"ADDrone: Uniendo al show con ID {self.dron_id}...")
-            if instruction == 'START':
+            elif instruction == 'START':
                 if self.in_show_mode:
-                    self.in_show_mode = True
+                    self.is_returning_to_base = False
                     print("ADDrone: Instrucción START recibida, iniciando movimiento hacia posición final...")
                     self.move_to_final_position()
                 else:
@@ -212,11 +214,19 @@ class ADDrone(threading.Thread):
                 print("ADDrone: Instrucción STOP recibida, deteniendo y regresando a la base...")
                 self.final_position = self.base_position
                 self.in_show_mode = False
+                self.is_returning_to_base = True
                 self.return_to_base()
-                self.in_show_mode = True
-        
+            elif instruction == 'RESET':
+                print("ADDrone: Instrucción RESET recibida, regresando a la posición inicial...")
+                self.final_position = self.base_position
+                self.in_show_mode = False
+                self.is_returning_to_base = True
+                self.return_to_base()
+                self.join_show()
         except json.JSONDecodeError:
             print(f"Received non-JSON message: {message.value}")
+
+
         
             
     def handle_final_position_message(self, message):
@@ -243,22 +253,30 @@ class ADDrone(threading.Thread):
             self.calculate_movement()
             self.send_position_update()
             time.sleep(1)
+        self.is_returning_to_base = False
         print(f"ADDrone: Posición base alcanzada: {self.current_position}")
+
+
 
     def move_to_final_position(self):
         if not self.in_show_mode:
             return
-        while self.current_position != self.final_position and self.in_show_mode:
+        while self.current_position != self.final_position:
+            if self.is_returning_to_base:  # Check if the drone should stop moving to final position
+                break
             self.calculate_movement()
             self.send_position_update()
             time.sleep(1)
-        if self.current_position == self.final_position:
+        if self.current_position == self.final_position and not self.is_returning_to_base:
             self.send_kafka_message('drone_position_reached', {
                 'type': 'position_reached',
                 'dron_id': self.dron_id,
                 'final_position': self.final_position
             })
-            print(f"ADDrone: Posición {('final' if self.in_show_mode else 'base')} alcanzada: {self.current_position}")
+            print(f"ADDrone: Posición final alcanzada: {self.current_position}")
+
+
+
 
 
     def calculate_movement(self):

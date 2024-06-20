@@ -15,6 +15,9 @@ import base64
 import requests
 import warnings
 from urllib3.exceptions import InsecureRequestWarning
+from pynput import keyboard  # Correct import for pynput
+import sys
+import select
 
 # Ignore InsecureRequestWarning
 warnings.simplefilter('ignore', InsecureRequestWarning)
@@ -59,6 +62,8 @@ class ADEngine:
         self.public_key = self.private_key.public_key()
         self.drones_involucrados = set()
         self.new_instructions_sent = False
+        self.reset_event = threading.Event()
+
         #Para conexiones seguras
         #self.context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
         #self.context.load_cert_chain(certfile="ssl/certificado_registry.crt", keyfile="ssl/clave_privada_registry.pem")
@@ -243,18 +248,21 @@ class ADEngine:
 
             
     def send_instruction_to_drone(self, dron_id, instruction):
+        final_position = [1, 1] if instruction == 'RESET' else self.final_positions.get(dron_id, [1, 1])
+
         message = {
             'type': 'instruction',
             'dron_id': dron_id,
             'instruction': instruction,
-            'final_position': self.final_positions[dron_id]
+            'final_position': final_position
         }
         self.send_encrypted_kafka_message('drone_messages_topic', message)
-        #self.kafka_producer.send('drone_final_position', message)
         self.kafka_producer.flush()
         print(f"Instrucción {instruction} enviada al dron {dron_id}")
         with self.state_lock:
             self.drones_state[dron_id] = {'instruction': instruction, 'reached': False}
+
+
             
     def are_all_drones_connected(self):
         return len(self.connected_drones) >= self.required_drones
@@ -302,16 +310,38 @@ class ADEngine:
         self.log_auditoria('STOP', 'Advertencia de clima frío enviada a todos los drones.', tipo='engine')
 
 
+    def reset_engine(self):
+        self.reset_event.set()
+        print("R key pressed. Resetting engine...")
+
+        # Reset the drones to initial positions
+        for dron_id in self.connected_drones:
+            self.send_final_position(dron_id, (1, 1))  # Sending initial position (1, 1)
+            self.send_instruction_to_drone(dron_id, 'RESET')
+
+        time.sleep(5)  # Wait for drones to reset to initial positions
+
+        # Reset engine state and load the first figure
+        self.end_show()
+        self.connected_drones.clear()
+        self.final_positions.clear()
+        self.current_positions.clear()
+        self.drones_state.clear()
+        self.indice_figura_actual = 0  # Set index to load the first figure
+        self.cargar_figura(self.indice_figura_actual)
+        self.send_positions_and_start_commands()  # Start the first figure
+
+        self.reset_event.clear()
+
+
     def send_final_position(self, dron_id, final_position):
         message = {
             'type': 'final_position',
             'dron_id': dron_id,
             'final_position': final_position
         }
-        #sin cifrar
         self.kafka_producer.send('drone_final_position', message)
         self.encrypted_message('drone_final_position', message)
-        #self.send_encrypted_kafka_message('drone_final_position', message)
         self.kafka_producer.flush()
 
 
@@ -323,6 +353,8 @@ class ADEngine:
         self.weather_warning_thread.start()
         self.heartbeat_thread = threading.Thread(target=self.send_heartbeat_messages)
         self.heartbeat_thread.start()
+        key_listener_thread = threading.Thread(target=self.listen_for_key_presses)
+        key_listener_thread.start()
         
         try:
             while True:
@@ -336,6 +368,16 @@ class ADEngine:
         finally:
             self.close()
             
+    def listen_for_key_presses(self):
+        while True:
+            i, o, e = select.select([sys.stdin], [], [], 1)
+            if i:
+                input_char = sys.stdin.read(1).strip().lower()
+                if input_char == 'r':
+                    print("R key pressed. Resetting engine...")
+                    self.reset_engine()
+    
+            
     def send_heartbeat_messages(self):
         while True:
             heartbeat_message = {'type': 'heartbeat'}
@@ -346,10 +388,11 @@ class ADEngine:
 
     def end_show(self):
         print("El espectáculo ha finalizado.")
-        # Finalmente, limpia o reinicia variables si es necesario.
-        #TODO: si no hay movimiento vuelta a la posicion original
         self.connected_drones.clear()
         self.final_positions.clear()
+        self.current_positions.clear()
+        self.drones_state.clear()
+
 
     def close(self):
         self.stop_event.set()
@@ -411,6 +454,8 @@ class ADEngine:
 
 
     def handle_drone_position_reached(self, dron_id, final_position):
+        if self.reset_event.is_set():
+            return
         final_position_tuple = tuple(final_position) if isinstance(final_position, list) else final_position
         self.current_positions[dron_id] = final_position_tuple
         with self.state_lock:
