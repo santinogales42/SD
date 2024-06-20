@@ -604,7 +604,6 @@ class ADDrone(threading.Thread):
             print("Token expirado, obteniendo uno nuevo...")
             self.get_jwt_token()
         
-    #TODO: An error occurred: 'NoneType' object has no attribute 'encrypt'
     def take_over_drone(self):
         print("Seleccionando un dron existente para controlar...")
         drones = self.list_drones_in_db()

@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, render_template
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required
-from pymongo import MongoClient, errors
+from pymongo import MongoClient, errors, IndexModel, ASCENDING
+
 from bson import ObjectId
 from datetime import timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -55,7 +56,6 @@ def create_app(mongo_address, kafka_address):
     drone_positions = {}
 
     BASE_URL = "http://api.openweathermap.org/data/2.5/weather"
-    
 
     # Configura el logger de auditoría
     auditoria_logger = logging.getLogger('auditoria')
@@ -70,10 +70,8 @@ def create_app(mongo_address, kafka_address):
 
     # Añade el manejador al logger
     auditoria_logger.addHandler(file_handler)
-    
-    db.auditoria.delete_many({})
 
-    
+    db.auditoria.delete_many({})
 
     # Esta función obtiene los datos del clima para una ciudad
     def get_weather(city_name):
@@ -288,20 +286,26 @@ def create_app(mongo_address, kafka_address):
             # Genera el token con una vida útil de 20 segundos
             access_token = create_access_token(identity=username, expires_delta=timedelta(seconds=20))
             print(access_token)
-            
+
             db.tokens.insert_one({
                 'username': username,
                 'token': access_token,
                 'created_at': datetime.now(),
                 'expires_at': datetime.now() + timedelta(seconds=20)
             })
-            
-            # Crear un índice para borrar automáticamente tokens expirados
-            db.tokens.create_index("expires_at", expireAfterSeconds=20)
 
             auditoria_logger.info('Usuario {} ha iniciado sesión'.format(username))
             return jsonify(access_token=access_token)
         return jsonify({"msg": "Credenciales incorrectas"}), 401
+    
+
+    def delete_expired_tokens():
+        while True:
+            now = datetime.now()
+            db.tokens.delete_many({"expires_at": {"$lte": now}})
+            time.sleep(5)  # Check every 5 seconds
+
+    threading.Thread(target=delete_expired_tokens, daemon=True).start()
 
 
     @app.route('/protegido', methods=['GET'])

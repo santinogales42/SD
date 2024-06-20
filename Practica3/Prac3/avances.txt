@@ -1,14 +1,14 @@
 Cosas que debo de hacer para Julio:
 
-1. Lo que pase el profesor
+1. Lo que pase el profesor (75%)
 2. Base de datos individual para cada dron
-3. Token visible en la base de datos (XD) -> Hecho pero no comprobado en API_Rest
+3. Token visible en la base de datos (100%)
 4. Seguridad en el aspecto de Kafka, es decir, mejorar la de Engine con Drone.
 5. Tengo ya el asimetrico con las claves RSa, pero en aspecto de seguridad me hace falta el simetrico, aun ns
 6. Distribuido
 7. Mejorar lo de que tenga que reiniciar los drones para que les lleguen a la segunda los mensajes de Kafka
 8. Que cuando yo quiera reiniciar el engine y que comiencen los drones
-9. Que los drones no haga falta registrarlos y unirlos de la forma que se tiene, sino que con un comando de terminal se pueda.
+9. Que los drones no haga falta registrarlos y unirlos de la forma que se tiene, sino que con un comando de terminal se pueda. (75%)
 10. 
 
 
