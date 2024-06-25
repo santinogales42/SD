@@ -18,8 +18,7 @@ def create_and_register_drones(drones_count, engine_ip, engine_port, broker_addr
         dron.dron_id = i + 1  # Asigna un ID secuencialmente
         dron.alias = f"Dron-{dron.dron_id}"
         dron.generate_keys()
-        #solo hacerlo una vez
-        dron.get_jwt_token()
+        dron.get_jwt_token()  # Solo hacerlo una vez
         dron.register_via_api()
         drones.append(dron)
         time.sleep(1)

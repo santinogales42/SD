@@ -556,8 +556,7 @@ class ADDrone(threading.Thread):
                             else:
                                 print("Invalid format for final position received from the server.")
                         else:
-                            print(f"Drone {self.dron_id} is not needed for the current figure. Waiting for the next figure...")
-                            time.sleep(10)  # Espera antes de reintentar
+                            time.sleep(1)  # Espera antes de reintentar
                     else:
                         print(f"Drone {self.dron_id} did not receive a response from the server. Retrying in 10 seconds...")
                         time.sleep(10)  # Espera antes de reintentar

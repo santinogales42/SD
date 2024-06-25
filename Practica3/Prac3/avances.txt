@@ -2,7 +2,6 @@ Cosas que debo de hacer para Julio:
 
 1. Lo que pase el profesor (75%)
 2. Base de datos individual para cada dron
-3. Token visible en la base de datos (100%)
 4. Seguridad en el aspecto de Kafka, es decir, mejorar la de Engine con Drone. (ya se vera si se hace)
 5. Tengo ya el asimetrico con las claves RSa, pero en aspecto de seguridad me hace falta el simetrico, aun ns
 6. Distribuido
@@ -12,4 +11,4 @@ Cosas que debo de hacer para Julio:
 
 
 Orden:
-9 > 8 > 6 > 3 > 2 > 7 > 5 > 4 > 1
+9 > 8 > 6 > 2 > 7 > 5 > 4 > 1
