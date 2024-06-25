@@ -633,10 +633,13 @@ class ADDrone(threading.Thread):
         password = input("Introduce tu contraseña: ")
         self.access_token = self.request_jwt_token(username, password)
         if self.access_token:
+            self.token_time_received = time.time()
+            self.token_expiration_time = datetime.datetime.now() + datetime.timedelta(seconds=20)
             print("Token JWT obtenido con éxito.")
             self.log_auditoria('Token obtenido', f"Usuario {username} ha obtenido el token exitoso", tipo='drone')
         else:
             print("Error al obtener token JWT")
+
     
     def ensure_token_valid(self):
         if self.is_token_expired():
