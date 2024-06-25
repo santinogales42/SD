@@ -22,6 +22,9 @@ import base64
 import json
 import binascii
 import datetime
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+import os
 
 
 class ADDrone(threading.Thread):
@@ -61,6 +64,8 @@ class ADDrone(threading.Thread):
         
         self.public_key = None
         self.private_key = None
+        self.key = self.generate_key()
+        self.iv = os.urandom(16)
                 
         warnings.filterwarnings('ignore', category=InsecureRequestWarning)
         #logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
@@ -274,9 +279,6 @@ class ADDrone(threading.Thread):
                 'final_position': self.final_position
             })
             print(f"ADDrone: Posición final alcanzada: {self.current_position}")
-
-
-
 
 
     def calculate_movement(self):
@@ -565,6 +567,29 @@ class ADDrone(threading.Thread):
                 print(f"An error occurred: {e}. Retrying in 10 seconds...")
                 time.sleep(10)  # Espera antes de reintentar
 
+    # Cifrado Simetrico con AES con modo CFB
+    """AES (Advanced Encryption Standard): Es un algoritmo de cifrado simétrico ampliamente utilizado que cifra y descifra datos utilizando la misma clave.
+        Modo CFB (Cipher Feedback): Es un modo de operación para cifrar bloques de datos utilizando cifrado de bloques. CFB convierte un cifrador de bloque en un cifrador de flujo, lo que permite cifrar datos de cualquier tamaño.
+        KDF (Key Derivation Function): En este caso, hemos utilizado PBKDF2 (Password-Based Key Derivation Function 2) para derivar una clave segura a partir de una contraseña. PBKDF2 aplica una función hash (SHA-256 en este caso) múltiples veces para generar una clave segura.
+        IV (Initialization Vector): Es un vector de inicialización utilizado para asegurar que el mismo texto plano cifrado con la misma clave dé como resultado diferentes textos cifrados. En este caso, hemos utilizado un IV aleatorio de 16 bytes."""
+    def generate_key(self):
+        password = b"shared_secret"
+        salt = b"your_saved_salt"
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000,
+            backend=default_backend()
+        )
+        key = kdf.derive(password)
+        return key
+
+    def encrypt_data(self, data):
+        cipher = Cipher(algorithms.AES(self.key), modes.CFB(self.iv))
+        encryptor = cipher.encryptor()
+        encrypted = encryptor.update(data.encode()) + encryptor.finalize()
+        return base64.b64encode(self.iv + encrypted).decode()
 
     def register_user(self):
         while True:
@@ -574,7 +599,10 @@ class ADDrone(threading.Thread):
             if not username or not password:
                 print("Nombre de usuario y contraseña son obligatorios.")
                 continue
-            response = requests.post(f'{self.api_address}/registro_usuario', json={'username': username, 'password': password}, verify=False)
+
+            data = json.dumps({'username': username, 'password': password})
+            encrypted_data = self.encrypt_data(data)
+            response = requests.post(f'{self.api_address}/registro_usuario', data=encrypted_data, verify=False)
 
             if response.status_code == 201:
                 print("Usuario registrado exitosamente.")
@@ -585,6 +613,14 @@ class ADDrone(threading.Thread):
                 print(f"Error al registrar usuario: {response.json().get('msg', 'Error desconocido')}")
                 break
 
+    def request_jwt_token(self, username, password):
+        data = {'username': username, 'password': password}
+        response = requests.post(f'{self.api_address}/login', json=data, verify=False)
+        if response.status_code == 200:
+            return response.json().get('access_token')
+        else:
+            print(f"Error al obtener token JWT: {response.text}")
+            return None
 
     def get_jwt_token(self):
         print("¿Ya tienes un usuario? (si/no): ")
@@ -597,24 +633,10 @@ class ADDrone(threading.Thread):
         password = input("Introduce tu contraseña: ")
         self.access_token = self.request_jwt_token(username, password)
         if self.access_token:
-            self.token_time_received = time.time()
-            self.token_expiration_time = datetime.datetime.now() + datetime.timedelta(seconds=20)
             print("Token JWT obtenido con éxito.")
             self.log_auditoria('Token obtenido', f"Usuario {username} ha obtenido el token exitoso", tipo='drone')
         else:
             print("Error al obtener token JWT")
-
-    def request_jwt_token(self, username, password):
-        try:
-            response = requests.post(f'{self.api_address}/login', json={'username': username, 'password': password}, verify=False)
-            if response.status_code == 200:
-                return response.json().get('access_token')
-            else:
-                print(f"Error al obtener token JWT: {response.text}")
-                return None
-        except requests.exceptions.ConnectionError:
-            print("No se pudo conectar a la API. Por favor, inicia el módulo de API.")
-            return None
     
     def ensure_token_valid(self):
         if self.is_token_expired():

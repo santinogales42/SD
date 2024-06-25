@@ -1,7 +1,6 @@
 from flask import Flask, request, jsonify, render_template
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required
 from pymongo import MongoClient, errors, IndexModel, ASCENDING
-
 from bson import ObjectId
 from datetime import timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -21,7 +20,9 @@ from cryptography.hazmat.primitives.asymmetric import padding, rsa
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.backends import default_backend
 import time
-
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+import base64
 from datetime import datetime, timedelta
 from flask_socketio import SocketIO, emit
 
@@ -260,21 +261,44 @@ def create_app(mongo_address, kafka_address):
 
 
     ###### SEGURIDAD ######
+    def create_key():
+        password = b"shared_secret"
+        salt = b"your_saved_salt"  # Usar el mismo salt que usaste para generar la clave
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000,
+            backend=default_backend()
+        )
+        key = kdf.derive(password)
+        return key
+
+    def decrypt_data(encrypted_data, key):
+        iv = encrypted_data[:16]
+        encrypted_data = encrypted_data[16:]
+        cipher = Cipher(algorithms.AES(key), modes.CFB(iv))
+        decryptor = cipher.decryptor()
+        return decryptor.update(encrypted_data) + decryptor.finalize()
+
     @app.route('/registro_usuario', methods=['POST'])
     def registro_usuario():
-        username = request.json.get("username")
-        password = request.json.get("password")
+        encrypted_data = base64.b64decode(request.data)
+        key = create_key()
+        decrypted_data = decrypt_data(encrypted_data, key)
+        data = json.loads(decrypted_data.decode())
+
+        username = data.get("username")
+        password = data.get("password")
         password_hash = generate_password_hash(password)
 
         if db.users.find_one({"username": username}):
             return jsonify({"msg": "El usuario ya existe"}), 409
 
         db.users.insert_one({"username": username, "password_hash": password_hash})
-        auditoria_logger.info('Evento específico en /registro_usuario')
         return jsonify({"msg": "Usuario registrado exitosamente"}), 201
 
     
-    #TODO: Comprobar la expiracion y visualizacion de los token
     @app.route('/login', methods=['POST'])
     def login():
         username = request.json.get("username")

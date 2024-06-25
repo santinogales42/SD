@@ -129,7 +129,6 @@ class ADEngine:
                     final_position = self.final_positions[drone_id]
                     response = {'status': 'success', 'final_position': final_position}
                 else:
-                    print(f"Drone ID {drone_id} has joined but is not needed for the current figure.")
                     response = {'status': 'not_required'}
             else:
                 print(f"Received unknown action from drone: {request_json.get('action')}")
@@ -312,18 +311,16 @@ class ADEngine:
 
     def reset_engine(self):
         self.reset_event.set()
-        print("R key pressed. Resetting engine...")
 
         # Reset the drones to initial positions
         for dron_id in self.connected_drones:
             self.send_final_position(dron_id, (1, 1))  # Sending initial position (1, 1)
             self.send_instruction_to_drone(dron_id, 'RESET')
 
-        time.sleep(5)  # Wait for drones to reset to initial positions
+        time.sleep(30)
+            
 
         # Reset engine state and load the first figure
-        self.end_show()
-        self.connected_drones.clear()
         self.final_positions.clear()
         self.current_positions.clear()
         self.drones_state.clear()
@@ -332,6 +329,39 @@ class ADEngine:
         self.send_positions_and_start_commands()  # Start the first figure
 
         self.reset_event.clear()
+
+    def handle_drone_position_reached(self, dron_id, final_position):
+        if self.reset_event.is_set():
+            return
+        final_position_tuple = tuple(final_position) if isinstance(final_position, list) else final_position
+        self.current_positions[dron_id] = final_position_tuple
+        with self.state_lock:
+            self.drones_state[dron_id]['reached'] = True
+        if final_position_tuple == (1, 1):  # Check if drone reached initial position
+            self.load_next_figure()
+        self.gestionar_estado_drones()
+
+    def gestionar_estado_drones(self):
+        if self.check_all_drones_in_position():
+            print("Todos los drones han alcanzado su posición final.")
+            if self.reset_event.is_set():
+                self.load_next_figure()  # Load the first figure after reset
+            else:
+                self.load_next_figure()
+        else:
+            print("Aún hay drones que no han alcanzado su posición final.")
+
+    def check_all_drones_in_position(self):
+        with self.state_lock:
+            # Verificar todos los drones requeridos para la figura actual
+            for dron_id in self.final_positions.keys():
+                # Si algún dron no ha alcanzado su posición, devuelve False
+                if dron_id not in self.drones_state or not self.drones_state[dron_id]['reached']:
+                    return False
+            # Todos los drones han alcanzado su posición
+            print("Todos los drones han alcanzado su posición final.")
+            return True
+
 
 
     def send_final_position(self, dron_id, final_position):
@@ -388,10 +418,21 @@ class ADEngine:
 
     def end_show(self):
         print("El espectáculo ha finalizado.")
-        self.connected_drones.clear()
-        self.final_positions.clear()
-        self.current_positions.clear()
-        self.drones_state.clear()
+        while True:
+            user_input = input("¿Deseas reiniciar el espectáculo? (y/n): ").strip().lower()
+            if user_input == 'y':
+                self.reset_engine()
+                return  # Salir del bucle y del método
+            elif user_input == 'n':
+                self.connected_drones.clear()
+                self.final_positions.clear()
+                self.current_positions.clear()
+                self.drones_state.clear()
+                print("El espectáculo ha terminado definitivamente.")
+                return  # Salir del bucle y del método
+            else:
+                print("Entrada no válida. Por favor, introduce 'y' para sí o 'n' para no.")
+
 
 
     def close(self):
@@ -452,36 +493,6 @@ class ADEngine:
             except Exception as e:
                 print(f"Error inesperado al procesar el mensaje de Kafka: {e}")
 
-
-    def handle_drone_position_reached(self, dron_id, final_position):
-        if self.reset_event.is_set():
-            return
-        final_position_tuple = tuple(final_position) if isinstance(final_position, list) else final_position
-        self.current_positions[dron_id] = final_position_tuple
-        with self.state_lock:
-            self.drones_state[dron_id]['reached'] = True
-        self.gestionar_estado_drones()
-
-    def gestionar_estado_drones(self):
-        if self.check_all_drones_in_position():
-            print("Todos los drones han alcanzado su posición final.")
-            self.load_next_figure()
-        else:
-            print("Aún hay drones que no han alcanzado su posición final.")
-
-
-    def check_all_drones_in_position(self):
-        with self.state_lock:
-            # Verificar todos los drones requeridos para la figura actual
-            for dron_id in self.final_positions.keys():
-                # Si algún dron no ha alcanzado su posición, devuelve False
-                if dron_id not in self.drones_state or not self.drones_state[dron_id]['reached']:
-                    return False
-            # Todos los drones han alcanzado su posición
-            print("Todos los drones han alcanzado su posición final.")
-            return True
-        
-
     def load_next_figure(self):
         self.indice_figura_actual += 1
         if self.indice_figura_actual < len(self.figuras):
@@ -489,6 +500,7 @@ class ADEngine:
             self.send_positions_and_start_commands()
         else:
             print("Todas las figuras han sido completadas.")
+            time.sleep(20)
             self.end_show()
 
     def procesar_datos_json(self, ruta_archivo_json):
@@ -527,7 +539,6 @@ class ADEngine:
             print("Instrucción START enviada a todos los drones.")
             self.log_auditoria('START', 'Instrucción START enviada a todos los drones.', tipo='engine')
             
-    #TODO: No se que pasa pero me sale un error raro al unir drones, EXCEPTION
     def log_auditoria(self,evento, descripcion, tipo='engine'):
         try:
             data = {
