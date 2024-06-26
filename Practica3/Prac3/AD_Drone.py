@@ -58,8 +58,9 @@ class ADDrone(threading.Thread):
         self.registered_drones = {}
         self.in_show_mode = False
         self.token_time_received = None  # Tiempo en el que se recibió el token
-        self.last_heartbeat_received = time.time()
-        self.heartbeat_timeout = 20  
+        self.heartbeat_interval = 5  # Intervalo de latido del corazón en segundos
+        self.heartbeat_timeout = 10  # Tiempo de espera máximo para la desconexión en segundos
+        self.last_heartbeat = time.time()
         self.token_expiration_time = None
         
         self.public_key = None
@@ -72,6 +73,25 @@ class ADDrone(threading.Thread):
      
     def start(self):
         self.show_menu()
+        self.start_heartbeat_check()
+
+    def start_heartbeat_check(self):
+        threading.Thread(target=self.send_heartbeat, daemon=True).start()
+
+    def send_heartbeat(self):
+        while self.in_show_mode:
+            message = {
+                'type': 'heartbeat',
+                'dron_id': self.dron_id
+            }
+            self.send_kafka_message('drone_heartbeats', message)
+            time.sleep(self.heartbeat_interval)
+            
+    def handle_disconnection(self):
+        # Lógica para manejar la desconexión del dron
+        self.in_show_mode = False
+        self.final_position = None
+        self.current_position = self.base_position
         
     def is_token_expired(self):
         return datetime.datetime.now() > self.token_expiration_time
@@ -208,6 +228,8 @@ class ADDrone(threading.Thread):
             if instruction == 'join_show':
                 self.in_show_mode = True
                 print(f"ADDrone: Uniendo al show con ID {self.dron_id}...")
+            if instruction == 'HEARTBEAT':
+                self.last_heartbeat = time.time()
             elif instruction == 'START':
                 if self.in_show_mode:
                     self.is_returning_to_base = False

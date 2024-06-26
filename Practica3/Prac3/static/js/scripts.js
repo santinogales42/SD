@@ -210,40 +210,6 @@ setInterval(function() {
     updateMapWithTableData();
 }, 500);
 
-function updateMapWithTableData() {
-    const tableRows = document.querySelectorAll('#drone-positions-table tr');
-    const mapContainer = document.getElementById('drone-map');
-    mapContainer.innerHTML = '';
-
-    const dronePositions = new Map();
-
-    for (let i = 1; i < tableRows.length; i++) {
-        const cells = tableRows[i].cells;
-        const droneID = cells[0].textContent; // ID del dron
-        const posX = parseInt(cells[1].textContent, 10);
-        const posY = parseInt(cells[2].textContent, 10);
-        const droneColor = getDroneColor(droneID); // Función para obtener el color del dron
-
-        // Agregar la posición y color del dron al mapa
-        dronePositions.set(`${posX},${posY}`, { id: droneID, color: droneColor });
-    }
-
-    for (let y = 0; y < 20; y++) {
-        for (let x = 0; x < 20; x++) {
-            const positionKey = `${x},${y}`;
-            const cell = document.createElement('div');
-            cell.classList.add('drone-cell');
-
-            if (dronePositions.has(positionKey)) {
-                const droneData = dronePositions.get(positionKey);
-                cell.style.backgroundColor = droneData.color; // Colorea el dron según su estado
-                cell.textContent = droneData.id; // Muestra el ID del dron en la celda
-            }
-            mapContainer.appendChild(cell);
-        }
-    }
-}
-
 function getDroneColor(droneID) {
     // Implementar la lógica para obtener el color del dron
     // Puedes ajustar esta función según tu lógica de aplicación
@@ -356,6 +322,7 @@ window.onload = function() {
     updateFinalDronePositions();
     listenForAuditUpdates();
     cargarAuditoria(); // Asegúrate de llamar a esta función al cargar la página
+    listenForDisconnections();
 };
 
 
@@ -373,6 +340,67 @@ function updateDronePositions() {
             document.getElementById('drone-positions-table').innerHTML = tableContent;
         })
         .catch(error => console.error('Error al obtener posiciones de drones:', error));
+}
+
+function updateMapWithTableData() {
+    const tableRows = document.querySelectorAll('#drone-positions-table tr');
+    const mapContainer = document.getElementById('drone-map');
+    mapContainer.innerHTML = '';
+
+    const dronePositions = new Map();
+
+    for (let i = 1; i < tableRows.length; i++) {
+        const cells = tableRows[i].cells;
+        const droneID = cells[0].textContent; // ID del dron
+        const posX = parseInt(cells[1].textContent, 10);
+        const posY = parseInt(cells[2].textContent, 10);
+        const droneColor = getDroneColor(droneID); // Función para obtener el color del dron
+
+        // Agregar la posición y color del dron al mapa
+        dronePositions.set(`${posX},${posY}`, { id: droneID, color: droneColor });
+    }
+
+    for (let y = 0; y < 20; y++) {
+        for (let x = 0; x < 20; x++) {
+            const positionKey = `${x},${y}`;
+            const cell = document.createElement('div');
+            cell.classList.add('drone-cell');
+
+            if (dronePositions.has(positionKey)) {
+                const droneData = dronePositions.get(positionKey);
+                cell.style.backgroundColor = droneData.color; // Colorea el dron según su estado
+                cell.textContent = droneData.id; // Muestra el ID del dron en la celda
+            }
+            mapContainer.appendChild(cell);
+        }
+    }
+}
+
+function listenForDisconnections() {
+    const eventSource = new EventSource('/stream_errors');
+    eventSource.onmessage = function(event) {
+        const errors = JSON.parse(event.data);
+        handleDisconnections(errors);
+    };
+}
+
+function handleDisconnections(errors) {
+    errors.forEach(error => {
+        if (error.includes('desconectado')) {
+            const droneID = error.split(' ')[1];  // Asume que el error tiene el formato "Dron <ID> desconectado"
+            removeDroneFromMap(droneID);
+        }
+    });
+}
+
+function removeDroneFromMap(droneID) {
+    const tableRows = document.querySelectorAll('#drone-positions-table tr');
+    tableRows.forEach(row => {
+        if (row.cells[0].textContent === droneID) {
+            row.remove();
+        }
+    });
+    updateMapWithTableData();  // Actualiza el mapa después de eliminar el dron
 }
 
 let finalDronePositions = {};

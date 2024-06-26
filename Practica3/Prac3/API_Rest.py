@@ -33,6 +33,7 @@ CORS(app)
 #logging.basicConfig(level=logging.INFO)
 
 def create_app(mongo_address, kafka_address):
+    global db 
     try:
         client = MongoClient(mongo_address, serverSelectionTimeoutMS=5000)
         client.server_info()  # Test MongoDB connection
@@ -55,6 +56,7 @@ def create_app(mongo_address, kafka_address):
     jwt = JWTManager(app)
 
     drone_positions = {}
+    last_heartbeat_times = {}
 
     BASE_URL = "http://api.openweathermap.org/data/2.5/weather"
 
@@ -255,9 +257,36 @@ def create_app(mongo_address, kafka_address):
         
         return jsonify(final_drone_positions)
 
-    @app.route('/get_drone_positions')
+    @app.route('/heartbeat', methods=['POST'])
+    def handle_heartbeat():
+        data = request.json
+        drone_id = data.get('dron_id')
+        last_heartbeat_times[drone_id] = time.time()
+        return jsonify({'status': 'success'}), 200
+
+    @app.route('/disconnect_drone', methods=['POST'])
+    def disconnect_drone():
+        data = request.json
+        drone_id = data.get('drone_id')
+        if drone_id in drone_positions:
+            del drone_positions[drone_id]
+            return jsonify({'status': 'success', 'message': f'Dron {drone_id} desconectado.'}), 200
+        else:
+            return jsonify({'status': 'error', 'message': 'Dron no encontrado.'}), 404
+
+    @app.route('/get_drone_positions', methods=['GET'])
     def get_drone_positions():
         return jsonify(drone_positions)
+
+    def check_heartbeat():
+        while True:
+            current_time = time.time()
+            for drone_id, last_heartbeat in list(last_heartbeat_times.items()):
+                if current_time - last_heartbeat > 10:  # Tiempo de espera para considerar desconectado
+                    print(f"Dron {drone_id} desconectado por tiempo de espera.")
+                    disconnect_drone({'drone_id': drone_id})
+                    del last_heartbeat_times[drone_id]
+            time.sleep(5)
 
 
     ###### SEGURIDAD ######

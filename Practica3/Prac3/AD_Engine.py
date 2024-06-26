@@ -311,15 +311,13 @@ class ADEngine:
 
     def reset_engine(self):
         self.reset_event.set()
-
         # Reset the drones to initial positions
         for dron_id in self.connected_drones:
             self.send_final_position(dron_id, (1, 1))  # Sending initial position (1, 1)
             self.send_instruction_to_drone(dron_id, 'RESET')
 
-        time.sleep(30)
-            
-
+        time.sleep(20)
+    
         # Reset engine state and load the first figure
         self.final_positions.clear()
         self.current_positions.clear()
@@ -338,7 +336,7 @@ class ADEngine:
         with self.state_lock:
             self.drones_state[dron_id]['reached'] = True
         if final_position_tuple == (1, 1):  # Check if drone reached initial position
-            self.load_next_figure()
+            self.cargar_figura(0)
         self.gestionar_estado_drones()
 
     def gestionar_estado_drones(self):
@@ -424,14 +422,24 @@ class ADEngine:
                 self.reset_engine()
                 return  # Salir del bucle y del método
             elif user_input == 'n':
-                self.connected_drones.clear()
-                self.final_positions.clear()
-                self.current_positions.clear()
-                self.drones_state.clear()
+                print("Enviando drones a la posición base antes de terminar definitivamente.")
+                self.send_drones_to_base()
+                self.wait_for_all_drones_to_reach_base()
                 print("El espectáculo ha terminado definitivamente.")
                 return  # Salir del bucle y del método
             else:
                 print("Entrada no válida. Por favor, introduce 'y' para sí o 'n' para no.")
+
+    def send_drones_to_base(self):
+        for dron_id in self.connected_drones:
+            self.send_final_position(dron_id, (1, 1))  # Enviar la posición base (1, 1)
+            self.send_instruction_to_drone(dron_id, 'RESET')  # Instrucción para ir a la posición base
+
+    def wait_for_all_drones_to_reach_base(self):
+        print("Esperando a que todos los drones lleguen a la posición base...")
+        while any(self.current_positions.get(dron_id) != (1, 1) for dron_id in self.connected_drones):
+            time.sleep(1)  # Esperar un segundo antes de verificar nuevamente
+        print("Todos los drones han llegado a la posición base.")
 
 
 
@@ -461,13 +469,17 @@ class ADEngine:
         for message in consumer:
             try:
                 # Convertir el dron_id a entero
-                dron_id = int(message.key) if message.key.isdigit() else None
+                dron_id = int(message.key) if message.key and message.key.isdigit() else None
                 if dron_id is None:
                     print(f"ID de dron inválido: {message.key}")
                     continue
 
                 # Decodificar y descifrar
                 private_key = self.load_drone_keys(dron_id)
+                if private_key is None:
+                    print(f"Clave privada no encontrada para el dron ID {dron_id}")
+                    continue
+
                 encrypted_data = base64.b64decode(message.value)
                 decrypted_data = private_key.decrypt(
                     encrypted_data,
@@ -479,20 +491,30 @@ class ADEngine:
                 )
                 message_data = json.loads(decrypted_data.decode('utf-8'))
 
+                # Asegurarnos de que message_data es un diccionario
+                if not isinstance(message_data, dict):
+                    print(f"Formato inesperado de mensaje: {message_data}")
+                    continue
+
                 # Procesar el mensaje si es del tipo esperado
-                if message_data['type'] == 'position_reached':
-                    final_position = message_data['final_position']
-                    self.handle_drone_position_reached(dron_id, final_position)
+                if message_data.get('type') == 'position_reached':
+                    final_position = message_data.get('final_position')
+                    if final_position is not None:
+                        self.handle_drone_position_reached(dron_id, final_position)
+                    else:
+                        print(f"Posición final no encontrada en el mensaje: {message_data}")
+                else:
+                    print(f"Tipo de mensaje no reconocido: {message_data.get('type')}")
 
             except json.JSONDecodeError:
                 print("Error al decodificar el mensaje JSON.")
-            except TypeError:
-                print("Error en el formato del mensaje. Se esperaba un diccionario.")
-            except KeyError:
-                print("Clave no encontrada en el mensaje.")
+            except TypeError as e:
+                print(f"Error en el formato del mensaje: {e}. Se esperaba un diccionario.")
+            except KeyError as e:
+                print(f"Clave no encontrada en el mensaje: {e}. Mensaje recibido: {message_data}")
             except Exception as e:
                 print(f"Error inesperado al procesar el mensaje de Kafka: {e}")
-
+                
     def load_next_figure(self):
         self.indice_figura_actual += 1
         if self.indice_figura_actual < len(self.figuras):
@@ -500,7 +522,6 @@ class ADEngine:
             self.send_positions_and_start_commands()
         else:
             print("Todas las figuras han sido completadas.")
-            time.sleep(20)
             self.end_show()
 
     def procesar_datos_json(self, ruta_archivo_json):
@@ -531,13 +552,17 @@ class ADEngine:
 
     def send_positions_and_start_commands(self):
         for dron_id in self.connected_drones:
-            self.send_final_position(dron_id, self.final_positions[dron_id])
+            if dron_id in self.final_positions:
+                self.send_final_position(dron_id, self.final_positions[dron_id])
+            else:
+                print(f"Advertencia: El dron ID {dron_id} no tiene una posición final asignada en la figura actual.")
         
         if self.are_all_drones_connected():
             for dron_id in self.connected_drones:
                 self.send_instruction_to_drone(dron_id, 'START')
             print("Instrucción START enviada a todos los drones.")
             self.log_auditoria('START', 'Instrucción START enviada a todos los drones.', tipo='engine')
+
             
     def log_auditoria(self,evento, descripcion, tipo='engine'):
         try:
