@@ -422,24 +422,14 @@ class ADEngine:
                 self.reset_engine()
                 return  # Salir del bucle y del método
             elif user_input == 'n':
-                print("Enviando drones a la posición base antes de terminar definitivamente.")
-                self.send_drones_to_base()
-                self.wait_for_all_drones_to_reach_base()
+                self.connected_drones.clear()
+                self.final_positions.clear()
+                self.current_positions.clear()
+                self.drones_state.clear()
                 print("El espectáculo ha terminado definitivamente.")
                 return  # Salir del bucle y del método
             else:
                 print("Entrada no válida. Por favor, introduce 'y' para sí o 'n' para no.")
-
-    def send_drones_to_base(self):
-        for dron_id in self.connected_drones:
-            self.send_final_position(dron_id, (1, 1))  # Enviar la posición base (1, 1)
-            self.send_instruction_to_drone(dron_id, 'RESET')  # Instrucción para ir a la posición base
-
-    def wait_for_all_drones_to_reach_base(self):
-        print("Esperando a que todos los drones lleguen a la posición base...")
-        while any(self.current_positions.get(dron_id) != (1, 1) for dron_id in self.connected_drones):
-            time.sleep(1)  # Esperar un segundo antes de verificar nuevamente
-        print("Todos los drones han llegado a la posición base.")
 
 
 
