@@ -1,3 +1,4 @@
+import ssl
 from flask import Flask, request, jsonify, render_template
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required
 from pymongo import MongoClient, errors, IndexModel, ASCENDING
@@ -31,6 +32,9 @@ app = Flask(__name__)
 socketio = SocketIO(app)
 CORS(app)
 #logging.basicConfig(level=logging.INFO)
+
+errores = []
+
 
 def create_app(mongo_address, kafka_address):
     global db 
@@ -134,12 +138,12 @@ def create_app(mongo_address, kafka_address):
     def stream_errors():
         def generate():
             while True:
-                # Suponiendo que tienes una función que obtiene los errores
-                errors = obtener_errores()  
+                errors = obtener_errores().json  # Obtener los errores como JSON
                 yield f"data: {json.dumps(errors)}\n\n"
                 time.sleep(1)  # Ajustar la frecuencia de actualización según sea necesario
 
         return Response(generate(), mimetype='text/event-stream')
+
 
 
 
@@ -440,13 +444,20 @@ def create_app(mongo_address, kafka_address):
     
     @app.route('/errores', methods=['GET'])
     def obtener_errores():
-        # Aquí el código para obtener los errores de la base de datos o archivo de registro
-        errores = []  # Supongamos que esta es la lista de errores
-        return jsonify(errores)
+        with app.app_context():
+            errores = []  # Supongamos que esta es la lista de errores
+            return jsonify(errores)
+
     
     def log_error(error):
         with open('error_log.txt', 'a') as file:
             file.write(f'{error}\n')
+            
+    @app.errorhandler(ssl.SSLError)
+    def handle_ssl_error(e):
+        logging.error(f'SSL error: {e}')
+        return jsonify(error="SSL Error occurred"), 500
+
 
     
     @app.errorhandler(Exception)
@@ -624,6 +635,8 @@ def create_app(mongo_address, kafka_address):
     #SSL
     app.run(debug=True, host='0.0.0.0', ssl_context=context, port=5000)
     #app.run(debug=False, host='0.0.0.0', port=5000)
+    
+    return app
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='API Rest para drones')
@@ -632,4 +645,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     app = create_app(args.mongo, args.kafka)
-    
+
+    context = ('ssl/certificado_registry.crt', 'ssl/clave_privada_registry.pem')
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000, ssl_context=context)
+    # app.run(debug=False, host='0.0.0.0', port=5000) # Sin SSL
