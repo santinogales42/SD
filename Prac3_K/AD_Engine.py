@@ -27,13 +27,11 @@ warnings.simplefilter('ignore', InsecureRequestWarning)
 
 
 class ADEngine:
-    def __init__(self, listen_port, max_drones, broker_address, database_address, ip_address, api_address):
+    def __init__(self, listen_port, max_drones, broker_address, database_address, api_address):
         self.listen_port = listen_port
         self.max_drones = max_drones
         self.broker_address = broker_address
         self.database_address = database_address
-        self.ip_address = ip_address  # Dirección IP del servidor donde se ejecuta el motor
-
         self.api_address = api_address
         self.client = pymongo.MongoClient(self.database_address)
         self.db = self.client["dronedb"]
@@ -43,10 +41,8 @@ class ADEngine:
         self.current_positions = {}
         self.connected_drones = set()
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        # Para conectarse desde cualquier IP de la misma red
         self.server_socket.bind(("0.0.0.0", self.listen_port))
-        self.server_socket.listen(15)
-
         self.server_socket.listen(15)
         self.kafka_producer = KafkaProducer(
             bootstrap_servers=[self.broker_address],
@@ -90,91 +86,60 @@ class ADEngine:
     def handle_drone_connection(self, client_socket):
         try:
             data = client_socket.recv(1024).decode('utf-8')
-            
-            # Verifica si se recibió algún dato
-            if not data:
-                print("No se recibió ningún dato del dron.")
-                return
-            
             data_dict = json.loads(data)
 
-            # Suponiendo que se recibe ID y datos sin cifrar
-            drone_id = data_dict.get('ID')
-            raw_data = data_dict.get('Data')
+            # Suponiendo que se recibe ID y datos cifrados
+            drone_id = data_dict['ID']
+            encrypted_data = base64.b64decode(data_dict['Data'])
 
-            if drone_id is not None and raw_data is not None:
-                # Decodificar datos sin cifrar
-                decoded_data = json.loads(raw_data)
-                                
-                if decoded_data.get('action') == 'join':
-                    if drone_id in self.final_positions:
-                        self.connected_drones.add(drone_id)
-                        self.drones_involucrados.add(drone_id)
-                        if self.are_all_drones_connected():
-                            print("Todos los drones necesarios están conectados. Preparando para iniciar el espectáculo.")
-                            self.send_positions_and_start_commands()
-                        else:
-                            threading.Timer(20, self.send_positions_and_start_commands).start()
-                        remaining_drones = self.required_drones - len(self.connected_drones)
-                        print(f"Drone ID {drone_id} has joined. {remaining_drones} drones are still required.")
-                        self.log_auditoria('JOIN', f"El dron {drone_id} se ha unido al espectáculo.", tipo='engine')
-                        final_position = self.final_positions[drone_id]
-                        response = {'status': 'success', 'final_position': final_position}
-                    else:
-                        response = {'status': 'not_required'}
+            # Cargar clave privada y descifrar datos
+            private_key = self.load_drone_keys(drone_id)
+            if private_key is None:
+                raise ValueError(f"No se pudo cargar la clave privada para el dron {drone_id}")
+
+            decrypted_data = private_key.decrypt(
+                encrypted_data,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
+                    label=None
+                )
+            )
+            self.db.MensajesKafka.insert_one({
+                'DroneID': drone_id,
+                'Type': 'Incoming a ADEngine',
+                'EncryptedMessage': data_dict['Data'],
+                'DecryptedMessage': decrypted_data.decode('utf-8')
+            })
+
+            #Procesar datos descifrados
+            request_json = json.loads(decrypted_data.decode('utf-8'))
+            print(f"Datos recibidos del dron {drone_id}: {request_json}")
+
+            if request_json.get('action') == 'join':
+                if drone_id in self.final_positions:
+                    self.connected_drones.add(drone_id)
+                    self.drones_involucrados.add(drone_id)
+                    if self.are_all_drones_connected():
+                        print("Todos los drones necesarios están conectados. Preparando para iniciar el espectáculo.")
+                        self.send_positions_and_start_commands()
+                    remaining_drones = self.required_drones - len(self.connected_drones)
+                    print(f"Drone ID {drone_id} has joined. {remaining_drones} drones are still required.")
+                    self.log_auditoria('JOIN', f"El dron {drone_id} se ha unido al espectáculo.", tipo='engine')
+                    final_position = self.final_positions[drone_id]
+                    response = {'status': 'success', 'final_position': final_position}
                 else:
-                    print(f"Received unknown action from drone: {decoded_data.get('action')}")
-                    response = {'status': 'error', 'message': 'Unknown action'}
-                
-                client_socket.send(json.dumps(response).encode('utf-8'))
+                    response = {'status': 'not_required'}
             else:
-                # Procesar datos sin cifrar directamente
-                self.process_non_encrypted_data(data_dict)
+                print(f"Received unknown action from drone: {request_json.get('action')}")
+                response = {'status': 'error', 'message': 'Unknown action'}
+            
+            client_socket.send(json.dumps(response).encode('utf-8'))
 
-        except json.JSONDecodeError as json_err:
-            print(f"Error al decodificar el mensaje JSON: {json_err}")
-        except ValueError as val_err:
-            print(f"Error en el valor de los datos recibidos: {val_err}")
         except Exception as e:
             print(f"Error al manejar la conexión del dron: {e}")
         finally:
             client_socket.close()
-
-    def send_positions_and_start_commands(self):
-        for dron_id in self.connected_drones:
-            if dron_id in self.final_positions:
-                self.send_final_position(dron_id, self.final_positions[dron_id])
-            else:
-                print(f"Advertencia: El dron ID {dron_id} no tiene una posición final asignada en la figura actual.")
-        
-        if self.are_all_drones_connected():
-            for dron_id in self.connected_drones:
-                self.send_instruction_to_drone(dron_id, 'START')
-            print("Instrucción START enviada a todos los drones.")
-            self.log_auditoria('START', 'Instrucción START enviada a todos los drones.', tipo='engine')
-
-
-
-    def process_non_encrypted_data(self, data_dict):
-        try:
-            message_type = data_dict.get('type')
-            if message_type == 'position_update':
-                pass
-            elif message_type == 'position_reached':
-                final_position = data_dict.get('final_position')
-                if final_position is not None:
-                    self.handle_drone_position_reached(data_dict['dron_id'], final_position)
-                else:
-                    print(f"Posición final no encontrada en el mensaje: {data_dict}")
-            elif message_type == 'heartbeat':
-                pass
-        except KeyError as e:
-            print(f"Clave no encontrada en el mensaje: {e}")
-        except Exception as e:
-            print(f"Error al manejar el mensaje: {e}")
-
-
-
         
     def load_drone_keys(self, drone_id):
         #Cargar la clave privada del dron desde MongoDB
@@ -290,59 +255,12 @@ class ADEngine:
             'instruction': instruction,
             'final_position': final_position
         }
-        self.send_encrypted_message(message)
         self.send_encrypted_kafka_message('drone_messages_topic', message)
         self.kafka_producer.flush()
         print(f"Instrucción {instruction} enviada al dron {dron_id}")
         with self.state_lock:
             self.drones_state[dron_id] = {'instruction': instruction, 'reached': False}
 
-    def send_encrypted_message(self, message):
-        try:
-            original_message_json = json.dumps(message)
-
-            # Encrypt the message
-            encrypted_data = self.public_key.encrypt(
-                original_message_json.encode(),
-                padding.OAEP(
-                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                    algorithm=hashes.SHA256(),
-                    label=None
-                )
-            )
-            if encrypted_data is None:
-                raise ValueError("Los datos cifrados son None")
-            encoded_message = base64.b64encode(encrypted_data).decode('utf-8')
-            if encoded_message is None:
-                raise ValueError("El mensaje codificado es None")
-
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as temp_socket:
-                temp_socket.connect((self.ip_address, self.listen_port + 1))
-                temp_socket.sendall(original_message_json.encode('utf-8'))
-
-            kafka_message_document = {
-                'Clase': 'ADEngine',
-                'OriginalMessage': message,
-                'EncryptedMessage': encoded_message
-            }
-
-            if message.get('type') != 'heartbeat':
-                main_db = self.client['dronedb']
-                main_db.MensajesKafka.insert_one(kafka_message_document)
-
-        except Exception as e:
-            print(f"Error al enviar mensaje: {e}")
-            try:
-                if message.get('type') != 'heartbeat':
-                    kafka_message_document = {
-                        'Clase': 'ADEngine',
-                        'OriginalMessage': message,
-                        'EncryptedMessage': encoded_message
-                    }
-                    main_db = self.client['dronedb']
-                    main_db.MensajesKafka.insert_one(kafka_message_document)
-            except Exception as db_error:
-                print(f"Error al guardar mensaje en la base de datos: {db_error}")
 
             
     def are_all_drones_connected(self):
@@ -384,7 +302,6 @@ class ADEngine:
             'instruction': 'STOP',
             'reason': f"Advertencia de clima frío en {city_name}: {temp_celsius}°C"
         }
-        self.send_encrypted_message(warning_message)
         self.kafka_producer.send('drone_final_position', warning_message)
         self.encrypted_message('drone_final_position', warning_message)
         self.kafka_producer.flush()
@@ -451,7 +368,6 @@ class ADEngine:
             'dron_id': dron_id,
             'final_position': final_position
         }
-        self.send_encrypted_message(message)
         self.kafka_producer.send('drone_final_position', message)
         self.encrypted_message('drone_final_position', message)
         self.kafka_producer.flush()
@@ -459,8 +375,8 @@ class ADEngine:
 
     def start(self):
         print(f"AD_Engine en funcionamiento. Escuchando en el puerto {self.listen_port}...")
-        self.message_listener_thread = threading.Thread(target=self.start_message_listener)
-        self.message_listener_thread.start()
+        self.kafka_consumer_thread = threading.Thread(target=self.start_kafka_consumer)
+        self.kafka_consumer_thread.start()
         self.weather_warning_thread = threading.Thread(target=self.check_weather_warnings)
         self.weather_warning_thread.start()
         self.heartbeat_thread = threading.Thread(target=self.send_heartbeat_messages)
@@ -470,8 +386,9 @@ class ADEngine:
         
         try:
             while True:
+                
                 client_socket, addr = self.server_socket.accept()
-                #print(f"Nueva conexión desde {addr}")
+                print(f"Nueva conexión desde {addr}")
                 drone_connection_thread = threading.Thread(target=self.handle_drone_connection, args=(client_socket,))
                 drone_connection_thread.start()
         except KeyboardInterrupt:
@@ -479,57 +396,6 @@ class ADEngine:
         finally:
             self.close()
             
-            
-    def start_message_listener(self):
-        listener_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        listener_socket.bind(("0.0.0.0", self.listen_port + 1))
-        listener_socket.listen(15)
-
-        while True:
-            client_socket, _ = listener_socket.accept()
-            threading.Thread(target=self.handle_incoming_message, args=(client_socket,)).start()
-
-    def handle_incoming_message(self, client_socket):
-        try:
-            data = client_socket.recv(1024).decode('utf-8')
-            if not data:
-                print("No se recibieron datos.")
-                return
-
-            # Decodificar el mensaje JSON
-            try:
-                message_data = json.loads(data)
-            except json.JSONDecodeError as e:
-                print(f"Error al decodificar el mensaje JSON: {e}")
-                return
-
-            # Asegurarnos de que message_data es un diccionario
-            if not isinstance(message_data, dict):
-                print(f"Formato inesperado de mensaje: {message_data}")
-                return
-
-            # Procesar el mensaje según su tipo
-            message_type = message_data.get('type')
-            if message_type == 'position_reached':
-                final_position = message_data.get('final_position')
-                if final_position is not None:
-                    self.handle_drone_position_reached(message_data['dron_id'], final_position)
-                else:
-                    print(f"Posición final no encontrada en el mensaje: {message_data}")
-            elif message_type == 'heartbeat':
-                pass
-                # Aquí puedes agregar cualquier lógica adicional para manejar el heartbeat si es necesario
-            else:
-                #print(f"Tipo de mensaje no reconocido: {message_type}")
-                pass
-
-        except Exception as e:
-            print(f"Error inesperado al procesar el mensaje: {e}")
-        finally:
-            client_socket.close()
-
-
-
     def listen_for_key_presses(self):
         while True:
             i, o, e = select.select([sys.stdin], [], [], 1)
@@ -543,7 +409,6 @@ class ADEngine:
     def send_heartbeat_messages(self):
         while True:
             heartbeat_message = {'type': 'heartbeat'}
-            self.send_encrypted_message(heartbeat_message)
             self.kafka_producer.send('engine_heartbeat_topic', heartbeat_message)
             self.kafka_producer.flush()
             time.sleep(5)
@@ -555,7 +420,6 @@ class ADEngine:
             user_input = input("¿Deseas reiniciar el espectáculo? (y/n): ").strip().lower()
             if user_input == 'y':
                 self.reset_engine()
-                self.log_auditoria('RESET', 'Show reseteado.', tipo='engine')
                 return  # Salir del bucle y del método
             elif user_input == 'n':
                 self.connected_drones.clear()
@@ -563,7 +427,6 @@ class ADEngine:
                 self.current_positions.clear()
                 self.drones_state.clear()
                 print("El espectáculo ha terminado definitivamente.")
-                self.log_auditoria('END', 'Show finalizado.', tipo='engine')
                 return  # Salir del bucle y del método
             else:
                 print("Entrada no válida. Por favor, introduce 'y' para sí o 'n' para no.")
@@ -646,7 +509,6 @@ class ADEngine:
         self.indice_figura_actual += 1
         if self.indice_figura_actual < len(self.figuras):
             self.cargar_figura(self.indice_figura_actual)
-            self.log_auditoria('NEXT', 'Figura completada, siguiente.', tipo='engine')
             self.send_positions_and_start_commands()
         else:
             print("Todas las figuras han sido completadas.")
@@ -676,6 +538,20 @@ class ADEngine:
                 print(f"Posición final del dron {dron_id}: {final_position}")
                 # Actualizar estado del dron
                 self.drones_state[dron_id] = {'instruction': 'PENDING', 'reached': False}
+        
+
+    def send_positions_and_start_commands(self):
+        for dron_id in self.connected_drones:
+            if dron_id in self.final_positions:
+                self.send_final_position(dron_id, self.final_positions[dron_id])
+            else:
+                print(f"Advertencia: El dron ID {dron_id} no tiene una posición final asignada en la figura actual.")
+        
+        if self.are_all_drones_connected():
+            for dron_id in self.connected_drones:
+                self.send_instruction_to_drone(dron_id, 'START')
+            print("Instrucción START enviada a todos los drones.")
+            self.log_auditoria('START', 'Instrucción START enviada a todos los drones.', tipo='engine')
 
             
     def log_auditoria(self,evento, descripcion, tipo='engine'):
@@ -702,7 +578,6 @@ if __name__ == "__main__":
     parser.add_argument('--max_drones', type=int, default=20, help='Maximum number of drones to support')
     parser.add_argument('--broker_address', default="127.0.0.1:29092", help='Address of the Kafka broker')
     parser.add_argument('--database_address', default="localhost:27017", help='MongoDB URI for the drones database')
-    parser.add_argument('--ip_address', default="0.0.0.0", help='IP address of the machine where AD_Engine is running')
     parser.add_argument('--json', default="PRUEBAS/AwD_figuras.json", help='Path to the JSON file with figures configuration')
     parser.add_argument('--api_address', type=str, default='https://localhost:5000', help='Address of the API server')
     args = parser.parse_args()
@@ -713,7 +588,6 @@ if __name__ == "__main__":
         max_drones=args.max_drones,  # Asegúrate de manejar este argumento en tu clase ADEngine
         broker_address=args.broker_address,
         database_address=args.database_address,
-        ip_address=args.ip_address,
         api_address=args.api_address
     )
 
