@@ -1,0 +1,21 @@
+Cosas que debo de hacer para Julio:
+
+1. Lo que pase el profesor (75%)
+2. Base de datos individual para cada dron
+4. Seguridad en el aspecto de Kafka, es decir, mejorar la de Engine con Drone. (ya se vera si se hace)
+6. Distribuido
+9. Que los drones no haga falta registrarlos y unirlos de la forma que se tiene, sino que con un comando de terminal se pueda. (75%)
+
+NOTA: Puede que por el añadido del cifrado simetrico de los usuarios se haya petado o algo porque al reiniciar da esto:
+El espectáculo ha finalizado.
+¿Deseas reiniciar el espectáculo? (y/n): y
+Instrucción RESET enviada al dron 1
+Instrucción RESET enviada al dron 2
+Instrucción RESET enviada al dron 3
+Cargando nueva figura: Triangulo
+Posición final del dron 1: (10, 7)
+Clave no encontrada en el mensaje.!!!!!!!!!!!!!
+Mirar el chatgpt el ultimo cambio y yasta.
+
+Orden:
+9 > 6 > 2 > 4 > 1

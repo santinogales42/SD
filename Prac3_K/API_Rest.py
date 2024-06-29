@@ -613,22 +613,21 @@ def create_app(mongo_address, kafka_address):
         except errors.PyMongoError as e:
             return jsonify({'error': str(e)}), 500
         
-    @app.route('/update_position', methods=['POST'])
-    def update_position():
-        try:
-            data = request.json
-            drone_id = data.get('ID')
-            position = data.get('Position')
-            
-            if not drone_id or not position:
-                return jsonify({'status': 'error', 'message': 'Datos incompletos'}), 400
-            
-            drone_positions[drone_id] = position
-            return jsonify({'status': 'success', 'message': 'Posición actualizada'}), 200
-        except Exception as e:
-            logging.error(f"Error al actualizar la posición: {e}")
-            return jsonify({'status': 'error', 'message': 'Error al procesar la solicitud'}), 500
+        
+    @app.route('/unir_drones_al_show', methods=['POST'])
+    def unir_drones_al_show():
+        data = request.json
+        drone_ids = data.get('drone_ids')
 
+        if not drone_ids:
+            return jsonify({'message': 'No se proporcionaron IDs de drones'}), 400
+
+        for drone_id in drone_ids:
+            kafka_producer.send(
+                'drone_messages_topic', 
+                {'type': 'instruction', 'dron_id': drone_id, 'instruction': 'join_show'}
+            )
+        return jsonify({'message': f'Drones {drone_ids} invitados a unirse al show'}), 200
 
 
     threading.Thread(target=kafka_listener, daemon=True).start()

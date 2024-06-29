@@ -1,7 +1,6 @@
 import socket
 import json
 import threading
-from flask_cors import CORS
 from kafka import KafkaProducer, KafkaConsumer
 from bson import ObjectId
 from flask import Flask
@@ -12,8 +11,6 @@ import time
 import requests
 import ssl
 import warnings
-from flask_socketio import SocketIO, emit
-import socketio
 from urllib3.exceptions import InsecureRequestWarning
 import logging
 from cryptography.hazmat.backends import default_backend
@@ -28,10 +25,6 @@ import datetime
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 import os
-
-app = Flask(__name__)
-socketio = SocketIO(app)
-CORS(app)
 
 
 class ADDrone(threading.Thread):
@@ -74,8 +67,6 @@ class ADDrone(threading.Thread):
         self.private_key = None
         self.key = self.generate_key()
         self.iv = os.urandom(16)
-        self.server_ip = engine_address[0]
-        self.server_port = engine_address[1]
                 
         warnings.filterwarnings('ignore', category=InsecureRequestWarning)
         #logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
@@ -93,7 +84,6 @@ class ADDrone(threading.Thread):
                 'type': 'heartbeat',
                 'dron_id': self.dron_id
             }
-            self.send_socket_message(message)
             self.send_kafka_message('drone_heartbeats', message)
             time.sleep(self.heartbeat_interval)
             
@@ -238,8 +228,11 @@ class ADDrone(threading.Thread):
             if instruction == 'join_show':
                 self.in_show_mode = True
                 print(f"ADDrone: Uniendo al show con ID {self.dron_id}...")
+            if instruction == 'HEARTBEAT':
+                self.last_heartbeat = time.time()
             elif instruction == 'START':
                 if self.in_show_mode:
+                    self.is_returning_to_base = False
                     print("ADDrone: Instrucción START recibida, iniciando movimiento hacia posición final...")
                     self.move_to_final_position()
                 else:
@@ -248,16 +241,21 @@ class ADDrone(threading.Thread):
                 print("ADDrone: Instrucción STOP recibida, deteniendo y regresando a la base...")
                 self.final_position = self.base_position
                 self.in_show_mode = False
+                self.is_returning_to_base = True
                 self.return_to_base()
             elif instruction == 'RESET':
                 print("ADDrone: Instrucción RESET recibida, regresando a la posición inicial...")
                 self.final_position = self.base_position
                 self.in_show_mode = False
+                self.is_returning_to_base = True
                 self.return_to_base()
                 self.join_show()
         except json.JSONDecodeError:
-            print(f"Received non-JSON message: {message}")
+            print(f"Received non-JSON message: {message.value}")
 
+
+        
+            
     def handle_final_position_message(self, message):
         try:
             if 'final_position' in message and 'dron_id' in message:
@@ -275,57 +273,7 @@ class ADDrone(threading.Thread):
                 print(f"ADDrone: Mensaje no contiene 'final_position' o 'dron_id'. Mensaje recibido: {message}")
         except Exception as e:
             print(f"Error al procesar el mensaje de posición final: {e}")
-
             
-    def start_message_listener(self):
-        listener_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        listener_socket.bind((self.engine_address))  # Usar la dirección y puerto proporcionados en `self.engine_address`
-        listener_socket.listen(15)
-
-        while True:
-            client_socket, _ = listener_socket.accept()
-            threading.Thread(target=self.handle_incoming_message, args=(client_socket,)).start()
-
-
-    def handle_incoming_message(self, client_socket):
-        try:
-            data = client_socket.recv(1024).decode('utf-8')
-            if not data:
-                return
-
-            # Decodificar el mensaje en texto plano
-            message_data = json.loads(data)
-
-            # Asegurarnos de que message_data es un diccionario
-            if not isinstance(message_data, dict):
-                print(f"Formato inesperado de mensaje: {message_data}")
-                return
-
-            # Procesar el mensaje según su tipo
-            message_type = message_data.get('type')
-            if message_type == 'position_reached':
-                final_position = message_data.get('final_position')
-                if final_position is not None:
-                    self.handle_drone_position_reached(message_data['dron_id'], final_position)
-                else:
-                    print(f"Posición final no encontrada en el mensaje: {message_data}")
-            elif message_type == 'heartbeat':
-                print("Mensaje de heartbeat recibido.")
-                # Aquí puedes agregar cualquier lógica adicional para manejar el heartbeat si es necesario
-            else:
-                print(f"Tipo de mensaje no reconocido: {message_type}")
-
-        except json.JSONDecodeError:
-            print("Error al decodificar el mensaje JSON.")
-        except TypeError as e:
-            print(f"Error en el formato del mensaje: {e}. Se esperaba un diccionario.")
-        except KeyError as e:
-            print(f"Clave no encontrada en el mensaje: {e}. Mensaje recibido: {message_data}")
-        except Exception as e:
-            print(f"Error inesperado al procesar el mensaje: {e}")
-        finally:
-            client_socket.close()
-  
             
     def return_to_base(self):
         while self.current_position != self.base_position:
@@ -352,26 +300,7 @@ class ADDrone(threading.Thread):
                 'dron_id': self.dron_id,
                 'final_position': self.final_position
             })
-            self.send_socket_message({
-                'type': 'position_reached',
-                'dron_id': self.dron_id,
-                'final_position': self.final_position
-            })
             print(f"ADDrone: Posición final alcanzada: {self.current_position}")
-
-    def send_position_update(self):
-        message = {
-            'ID': self.dron_id,
-            'Position': self.current_position
-        }
-        try:
-            response = requests.post(f"{self.api_address}/update_position", json=message, verify=False)
-            if response.status_code == 200:
-                print(f"Nueva posición: {self.current_position}")
-            else:
-                print(f"Error al enviar la posición: {response.text}")
-        except requests.RequestException as e:
-            print(f"Error al enviar la posición: {e}")
 
 
     def calculate_movement(self):
@@ -389,37 +318,6 @@ class ADDrone(threading.Thread):
             next_y -= 1
 
         self.current_position = (next_x, next_y)
-        
-    def send_socket_message(self, message):
-        try:
-            # Convertir el mensaje a JSON y enviarlo a través de una conexión de socket temporal
-            message_json = json.dumps(message)
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as temp_socket:
-                temp_socket.connect((self.server_ip, self.server_port))
-                temp_socket.sendall(message_json.encode('utf-8'))
-            #print(f"Mensaje enviado: {message_json}")
-        except Exception as e:
-            print(f"Error al enviar el mensaje: {e}")
-
-
-            
-    
-    def handle_register_message(self, message):
-        try:
-            # Lógica para manejar mensajes de registro
-            print(f"Registro recibido: {message}")
-        except Exception as e:
-            print(f"Error al procesar el mensaje de registro: {e}")
-
-    def handle_api_response_message(self, message):
-        try:
-            # Lógica para manejar respuestas de la API
-            print(f"Respuesta de API recibida: {message}")
-        except Exception as e:
-            print(f"Error al procesar la respuesta de API: {e}")
-
-
-
 
 
     def send_kafka_message(self, topic, message):
@@ -457,6 +355,17 @@ class ADDrone(threading.Thread):
         except Exception as e:
             print(f"Error al enviar mensaje Kafka: {e}")
 
+
+    def send_position_update(self):
+        message = {
+            'type': 'position_update',
+            'ID': self.dron_id,
+            'Position': self.current_position
+        }
+        #self.send_kafka_message('drone_position_updates', message)
+        self.kafka_producer.send('drone_position_updates', value=message)
+        self.kafka_producer.flush()
+        print(f"Nueva posición: {self.current_position}")
     
     def input_drone_data(self):
         self.ensure_token_valid()
@@ -621,7 +530,15 @@ class ADDrone(threading.Thread):
                 # Cargar el certificado de la autoridad certificadora
                 context.load_verify_locations('ssl/certificado_CA.crt')
                 context.load_cert_chain(certfile='ssl/certificado_registry.crt', keyfile='ssl/clave_privada_registry.pem')
+                #with socket.create_connection((host, port)) as sock:
+                #    with context.wrap_socket(sock, server_hostname=host) as secure_sock:
+                #with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as raw_socket:
+                    # Envolver el socket en el contexto SSL
+                #    secure_socket = context.wrap_socket(raw_socket, server_hostname="registry")
 
+                #    secure_socket.connect(self.engine_address)
+                #    join_message = {'action': 'join', 'ID': self.dron_id, 'Alias': self.alias}
+                #    secure_socket.send(json.dumps(join_message).encode('utf-8'))
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as engine_socket:
                     engine_socket.connect(self.engine_address)
 
@@ -629,16 +546,26 @@ class ADDrone(threading.Thread):
                     join_message = {'action': 'join', 'ID': self.dron_id, 'Alias': self.alias}
                     encoded_message = json.dumps(join_message).encode()
 
-                    # Preparar el mensaje final con ID y datos sin cifrar
-                    final_message = json.dumps({'ID': self.dron_id, 'Data': encoded_message.decode()}).encode()
+                    # Cifrar el mensaje
+                    encrypted_message = self.public_key.encrypt(
+                        encoded_message,
+                        padding.OAEP(
+                            mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                            algorithm=hashes.SHA256(),
+                            label=None
+                        )
+                    )
+
+                    # Preparar el mensaje final con ID y datos cifrados
+                    final_message = json.dumps({'ID': self.dron_id, 'Data': base64.b64encode(encrypted_message).decode()}).encode()
                     self.db.MensajesKafka.insert_one({
                         'DroneID': self.dron_id,
                         'MessageType': 'join',
                         'OriginalMessage': join_message,
-                        'EncryptedMessage': encoded_message.decode()
+                        'EncryptedMessage': base64.b64encode(encrypted_message).decode()
                     })
                     engine_socket.sendall(final_message)
-
+                    
                     response_data = engine_socket.recv(1024).decode()
                     if response_data:
                         response = json.loads(response_data)
@@ -661,7 +588,6 @@ class ADDrone(threading.Thread):
             except (ConnectionError, json.JSONDecodeError, socket.timeout) as e:
                 print(f"An error occurred: {e}. Retrying in 10 seconds...")
                 time.sleep(10)  # Espera antes de reintentar
-
 
     # Cifrado Simetrico con AES con modo CFB
     """AES (Advanced Encryption Standard): Es un algoritmo de cifrado simétrico ampliamente utilizado que cifra y descifra datos utilizando la misma clave.
