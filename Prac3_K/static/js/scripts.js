@@ -210,82 +210,25 @@ setInterval(function() {
     updateMapWithTableData();
 }, 500);
 
-function getDroneColor(droneID) {
-    // Implementar la lógica para obtener el color del dron
-    // Puedes ajustar esta función según tu lógica de aplicación
-    // Por ejemplo, devolver un color según si el dron ha llegado a su posición final
-    if (finalDronePositions[droneID]) {
-        return 'green';
-    }
-    return 'red';
-}
-
-
-function makeEncryptedAuditVisible() {
-    const username = prompt("Introduce tu nombre de usuario:");
-    const password = prompt("Introduce tu contraseña:");
-
-    fetch('/login', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ username: username, password: password }),
-    })
-    .then(response => {
-        if (response.ok) {
-            return response.json();
-        } else {
-            throw new Error("Error al obtener token JWT");
-        }
-    })
-    .then(data => {
-        const encryptedAudit = document.getElementById('encrypted-audit');
-        encryptedAudit.style.display = 'block';
-        loadEncryptedAuditData(data.access_token);
-    })
-    .catch(error => {
-        alert("Error durante el inicio de sesión: " + error.message);
-    });
-}
-
-function loadEncryptedAuditData(token) {
-    fetch('/auditoria', {
-        method: 'GET',
-        headers: {
-            'Authorization': 'Bearer ' + token
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        const listaCifrada = document.getElementById('lista-auditoria-cifrada');
-        listaCifrada.innerHTML = ''; // Limpiar lista actual
-
-        data.forEach(log => {
-            const item = document.createElement('li');
-            item.textContent = `${log.timestamp}: ${log.evento} - ${log.descripcion}`;
-            listaCifrada.appendChild(item);
-        });
-    })
-    .catch(error => console.error('Error al cargar auditoría cifrada:', error));
-}
-
 function cargarAuditoria() {
     fetch('/auditoria')
     .then(response => response.json())
     .then(data => {
         const listaDrones = document.getElementById('lista-auditoria');
         const listaEngine = document.getElementById('lista-auditoria-engine');
+        const listaRegistry = document.getElementById('lista-auditoria-registry');
         listaDrones.innerHTML = ''; // Limpiar lista actual
         listaEngine.innerHTML = ''; // Limpiar lista actual
+        listaRegistry.innerHTML = ''; // Limpiar lista actual
 
-        data.forEach(log => {
+        data.general.forEach(log => {
             const item = document.createElement('li');
             item.textContent = `${log.timestamp}: ${log.evento} - ${log.descripcion}`;
             if (log.tipo === 'engine') {
                 listaEngine.appendChild(item);
-            } 
-            else {
+            } else if (log.tipo === 'registry') {
+                listaRegistry.appendChild(item);
+            } else {
                 listaDrones.appendChild(item);
             }
         });
@@ -299,21 +242,25 @@ function listenForAuditUpdates() {
         const auditoria = JSON.parse(event.data);
         const listaDrones = document.getElementById('lista-auditoria');
         const listaEngine = document.getElementById('lista-auditoria-engine');
+        const listaRegistry = document.getElementById('lista-auditoria-registry');
         listaDrones.innerHTML = ''; // Limpiar lista actual
         listaEngine.innerHTML = ''; // Limpiar lista actual
+        listaRegistry.innerHTML = ''; // Limpiar lista actual
 
-        auditoria.forEach(log => {
+        auditoria.general.forEach(log => {
             const item = document.createElement('li');
             item.textContent = `${log.timestamp}: ${log.evento} - ${log.descripcion}`;
             if (log.tipo === 'engine') {
                 listaEngine.appendChild(item);
-            }
-            else {
+            } else if (log.tipo === 'registry') {
+                listaRegistry.appendChild(item);
+            } else {
                 listaDrones.appendChild(item);
             }
         });
     };
 }
+
 
 window.onload = function() {
     createDroneMap();
@@ -325,21 +272,53 @@ window.onload = function() {
     listenForDisconnections();
 };
 
+function listenForDisconnections() {
+    const eventSource = new EventSource('/stream_errors');
+    eventSource.onmessage = function(event) {
+        const errors = JSON.parse(event.data);
+        handleDisconnections(errors);
+    };
+}
 
+function handleDisconnections(errors) {
+    errors.forEach(error => {
+        if (error.includes('desconectado')) {
+            const droneID = error.split(' ')[1];  // Asume que el error tiene el formato "Dron <ID> desconectado"
+            removeDroneFromMap(droneID);
+        }
+    });
+}
+
+function removeDroneFromMap(droneID) {
+    const tableRows = document.querySelectorAll('#drone-positions-table tr');
+    tableRows.forEach(row => {
+        if (row.cells[0].textContent === droneID) {
+            row.remove();
+        }
+    });
+    updateMapWithTableData();  // Actualiza el mapa después de eliminar el dron
+}
+
+let finalDronePositions = {};
 
 function updateDronePositions() {
     fetch('/get_drone_positions')
         .then(response => response.json())
         .then(data => {
             let tableContent = '<h3>Posiciones de Drones</h3>';
-            tableContent += '<table><tr><th>ID</th><th>Posición X</th><th>Posición Y</th></tr>';
+            tableContent += '<table><tr><th>ID</th><th>Posición X</th><th>Posición Y</th><th>Estado</th></tr>';
             for (let droneID in data) {
-                tableContent += `<tr><td>${droneID}</td><td>${data[droneID][0]}</td><td>${data[droneID][1]}</td></tr>`;
+                tableContent += `<tr><td>${droneID}</td><td>${data[droneID][0]}</td><td>${data[droneID][1]}</td><td>${data[droneID][2]}</td></tr>`;
             }
             tableContent += '</table>';
             document.getElementById('drone-positions-table').innerHTML = tableContent;
         })
         .catch(error => console.error('Error al obtener posiciones de drones:', error));
+}
+
+function getDroneColor(droneID) {
+    const status = finalDronePositions[droneID];
+    return status === 'final' ? 'green' : 'red';
 }
 
 function updateMapWithTableData() {
@@ -376,44 +355,6 @@ function updateMapWithTableData() {
     }
 }
 
-function listenForDisconnections() {
-    const eventSource = new EventSource('/stream_errors');
-    eventSource.onmessage = function(event) {
-        const errors = JSON.parse(event.data);
-        handleDisconnections(errors);
-    };
-}
-
-function handleDisconnections(errors) {
-    errors.forEach(error => {
-        if (error.includes('desconectado')) {
-            const droneID = error.split(' ')[1];  // Asume que el error tiene el formato "Dron <ID> desconectado"
-            removeDroneFromMap(droneID);
-        }
-    });
-}
-
-function removeDroneFromMap(droneID) {
-    const tableRows = document.querySelectorAll('#drone-positions-table tr');
-    tableRows.forEach(row => {
-        if (row.cells[0].textContent === droneID) {
-            row.remove();
-        }
-    });
-    updateMapWithTableData();  // Actualiza el mapa después de eliminar el dron
-}
-
-let finalDronePositions = {};
-
-function updateFinalDronePositions() {
-    fetch('/get_final_drone_positions') // Ruta de tu API para obtener posiciones finales
-        .then(response => response.json())
-        .then(data => {
-            finalDronePositions = data;
-            console.log('Posiciones Finales de Drones:', finalDronePositions);
-        })
-        .catch(error => console.error('Error al obtener posiciones finales de drones:', error));
-}
 
 function listenForErrors() {
     const eventSource = new EventSource('/stream_errors');

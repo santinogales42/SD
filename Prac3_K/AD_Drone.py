@@ -51,7 +51,7 @@ class ADDrone(threading.Thread):
         self.alias = None
         self.access_token = None
         self.mongo_client = pymongo.MongoClient(mongo_address)  # Usamos el argumento proporcionado
-        self.db = self.mongo_client["dronedb"]
+        self.db = None
         self.is_returning_to_base = False
 
         
@@ -71,6 +71,11 @@ class ADDrone(threading.Thread):
         warnings.filterwarnings('ignore', category=InsecureRequestWarning)
         #logging.basicConfig(level=logging.DEBUG, filename='app.log', filemode='w', format='%(name)s - %(levelname)s - %(message)s')
      
+    def initialize_db(self):
+        if self.dron_id is None:
+            raise ValueError("Drone ID is not set. Can't initialize database.")
+        self.db = self.mongo_client[f"dronedb_{self.dron_id}"]
+    
     def start(self):
         self.show_menu()
         self.start_heartbeat_check()
@@ -293,6 +298,7 @@ class ADDrone(threading.Thread):
                 break
             self.calculate_movement()
             self.send_position_update()
+            self.send_status_update('moving')  # Notify the API that the drone is moving
             time.sleep(1)
         if self.current_position == self.final_position and not self.is_returning_to_base:
             self.send_kafka_message('drone_position_reached', {
@@ -300,7 +306,23 @@ class ADDrone(threading.Thread):
                 'dron_id': self.dron_id,
                 'final_position': self.final_position
             })
+            self.send_status_update('final')  # Notify the API that the drone reached the final position
             print(f"ADDrone: Posición final alcanzada: {self.current_position}")
+
+    def send_status_update(self, status):
+        message = {
+            'ID': self.dron_id,
+            'Status': status
+        }
+        try:
+            response = requests.post(f"{self.api_address}/update_drone_status", json=message, verify=False)
+            if response.status_code == 200:
+                pass
+            else:
+                print(f"Error al enviar la actualización del estado del dron: {response.status_code} - {response.text}")
+        except Exception as e:
+            print(f"Error al enviar la actualización del estado del dron: {e}")
+
 
 
     def calculate_movement(self):
@@ -362,10 +384,15 @@ class ADDrone(threading.Thread):
             'ID': self.dron_id,
             'Position': self.current_position
         }
-        #self.send_kafka_message('drone_position_updates', message)
-        self.kafka_producer.send('drone_position_updates', value=message)
-        self.kafka_producer.flush()
-        print(f"Nueva posición: {self.current_position}")
+        try:
+            response = requests.post(f"{self.api_address}/position_update", json=message, verify=False)
+            if response.status_code == 200:
+                print(f"Nueva posición: {self.current_position}")
+            else:
+                print(f"Error al enviar la actualización de posición: {response.status_code} - {response.text}")
+        except Exception as e:
+            print(f"Error al enviar la actualización de posición: {e}")
+
     
     def input_drone_data(self):
         self.ensure_token_valid()
@@ -385,25 +412,21 @@ class ADDrone(threading.Thread):
                     if 1 <= dron_id <= 99:
                         mongo_address = args.mongo_address 
                         mongo_client = pymongo.MongoClient(mongo_address)
-                        #mongo_client = pymongo.MongoClient("mongodb://localhost:27017/")
-                        db = mongo_client["dronedb"]
-                        drones_collection = db["drones"]
-                        existing_dron = drones_collection.find_one({"ID": dron_id})
-                        
-                        if existing_dron:
+                        db_name = f"dronedb_{dron_id}"
+
+                        # Comprobar si existe una base de datos con el nombre correspondiente
+                        if db_name in mongo_client.list_database_names():
                             print("ID de dron ya existe. Introduce un ID diferente.")
                         else:
                             self.dron_id = dron_id
                             self.alias = alias
+                            self.initialize_db()  # Inicializar la base de datos específica del dron
                             self.generate_keys()
-                            self.choose_registration_method()
-                            break  
-                    else:
-                        print("El ID del dron debe estar entre 1 y 99. Inténtalo de nuevo.")
+                            self.register_drone()
+                            break
                 except ValueError:
-                    print("Entrada inválida. Debes ingresar un número válido.")
-            else:
-                print("Ambos campos son obligatorios. Introduce el ID y el alias del dron.")
+                    print("Por favor, introduce un número válido entre 1 y 99.")
+
 
 
     def id_exists(self, drone_id):
@@ -416,6 +439,17 @@ class ADDrone(threading.Thread):
             registry_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             registry_socket.connect((host, int(port)))
             dron_data = {'ID': self.dron_id, 'Alias': self.alias}
+
+            # Cargar clave pública de la base de datos
+            key_document = self.db.Claves.find_one({'ID': self.dron_id})
+            if key_document is None:
+                raise ValueError(f"No se encontró la clave para el dron ID {self.dron_id}")
+
+            public_key_data = key_document['PublicKey']
+            self.public_key = serialization.load_pem_public_key(
+                public_key_data.encode() if isinstance(public_key_data, str) else public_key_data,
+                backend=default_backend()
+            )
 
             # Cifrar los datos
             encrypted_data = self.public_key.encrypt(
@@ -435,7 +469,7 @@ class ADDrone(threading.Thread):
             response = registry_socket.recv(1024).decode()
             response_json = json.loads(response)
             registry_socket.close()
-            
+
             if self.id_exists(self.dron_id):
                 print("ID de dron ya existe. Introduce un ID diferente.")
                 return
@@ -443,7 +477,7 @@ class ADDrone(threading.Thread):
                 self.access_token = response_json.get('token', '')
                 self.registered_drones[self.dron_id] = self.access_token
                 print(f"Registro exitoso del dron {self.dron_id}.")
-                
+
                 full_message = {
                     'type': 'register',
                     'ID': self.dron_id,
@@ -458,6 +492,7 @@ class ADDrone(threading.Thread):
             print("Error: El registro no está funcionando. Por favor, inicia el módulo de registro.")
         except Exception as e:
             print(f"Error inesperado: {e}")
+
             
                    
     def register_via_api(self):
@@ -520,6 +555,8 @@ class ADDrone(threading.Thread):
         if not (self.dron_id and self.alias and self.access_token):
             print("Es necesario registrarse y obtener un token antes de unirse al show.")
             return
+
+        self.initialize_db()
 
         headers = {'Authorization': f'Bearer {self.access_token}'}
         waiting_for_figure = True
@@ -667,6 +704,10 @@ class ADDrone(threading.Thread):
         if self.is_token_expired():
             print("Token expirado, obteniendo uno nuevo...")
             self.get_jwt_token()
+            
+    def get_drone_db(self, drone_id):
+        return self.mongo_client[f'dronedb_{drone_id}']
+
         
     def take_over_drone(self):
         print("Seleccionando un dron existente para controlar...")
@@ -691,18 +732,20 @@ class ADDrone(threading.Thread):
                 print("Selección inválida.")
         except ValueError:
             print("Por favor, introduce un número válido.")
+
             
-    def load_drones_keys(self,drone_id):
+    def load_drones_keys(self, drone_id):
         try:
-            key_document = self.db.Claves.find_one({'ID': drone_id})
+            db = self.get_drone_db(drone_id)
+            key_document = db.Claves.find_one({'ID': drone_id})
             if key_document:
                 self.private_key = serialization.load_pem_private_key(
-                    key_document['PrivateKey'],
+                    key_document['PrivateKey'].encode() if isinstance(key_document['PrivateKey'], str) else key_document['PrivateKey'],
                     password=None,
                     backend=default_backend()
                 )
                 self.public_key = serialization.load_pem_public_key(
-                    key_document['PublicKey'],
+                    key_document['PublicKey'].encode() if isinstance(key_document['PublicKey'], str) else key_document['PublicKey'],
                     backend=default_backend()
                 )
                 print(f"Claves cargadas para el dron ID {drone_id}")
@@ -711,22 +754,52 @@ class ADDrone(threading.Thread):
         except Exception as e:
             print(f"Error al cargar claves para el dron ID {drone_id}: {e}")
 
+
     def list_drones_in_db(self):
         try:
-            drones = list(self.db.drones.find({}, {'ID': 1, 'Alias': 1}))
-            return [{'ID': drone['ID'], 'Alias': drone.get('Alias', 'Sin alias')} for drone in drones]
+            # Obtener todas las bases de datos en MongoDB
+            databases = self.mongo_client.list_database_names()
+            
+            # Filtrar las bases de datos que comienzan con "dronedb_"
+            dronedb_databases = [db for db in databases if db.startswith("dronedb_")]
+
+            drones = []
+            for db_name in dronedb_databases:
+                db = self.mongo_client[db_name]
+                drone_info = db.drones.find_one({}, {'ID': 1, 'Alias': 1})
+                if drone_info:
+                    drones.append({
+                        'ID': drone_info['ID'],
+                        'Alias': drone_info.get('Alias', 'Sin alias')
+                    })
+
+            return drones
         except Exception as e:
             print(f"Error al listar drones: {e}")
             return []
+
     
     def cleanbd(self):
         try:
-            self.db.Claves.delete_many({})
-            self.db.MensajesKafka.delete_many({})
-            self.db.drones.delete_many({})
-            print("Base de datos limpiada.")
+            # Obtener todas las bases de datos en MongoDB
+            databases = self.mongo_client.list_database_names()
+            
+            # Filtrar las bases de datos que comienzan con "dronedb_" o son exactamente "dronedb"
+            dronedb_databases = [db for db in databases if db.startswith("dronedb_") or db == "dronedb"]
+            
+            for db_name in dronedb_databases:
+                if db_name == "dronedb":
+                    # Obtener todas las colecciones en la base de datos "dronedb"
+                    collections = self.mongo_client[db_name].list_collection_names()
+                    for collection in collections:
+                        if collection != "users":
+                            self.mongo_client[db_name].drop_collection(collection)
+                else:
+                    self.mongo_client.drop_database(db_name)
+
         except Exception as e:
-            print(f"Error al limpiar la base de datos: {e}")
+            print(f"Error al limpiar las bases de datos: {e}")
+
     
     #TODO: Implementar el método de auditoría      
     def log_auditoria(self, evento, descripcion, tipo):
@@ -735,7 +808,7 @@ class ADDrone(threading.Thread):
                 'evento': evento,
                 'descripcion': descripcion,
                 'timestamp': time.strftime("%Y-%m-%d %H:%M:%S"),
-                'tipo':tipo
+                'tipo': tipo
             }
             response = requests.post(f'{self.api_address}/auditoria', json=data, verify=False)
             if response.status_code == 201:
@@ -744,7 +817,7 @@ class ADDrone(threading.Thread):
                 print(f"Error al registrar evento de auditoría: {response.text}")
         except requests.exceptions.RequestException as e:
             print(f"Error de conexión al registrar evento de auditoría: {e}")
-           
+            
     def show_menu(self):
         options = {
             "1": self.input_drone_data,

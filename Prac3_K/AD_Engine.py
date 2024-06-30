@@ -97,14 +97,21 @@ class ADEngine:
             if private_key is None:
                 raise ValueError(f"No se pudo cargar la clave privada para el dron {drone_id}")
 
-            decrypted_data = private_key.decrypt(
-                encrypted_data,
-                padding.OAEP(
-                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                    algorithm=hashes.SHA256(),
-                    label=None
+            try:
+                decrypted_data = private_key.decrypt(
+                    encrypted_data,
+                    padding.OAEP(
+                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                        algorithm=hashes.SHA256(),
+                        label=None
+                    )
                 )
-            )
+            except Exception as decryption_error:
+                # Registrar intento fallido de descifrado
+                self.log_auditoria('DECRYPTION_FAILED', f"Fallo en el descifrado de datos para el dron {drone_id}: {decryption_error}")
+                client_socket.send(json.dumps({'status': 'error', 'message': 'Decryption failed'}).encode('utf-8'))
+                return
+
             self.db.MensajesKafka.insert_one({
                 'DroneID': drone_id,
                 'Type': 'Incoming a ADEngine',
@@ -112,7 +119,7 @@ class ADEngine:
                 'DecryptedMessage': decrypted_data.decode('utf-8')
             })
 
-            #Procesar datos descifrados
+            # Procesar datos descifrados
             request_json = json.loads(decrypted_data.decode('utf-8'))
             print(f"Datos recibidos del dron {drone_id}: {request_json}")
 
@@ -133,37 +140,107 @@ class ADEngine:
             else:
                 print(f"Received unknown action from drone: {request_json.get('action')}")
                 response = {'status': 'error', 'message': 'Unknown action'}
-            
+
             client_socket.send(json.dumps(response).encode('utf-8'))
 
         except Exception as e:
             print(f"Error al manejar la conexión del dron: {e}")
         finally:
             client_socket.close()
-        
+
+
     def load_drone_keys(self, drone_id):
-        #Cargar la clave privada del dron desde MongoDB
-        try:            
-            #obtener la clave privada del dron
-            key_document = self.db.Claves.find_one({'ID': drone_id})
-            
-            #Comprobar si se encontró el documento
+        try:
+            # Conectar a la base de datos específica del dron
+            db = self.client[f'dronedb_{drone_id}']
+
+            # Obtener la clave privada del dron desde la colección 'Claves'
+            key_document = db.Claves.find_one({'ID': drone_id})
+
+            # Comprobar si se encontró el documento
             if key_document is None:
                 print(f"No se encontró la clave para el dron ID {drone_id}")
                 return None
-            
-            #Cargar la clave privada desde el documento
+
+            # Cargar la clave privada desde el documento
             private_key_data = key_document['PrivateKey']
             private_key = serialization.load_pem_private_key(
-                private_key_data,
+                private_key_data.encode() if isinstance(private_key_data, str) else private_key_data,
                 password=None,
                 backend=default_backend()
             )
             return private_key
-
         except Exception as e:
-            print(f"Error al cargar clave privada: {e}")
+            print(f"Error al cargar clave privada para el dron {drone_id}: {e}")
             return None
+
+
+    def start_kafka_consumer(self):
+        consumer = KafkaConsumer(
+            'drone_position_reached',
+            bootstrap_servers=self.broker_address,
+            auto_offset_reset='latest',
+            enable_auto_commit=True,
+            group_id='engine-group',
+            key_deserializer=lambda x: x.decode('utf-8') if x else None,
+            value_deserializer=lambda x: x.decode('utf-8') if x else None,
+            ssl_cafile='ssl/certificado_CA.crt',
+            ssl_certfile='ssl/certificado_registry.crt',
+            ssl_keyfile='ssl/clave_privada_registry.pem'
+        )
+
+        for message in consumer:
+            try:
+                # Convertir el dron_id a entero
+                dron_id = int(message.key) if message.key and message.key.isdigit() else None
+                if dron_id is None:
+                    print(f"ID de dron inválido: {message.key}")
+                    continue
+
+                # Decodificar y descifrar
+                private_key = self.load_drone_keys(dron_id)
+                if private_key is None:
+                    print(f"Clave privada no encontrada para el dron ID {dron_id}")
+                    continue
+
+                encrypted_data = base64.b64decode(message.value)
+                decrypted_data = private_key.decrypt(
+                    encrypted_data,
+                    padding.OAEP(
+                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                        algorithm=hashes.SHA256(),
+                        label=None
+                    )
+                )
+                message_data = json.loads(decrypted_data.decode('utf-8'))
+
+                # Asegurarnos de que message_data es un diccionario
+                if not isinstance(message_data, dict):
+                    print(f"Formato inesperado de mensaje: {message_data}")
+                    continue
+
+                # Procesar el mensaje si es del tipo esperado
+                if message_data.get('type') == 'position_reached':
+                    final_position = message_data.get('final_position')
+                    if final_position is not None:
+                        self.handle_drone_position_reached(dron_id, final_position)
+                    else:
+                        print(f"Posición final no encontrada en el mensaje: {message_data}")
+                else:
+                    print(f"Tipo de mensaje no reconocido: {message_data.get('type')}")
+
+            except json.JSONDecodeError:
+                print("Error al decodificar el mensaje JSON.")
+            except TypeError as e:
+                print(f"Error en el formato del mensaje: {e}. Se esperaba un diccionario.")
+            except KeyError as e:
+                print(f"Clave no encontrada en el mensaje: {e}. Mensaje recibido: {message_data}")
+            except Exception as e:
+                print(f"Error inesperado al procesar el mensaje de Kafka: {e}")
+
+
+
+
         
     def encrypted_message(self, topic, message):
         try:
@@ -440,70 +517,7 @@ class ADEngine:
         self.server_socket.close()
         self.kafka_producer.close()
         print("AD_Engine ha cerrado todos los recursos.")
-        
-    
-    def start_kafka_consumer(self):
-        consumer = KafkaConsumer(
-            'drone_position_reached',
-            bootstrap_servers=self.broker_address,
-            auto_offset_reset='latest',
-            enable_auto_commit=True,
-            group_id='engine-group',
-            key_deserializer=lambda x: x.decode('utf-8') if x else None,
-            value_deserializer=lambda x: x.decode('utf-8') if x else None,
-            ssl_cafile='ssl/certificado_CA.crt',
-            ssl_certfile='ssl/certificado_registry.crt',
-            ssl_keyfile='ssl/clave_privada_registry.pem'
-        )
-
-        for message in consumer:
-            try:
-                # Convertir el dron_id a entero
-                dron_id = int(message.key) if message.key and message.key.isdigit() else None
-                if dron_id is None:
-                    print(f"ID de dron inválido: {message.key}")
-                    continue
-
-                # Decodificar y descifrar
-                private_key = self.load_drone_keys(dron_id)
-                if private_key is None:
-                    print(f"Clave privada no encontrada para el dron ID {dron_id}")
-                    continue
-
-                encrypted_data = base64.b64decode(message.value)
-                decrypted_data = private_key.decrypt(
-                    encrypted_data,
-                    padding.OAEP(
-                        mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                        algorithm=hashes.SHA256(),
-                        label=None
-                    )
-                )
-                message_data = json.loads(decrypted_data.decode('utf-8'))
-
-                # Asegurarnos de que message_data es un diccionario
-                if not isinstance(message_data, dict):
-                    print(f"Formato inesperado de mensaje: {message_data}")
-                    continue
-
-                # Procesar el mensaje si es del tipo esperado
-                if message_data.get('type') == 'position_reached':
-                    final_position = message_data.get('final_position')
-                    if final_position is not None:
-                        self.handle_drone_position_reached(dron_id, final_position)
-                    else:
-                        print(f"Posición final no encontrada en el mensaje: {message_data}")
-                else:
-                    print(f"Tipo de mensaje no reconocido: {message_data.get('type')}")
-
-            except json.JSONDecodeError:
-                print("Error al decodificar el mensaje JSON.")
-            except TypeError as e:
-                print(f"Error en el formato del mensaje: {e}. Se esperaba un diccionario.")
-            except KeyError as e:
-                print(f"Clave no encontrada en el mensaje: {e}. Mensaje recibido: {message_data}")
-            except Exception as e:
-                print(f"Error inesperado al procesar el mensaje de Kafka: {e}")
+           
                 
     def load_next_figure(self):
         self.indice_figura_actual += 1

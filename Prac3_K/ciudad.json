@@ -1,7 +1,7 @@
 {
     "coord": {
-        "lon": -0.4815,
-        "lat": 38.3452
+        "lon": -0.5658,
+        "lat": 38.1917
     },
     "weather": [
         {
@@ -13,31 +13,33 @@
     ],
     "base": "stations",
     "main": {
-        "temp": 296.85,
-        "feels_like": 296.87,
-        "temp_min": 294.9,
-        "temp_max": 300.32,
-        "pressure": 1011,
-        "humidity": 61
+        "temp": 301.36,
+        "feels_like": 303.16,
+        "temp_min": 299.63,
+        "temp_max": 302.87,
+        "pressure": 1014,
+        "humidity": 62,
+        "sea_level": 1014,
+        "grnd_level": 1015
     },
     "visibility": 10000,
     "wind": {
-        "speed": 4.63,
-        "deg": 170
+        "speed": 3.09,
+        "deg": 90
     },
     "clouds": {
         "all": 0
     },
-    "dt": 1716376803,
+    "dt": 1719738257,
     "sys": {
         "type": 2,
-        "id": 2093430,
+        "id": 2001966,
         "country": "ES",
-        "sunrise": 1716353119,
-        "sunset": 1716405133
+        "sunrise": 1719722541,
+        "sunset": 1719775761
     },
     "timezone": 7200,
-    "id": 2521978,
-    "name": "Alicante",
+    "id": 2511102,
+    "name": "Santa Pola",
     "cod": 200
 }

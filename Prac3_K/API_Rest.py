@@ -150,15 +150,13 @@ def create_app(mongo_address, kafka_address):
     ###### KAFKA ######
     def load_drone_keys(drone_id):
         try:
-            # Obtener la clave privada del dron desde MongoDB
+            db = client[f'dronedb_{drone_id}']
             key_document = db.Claves.find_one({'ID': drone_id})
-            
-            # Comprobar si se encontró el documento
+
             if key_document is None:
                 print(f"No se encontró la clave para el dron ID {drone_id}")
                 return None
-            
-            # Cargar la clave privada desde el documento
+
             private_key_data = key_document['PrivateKey']
             private_key = serialization.load_pem_private_key(
                 private_key_data.encode(),
@@ -169,6 +167,7 @@ def create_app(mongo_address, kafka_address):
         except Exception as e:
             print(f"Error al cargar clave privada: {e}")
             return None
+
         
     def load_engine_keys():
         try:
@@ -192,7 +191,32 @@ def create_app(mongo_address, kafka_address):
             print(f"Error al cargar clave privada: {e}")
             return None
 
-    
+    @app.route('/position_update', methods=['POST'])
+    def position_update():
+        try:
+            data = request.json
+            drone_id = data.get('ID')
+            position = data.get('Position')
+
+            if not drone_id or not position:
+                return jsonify({'error': 'Faltan datos necesarios'}), 400
+
+            # Actualizar la posición del dron en la base de datos
+            db = client[f'dronedb_{drone_id}']
+            db.Posiciones.update_one(
+                {'ID': drone_id},
+                {'$set': {'Position': position}},
+                upsert=True
+            )
+
+            # También actualizar en el diccionario global si es necesario
+            drone_positions[drone_id] = position
+
+            return jsonify({'status': 'success'}), 200
+        except Exception as e:
+            logging.error(f"Error al actualizar la posición del dron: {e}")
+            return jsonify({'error': str(e)}), 500
+
     
     
     def kafka_listener():
@@ -260,6 +284,51 @@ def create_app(mongo_address, kafka_address):
         auditoria_logger.info('Evento específico en /get_final_drone_positions')
         
         return jsonify(final_drone_positions)
+    
+    @app.route('/update_drone_status', methods=['POST'])
+    def update_drone_status():
+        try:
+            data = request.json
+            drone_id = data.get('ID')
+            status = data.get('Status')
+
+            if not drone_id or not status:
+                return jsonify({'error': 'Faltan datos necesarios'}), 400
+
+            # Actualizar el estado del dron en la base de datos
+            db = client[f'dronedb_{drone_id}']
+            db.Status.update_one(
+                {'ID': drone_id},
+                {'$set': {'Status': status}},
+                upsert=True
+            )
+
+            return jsonify({'status': 'success'}), 200
+        except Exception as e:
+            logging.error(f"Error al actualizar el estado del dron: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/get_drone_positions', methods=['GET'])
+    def get_drone_positions():
+        try:
+            positions = {}
+            # Obtener todas las bases de datos en MongoDB
+            databases = client.list_database_names()
+            for db_name in databases:
+                if db_name.startswith("dronedb_"):
+                    db = client[db_name]
+                    position_doc = db.Posiciones.find_one({}, {'ID': 1, 'Position': 1})
+                    status_doc = db.Status.find_one({}, {'ID': 1, 'Status': 1})
+                    if position_doc and status_doc:
+                        drone_id = str(position_doc['ID'])
+                        position = position_doc['Position']
+                        status = status_doc['Status']
+                        positions[drone_id] = [position[0], position[1], status]
+            return jsonify(positions), 200
+        except errors.PyMongoError as e:
+            return jsonify({'error': f'Error de base de datos: {e}'}), 500
+
+
 
     @app.route('/heartbeat', methods=['POST'])
     def handle_heartbeat():
@@ -277,10 +346,6 @@ def create_app(mongo_address, kafka_address):
             return jsonify({'status': 'success', 'message': f'Dron {drone_id} desconectado.'}), 200
         else:
             return jsonify({'status': 'error', 'message': 'Dron no encontrado.'}), 404
-
-    @app.route('/get_drone_positions', methods=['GET'])
-    def get_drone_positions():
-        return jsonify(drone_positions)
 
     def check_heartbeat():
         while True:
@@ -529,26 +594,51 @@ def create_app(mongo_address, kafka_address):
     def registro():
         try:
             data = request.json
-            Alias = data.get('Alias', '').strip()  # Usar 'Alias' con mayúscula
-            drone_id = int(data.get('ID')) # Obtener el ID proporcionado
+            Alias = data.get('Alias', '').strip()
+            drone_id = int(data.get('ID'))
 
             if not Alias or not drone_id:
                 return jsonify({'error': 'Falta el Alias o el ID del dron'}), 400
 
             # Verificar si el ID ya existe
-            if db.drones.find_one({'ID': drone_id}):
+            if client[f'dronedb_{drone_id}'].drones.find_one({'ID': drone_id}):
                 return jsonify({'error': 'El ID ya existe'}), 409
-            
+
+            # Crear la base de datos específica para el dron
+            db = client[f'dronedb_{drone_id}']
+
             new_drone = {
-                '_id': ObjectId(),  # Generar ObjectId automáticamente
+                '_id': ObjectId(),
                 'type': 'register',
-                'ID': drone_id,  # Usar el ID proporcionado
+                'ID': drone_id,
                 'Alias': Alias,
                 'InitialPosition': [1, 1]
             }
 
             db.drones.insert_one(new_drone)
             auditoria_logger.info('Evento específico en /registro_dron')
+
+            # Generar claves privada y pública
+            private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048, backend=default_backend())
+            public_key = private_key.public_key()
+
+            # Convertir las claves a formato PEM
+            private_key_pem = private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption()
+            )
+            public_key_pem = public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+
+            key_document = {
+                'ID': drone_id,
+                'PrivateKey': private_key_pem,
+                'PublicKey': public_key_pem
+            }
+            db.Claves.replace_one({'ID': drone_id}, key_document, upsert=True)
 
             return jsonify({'status': 'success', 'drone_id': drone_id}), 201
         except errors.PyMongoError as e:
@@ -558,10 +648,26 @@ def create_app(mongo_address, kafka_address):
     @app.route('/listar_drones', methods=['GET'])
     def listar_drones():
         try:
-            drones = list(db.drones.find({}, {'ID': 1, 'alias': 1}))
-            return jsonify([{'ID': str(drone['ID']), 'Alias': drone.get('Alias', 'Sin alias')} for drone in drones])
+            # Obtener todas las bases de datos en MongoDB
+            databases = client.list_database_names()
+            
+            # Filtrar las bases de datos que comienzan con "dronedb_"
+            dronedb_databases = [db for db in databases if db.startswith("dronedb_")]
+
+            drones = []
+            for db_name in dronedb_databases:
+                db = client[db_name]
+                drone_info = db.drones.find_one({}, {'ID': 1, 'Alias': 1})
+                if drone_info:
+                    drones.append({
+                        'ID': str(drone_info['ID']),
+                        'Alias': drone_info.get('Alias', 'Sin alias')
+                    })
+
+            return jsonify(drones), 200
         except errors.PyMongoError as e:
-            return error_response(f'Error de base de datos: {e}', 500)
+            return jsonify({'error': f'Error de base de datos: {e}'}), 500
+
 
 
     @app.route('/modificar_dron/<drone_id>', methods=['PUT'])
@@ -583,18 +689,24 @@ def create_app(mongo_address, kafka_address):
     def borrar_dron(drone_id):
         try:
             if drone_id == "-1":
-                # Borrar todos los drones
-                result = db.drones.delete_many({})
-                return jsonify({'message': f'{result.deleted_count} drones eliminados correctamente'}), 200
+                # Borrar todas las bases de datos de drones
+                databases = client.list_database_names()
+                for db_name in databases:
+                    if db_name.startswith('dronedb_'):
+                        client.drop_database(db_name)
+                return jsonify({'message': 'Todas las bases de datos de drones eliminadas correctamente'}), 200
             else:
-                #Borrar un solo dron
-                result = db.drones.delete_one({'ID': int(drone_id)})
-                if result.deleted_count == 0:
-                    return error_response('Dron no encontrado', 404)
-                auditoria_logger.info('Evento específico en /borrar_dron/<drone_id>')
-                return jsonify({'message': 'Dron eliminado correctamente'}), 200
+                # Borrar base de datos específica de un solo dron
+                db_name = f'dronedb_{drone_id}'
+                if db_name in client.list_database_names():
+                    client.drop_database(db_name)
+                    auditoria_logger.info(f'Base de datos {db_name} eliminada')
+                    return jsonify({'message': f'Base de datos {db_name} eliminada correctamente'}), 200
+                else:
+                    return jsonify({'error': 'Dron no encontrado'}), 404
         except errors.PyMongoError as e:
             return jsonify({'error': str(e)}), 500
+
 
     @app.route('/borrar_drones', methods=['POST'])
     def borrar_drones():
@@ -605,29 +717,19 @@ def create_app(mongo_address, kafka_address):
             if not drone_ids:
                 return jsonify({'message': 'No se proporcionaron IDs de drones'}), 400
 
-            # Elimina cada dron por su ID
+            # Elimina cada dron por su ID y su base de datos correspondiente
             for drone_id in drone_ids:
-                db.drones.delete_one({'ID': int(drone_id)})
+                # Eliminar el documento del dron en la base de datos principal
+                client.dronedb.drones.delete_one({'ID': int(drone_id)})
+                
+                # Eliminar la base de datos específica del dron
+                db_name = f'dronedb_{drone_id}'
+                if db_name in client.list_database_names():
+                    client.drop_database(db_name)
 
-            return jsonify({'message': f'Drones eliminados correctamente'}), 200
+            return jsonify({'message': 'Drones y sus bases de datos eliminados correctamente'}), 200
         except errors.PyMongoError as e:
             return jsonify({'error': str(e)}), 500
-        
-        
-    @app.route('/unir_drones_al_show', methods=['POST'])
-    def unir_drones_al_show():
-        data = request.json
-        drone_ids = data.get('drone_ids')
-
-        if not drone_ids:
-            return jsonify({'message': 'No se proporcionaron IDs de drones'}), 400
-
-        for drone_id in drone_ids:
-            kafka_producer.send(
-                'drone_messages_topic', 
-                {'type': 'instruction', 'dron_id': drone_id, 'instruction': 'join_show'}
-            )
-        return jsonify({'message': f'Drones {drone_ids} invitados a unirse al show'}), 200
 
 
     threading.Thread(target=kafka_listener, daemon=True).start()
